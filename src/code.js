@@ -337,7 +337,7 @@
     const CANVAS_OFFSET = 58
     const MENU_FULL_MIN_SIZE = 600
     const MENU_WIDTH = {
-        true: 230,
+        true: 240,
         false: 60
     }
     const MENU_X0 = 10
