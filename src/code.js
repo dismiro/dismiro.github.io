@@ -729,14 +729,17 @@
     }
     Block.prototype.DrawCondition = function(ctx, x0, y0, scale) {
         ctx.beginPath()
-        ctx.moveTo(this.x * scale + x0, (this.top - this.height) * scale + y0)
-        ctx.lineTo((this.x + this.height) * scale + x0, (this.top - this.height) * scale + y0)
-        ctx.lineTo((this.x + this.height - 20) * scale + x0, this.top * scale + y0)
-        ctx.lineTo(this.right * scale + x0, this.top * scale + y0)
-        ctx.lineTo(this.right * scale + x0, (this.bottom) * scale + y0)
-        ctx.lineTo(this.left * scale + x0, this.bottom * scale + y0)
-        ctx.lineTo(this.left * scale + x0, this.top * scale + y0)
-        ctx.lineTo((this.x - 20)  * scale + x0, this.top * scale + y0)
+ 		let dx = this.isMenuBlock ? 10 : 20
+        let dy = this.isMenuBlock ? 8 : this.height
+        let dy2 = this.isMenuBlock ? 5 : 0
+        ctx.moveTo((this.x) * scale + x0, (this.top - dy) * scale + y0)
+        ctx.lineTo((this.x  + this.height) * scale + x0, (this.top - dy) * scale + y0)
+        ctx.lineTo((this.x + this.height- dx) * scale + x0, (this.top + dy2) * scale + y0)
+        ctx.lineTo(this.right * scale + x0, (this.top + dy2) * scale + y0)
+        ctx.lineTo(this.right * scale + x0, (this.bottom + dy2) * scale + y0)
+        ctx.lineTo(this.left * scale + x0, (this.bottom + dy2) * scale + y0)
+        ctx.lineTo(this.left * scale + x0, (this.top + dy2) * scale + y0)
+        ctx.lineTo((this.x - dx)  * scale + x0, (this.top + dy2) * scale + y0)
         ctx.closePath()
         ctx.stroke()
         ctx.fill()
