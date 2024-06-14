@@ -938,11 +938,6 @@
         ctx.stroke()
         ctx.fill()
     }
-    Block.prototype.DrawLabelText = function(ctx, text, x, y, align) {
-        ctx.fillStyle = BLOCK_LINE_COLOR[DARK_THEME]
-        ctx.textAlign = align
-        ctx.fillText(text, x, y)
-    }
     Block.prototype.GetHorizontalCursorPosition = function(index, offset, ctx, x0, scale) {
         let width = ctx.measureText(this.field.texts[index].substr(0, offset)).width
         if (this.textAlign == LEFT_TEXT_ALIGN) return (this.left + this.GetTextOffset() + GRID_SIZE / 2) * scale + width + x0
@@ -991,21 +986,6 @@
             ctx.fillText(this.field.texts[index].substr(offsetLeft, offsetRight - offsetLeft), x1, y)
         }
     }
-    Block.prototype.DrawLabels = function(ctx, x0, y0, scale) {
-        ctx.font = (BLOCK_FONT_SIZE * scale) + 'px ' + BLOCK_FONT
-        if (this.labelsPosition == 3) {
-            this.DrawLabelText(ctx, 'да', (this.right + 5) * scale + x0, (this.y - BLOCK_TEXT_HEIGHT) * scale + y0, 'right')
-            this.DrawLabelText(ctx, 'нет', (this.x + 5) * scale + x0, (this.bottom + BLOCK_TEXT_HEIGHT) * scale + y0, 'left')
-            return
-        }
-        if (this.labelsPosition == 4) {
-            this.DrawLabelText(ctx, 'нет', (this.right + 5) * scale + x0, (this.y - BLOCK_TEXT_HEIGHT) * scale + y0, 'right')
-            this.DrawLabelText(ctx, 'да', (this.x + 5) * scale + x0, (this.bottom + BLOCK_TEXT_HEIGHT) * scale + y0, 'left')
-            return
-        }
-        this.DrawLabelText(ctx, this.labelsPosition == 2 ? 'да' : 'нет', (this.left - 5) * scale + x0, (this.y - BLOCK_TEXT_HEIGHT) * scale + y0, 'left')
-        this.DrawLabelText(ctx, this.labelsPosition == 2 ? 'нет' : 'да', (this.right + 5) * scale + x0, (this.y - BLOCK_TEXT_HEIGHT) * scale + y0, 'right')
-    }
     Block.prototype.DrawText = function(ctx, x0, y0, scale) {
         ctx.fillStyle = BLOCK_LINE_COLOR[DARK_THEME]
         ctx.textAlign = this.textAlign
@@ -1018,9 +998,6 @@
         if (this.field.isEdit) {
             this.DrawSelection(ctx, x0, y0, scale)
             this.DrawCursor(ctx, x0, y0, scale)
-        }
-        if (this.type == CONDITION_TYPE && this.labelsPosition != 0) {
-            this.DrawLabels(ctx, x0, y0, scale)
         }
     }
     Block.prototype.DrawResizePoint = function(ctx, x0, y0, scale, point) {
