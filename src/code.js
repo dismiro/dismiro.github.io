@@ -731,7 +731,7 @@
         ctx.beginPath()
         ctx.moveTo(this.x * scale + x0, (this.top - this.height) * scale + y0)
         ctx.lineTo((this.x + this.height) * scale + x0, (this.top - this.height) * scale + y0)
-        ctx.lineTo((this.x + this.height + 20) * scale + x0, this.top * scale + y0)
+        ctx.lineTo((this.x + this.height - 20) * scale + x0, this.top * scale + y0)
         ctx.lineTo(this.right * scale + x0, this.top * scale + y0)
         ctx.lineTo(this.right * scale + x0, (this.bottom) * scale + y0)
         ctx.lineTo(this.left * scale + x0, this.bottom * scale + y0)
