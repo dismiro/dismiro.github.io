@@ -701,10 +701,10 @@
     }
     Block.prototype.InitConnectors = function() {
         this.connectors = []
-        this.connectors[TOP_CONNECTOR] = new Connector(this, 0, -0.5)
-        this.connectors[RIGHT_CONNECTOR] = new Connector(this, 0.5, 0)
-        this.connectors[BOTTOM_CONNECTOR] = new Connector(this, 0, 0.5)
-        this.connectors[LEFT_CONNECTOR] = new Connector(this, -0.5, 0)
+        // this.connectors[TOP_CONNECTOR] = new Connector(this, 0, -0.5)
+        // this.connectors[RIGHT_CONNECTOR] = new Connector(this, 0.5, 0)
+        // this.connectors[BOTTOM_CONNECTOR] = new Connector(this, 0, 0.5)
+        // this.connectors[LEFT_CONNECTOR] = new Connector(this, -0.5, 0)
     }
     Block.prototype.UpdateConnectors = function() {
         for (let i = 0; i < this.connectors.length; i++) this.connectors[i].Update()
@@ -729,10 +729,14 @@
     }
     Block.prototype.DrawCondition = function(ctx, x0, y0, scale) {
         ctx.beginPath()
-        ctx.moveTo(this.x * scale + x0, this.top * scale + y0)
-        ctx.lineTo(this.right * scale + x0, this.y * scale + y0)
-        ctx.lineTo(this.x * scale + x0, this.bottom * scale + y0)
-        ctx.lineTo(this.left * scale + x0, this.y * scale + y0)
+        ctx.moveTo((this.x + 10) * scale + x0, (this.top - this.height/2) * scale + y0)
+        ctx.lineTo((this.x + 10 + 15) * scale + x0, (this.top - this.height/2) * scale + y0)
+        ctx.lineTo((this.x + 10 - 15) * scale + x0, this.top * scale + y0)
+        ctx.lineTo(this.right * scale + x0, this.top * scale + y0)
+        ctx.lineTo(this.right * scale + x0, (this.bottom) * scale + y0)
+        ctx.lineTo(this.left * scale + x0, this.bottom * scale + y0)
+        ctx.lineTo(this.left * scale + x0, this.top * scale + y0)
+        ctx.lineTo((this.x + 10 - 15 - 15 )  * scale + x0, this.top * scale + y0)
         ctx.closePath()
         ctx.stroke()
         ctx.fill()
@@ -2009,11 +2013,11 @@
         return icons
     }
     Diagram.prototype.InitIcons = function() {
-        this.keyboardIcons = []
-        this.keyboardIcons.push(document.getElementById("keyboard-dark"))
-        this.keyboardIcons.push(document.getElementById("keyboard"))
-        this.keyboardIcons.push(document.getElementById("keyboard-active-dark"))
-        this.keyboardIcons.push(document.getElementById("keyboard-active"))
+        this.keyboardIcons = this.GetIcons('keyboard')
+        // this.keyboardIcons.push(document.getElementById("keyboard-dark"))
+        // this.keyboardIcons.push(document.getElementById("keyboard"))
+        // this.keyboardIcons.push(document.getElementById("keyboard-active-dark"))
+        // this.keyboardIcons.push(document.getElementById("keyboard-active"))
         let jsonIcons = this.GetIcons('download', 3)
         let pngIcons = this.GetIcons('image', 3)
         let areasIcons = this.GetIcons('areas', 3)
@@ -2031,14 +2035,14 @@
         let blockIcons = this.GetIcons('block', 2)
         let arrowIcons = this.GetIcons('arrow', 2)
         this.infoIcons = [blockIcons, arrowIcons, zoomOutIcons, zoomInIcons]
-        let editIcons = this.GetIcons('edit')
-        let boldIcons = this.GetIcons('bold')
-        let italicIcons = this.GetIcons('italic')
-        let increaseIcons = this.GetIcons('increase-font')
-        let decreaseIcons = this.GetIcons('decrease-font')
-        let leftAlignIcons = this.GetIcons('left-align')
-        let centerAlignIcons = this.GetIcons('center-align')
-        let changeIcons = this.GetIcons('change')
+        // let editIcons = this.GetIcons('edit')
+        // let boldIcons = this.GetIcons('bold')
+        // let italicIcons = this.GetIcons('italic')
+        // let increaseIcons = this.GetIcons('increase-font')
+        // let decreaseIcons = this.GetIcons('decrease-font')
+        // let leftAlignIcons = this.GetIcons('left-align')
+        // let centerAlignIcons = this.GetIcons('center-align')
+        // let changeIcons = this.GetIcons('change')
         this.rightItems = ['edit', 'left-align', 'center-align', 'bold', 'italic', 'increase-font', 'decrease-font', 'change']
         this.rightIcons = this.GetIconsForItems(this.rightItems)
         this.rightHints = ['Редактирование', 'Выравнивание по левому краю', 'Выравнивание по центру', 'Жирность', 'Курсив', 'Увеличение размера шрифта', 'Уменьшение размера шрифта', 'Смените метки']
@@ -2082,7 +2086,7 @@
             e.returnValue = ' ';
             return ' '
         }
-        let touchEvents = new TouchEvents(this)
+        // let touchEvents = new TouchEvents(this)
         this.canvas.ondragover = function(e) {
             diagram.DragOver(e);
             return false
