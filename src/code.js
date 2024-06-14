@@ -2645,25 +2645,6 @@
         arrow.TraceTo(block2, block2.connectors[connector2], this.blocks, this.arrows)
         return arrow
     }
-    Diagram.prototype.InsertTemplateById = function(index, x, y) {
-        if (this.IsMouseInMenu(x) || this.IsMouseInRightMenu(x, y) || this.IsMouseInKeyboardMenu(x, y)) return
-        this.SwitchToMode(BLOCK_MODE)
-        x = (x - this.x0) / this.scale
-        y = (y - this.y0) / this.scale
-        if (index == 0) {
-            this.InsertForLoopTemplate(x, y)
-        } else if (index == 1) {
-            this.InsertWhileLoopTemplate(x, y)
-        } else if (index == 2) {
-            this.InsertForInForTemplate(x, y)
-        } else if (index == 3) {
-            this.InsertConditionTemplate(x, y)
-        } else if (index == 4) {
-            this.InsertSwitchTemplate(x, y)
-        } else if (index == 5) {
-            this.InsertProgramTemplate(x, y)
-        }
-    }
     Diagram.prototype.BlocksMenuAction = function() {
         let index = Math.floor((this.currPoint.y - BLOCKS_MENU_Y0 + BLOCKS_MENU_ITEM_PADDING) / (BLOCKS_MENU_BLOCK_HEIGHT + BLOCKS_MENU_DY))
         let x = MENU_WIDTH[this.isFullMenu] + INIT_BLOCK_X0 + BLOCK_WIDTHS[index] / 2 * this.scale
@@ -3864,9 +3845,7 @@
             this.DeleteKeyDownProcess()
             e.preventDefault()
         } else if (Number.isInteger(+e.key) && !this.isEdit && this.activeArrow == null && !this.isPressed) {
-            if ((e.ctrlKey || e.metaKey)) {
-                this.InsertTemplateById(+e.key - 1, this.currPoint.x, this.currPoint.y)
-            } else if (this.activeBlock != null && this.activeBlock.IsMouseHover(this.currRealPoint.x, this.currRealPoint.y)) {
+            if (this.activeBlock != null && this.activeBlock.IsMouseHover(this.currRealPoint.x, this.currRealPoint.y)) {
                 let index = +e.key - 1
                 if (index >= 0 && index < BLOCK_TYPES.length - 2) {
                     this.AddHistory(ACTION_CHANGE_TYPE, {
@@ -3980,104 +3959,6 @@
             fr.readAsText(files[0], encoding)
         }
         reader.readAsText(files[0])
-    }
-    Diagram.prototype.InsertForLoopTemplate = function(x, y) {
-        let block1 = new Block(x, y, '', 100, 40, FOR_LOOP_TYPE)
-        let block2 = new Block(x, y + GRID_SIZE * 2 + 40, '', 100, 40, BLOCK_TYPE)
-        let block3 = new Block(x, y + GRID_SIZE * 8 + 80, '', 100, 40, BLOCK_TYPE)
-        this.AddBlock(block1)
-        this.AddBlock(block2)
-        this.AddBlock(block3)
-        this.AddArrow(this.MakeArrow(block1, BOTTOM_CONNECTOR, block2, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block2, BOTTOM_CONNECTOR, block1, LEFT_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block1, RIGHT_CONNECTOR, block3, TOP_CONNECTOR))
-    }
-    Diagram.prototype.InsertWhileLoopTemplate = function(x, y) {
-        let block1 = new Block(x, y, '', 100, 40, BLOCK_TYPE)
-        let block2 = new Block(x, y + GRID_SIZE * 2 + 40, '', 100, 40, CONDITION_TYPE)
-        let block3 = new Block(x, y + GRID_SIZE * 4 + 80, '', 100, 40, BLOCK_TYPE)
-        let block4 = new Block(x, y + GRID_SIZE * 10 + 120, '', 100, 40, BLOCK_TYPE)
-        block2.labelsPosition = 0
-        this.AddBlock(block1)
-        this.AddBlock(block2)
-        this.AddBlock(block3)
-        this.AddBlock(block4)
-        this.AddArrow(this.MakeArrow(block1, BOTTOM_CONNECTOR, block2, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block2, BOTTOM_CONNECTOR, block3, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block3, BOTTOM_CONNECTOR, block2, LEFT_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block2, RIGHT_CONNECTOR, block4, TOP_CONNECTOR))
-    }
-    Diagram.prototype.InsertForInForTemplate = function(x, y) {
-        let block1 = new Block(x, y, '', 100, 40, FOR_LOOP_TYPE)
-        let block2 = new Block(x, y + GRID_SIZE * 2 + 40, '', 100, 40, BLOCK_TYPE)
-        let block3 = new Block(x, y + GRID_SIZE * 4 + 80, 'j от 1 до n', 100, 40, FOR_LOOP_TYPE)
-        let block4 = new Block(x, y + GRID_SIZE * 6 + 120, '', 100, 40, BLOCK_TYPE)
-        let block5 = new Block(x, y + GRID_SIZE * 12 + 160, '', 100, 40, BLOCK_TYPE)
-        let block6 = new Block(x, y + GRID_SIZE * 18 + 200, '', 100, 40, BLOCK_TYPE)
-        this.AddBlock(block1)
-        this.AddBlock(block2)
-        this.AddBlock(block3)
-        this.AddBlock(block4)
-        this.AddBlock(block5)
-        this.AddBlock(block6)
-        this.AddArrow(this.MakeArrow(block1, BOTTOM_CONNECTOR, block2, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block2, BOTTOM_CONNECTOR, block3, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block3, BOTTOM_CONNECTOR, block4, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block4, BOTTOM_CONNECTOR, block3, LEFT_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block3, RIGHT_CONNECTOR, block5, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block5, BOTTOM_CONNECTOR, block1, LEFT_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block1, RIGHT_CONNECTOR, block6, TOP_CONNECTOR))
-    }
-    Diagram.prototype.InsertConditionTemplate = function(x, y) {
-        let block1 = new Block(x, y, '', 100, 40, CONDITION_TYPE)
-        let block2 = new Block(x + 100, y + GRID_SIZE * 2 + 30, '', 100, 40, BLOCK_TYPE)
-        let block3 = new Block(x - 100, y + GRID_SIZE * 2 + 30, '', 100, 40, BLOCK_TYPE)
-        let block4 = new Block(x, y + GRID_SIZE * 4 + 100, '', 100, 40, BLOCK_TYPE)
-        block2.labelsPosition = 0
-        this.AddBlock(block1)
-        this.AddBlock(block2)
-        this.AddBlock(block3)
-        this.AddBlock(block4)
-        this.AddArrow(this.MakeArrow(block1, RIGHT_CONNECTOR, block2, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block1, LEFT_CONNECTOR, block3, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block2, BOTTOM_CONNECTOR, block4, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block3, BOTTOM_CONNECTOR, block4, TOP_CONNECTOR))
-    }
-    Diagram.prototype.InsertSwitchTemplate = function(x, y) {
-        let blocks = []
-        let n = 3
-        for (let i = 0; i < n; i++) {
-            blocks.push(new Block(x, y + i * (GRID_SIZE * 2 + 40), 'i == ' + (i + 1), 100, 40, CONDITION_TYPE))
-            blocks.push(new Block(x + GRID_SIZE * 4 + 100, y + i * (GRID_SIZE * 2 + 40), '', 100, 40, BLOCK_TYPE))
-            blocks.push(new Block(x + GRID_SIZE * 4 + 200, y + i * (GRID_SIZE * 2 + 40), '', 30, 30, LABEL_TYPE))
-            blocks[3 * i].labelsPosition = 0
-        }
-        blocks.push(new Block(x + GRID_SIZE * 4 + 100, y + n * (GRID_SIZE * 2 + 40), '', 100, 40, BLOCK_TYPE))
-        blocks.push(new Block(x + GRID_SIZE * 4 + 200, y + n * (GRID_SIZE * 2 + 40), '', 30, 30, LABEL_TYPE))
-        this.AddBlock(blocks[n * 3])
-        this.AddBlock(blocks[n * 3 + 1])
-        for (let i = 0; i < n; i++) {
-            this.AddBlock(blocks[3 * i])
-            this.AddBlock(blocks[3 * i + 1])
-            this.AddBlock(blocks[3 * i + 2])
-            this.AddArrow(this.MakeArrow(blocks[3 * i], RIGHT_CONNECTOR, blocks[3 * i + 1], LEFT_CONNECTOR))
-            this.AddArrow(this.MakeArrow(blocks[3 * i + 1], RIGHT_CONNECTOR, blocks[3 * i + 2], LEFT_CONNECTOR))
-            this.AddArrow(this.MakeArrow(blocks[3 * i], BOTTOM_CONNECTOR, blocks[3 * i + 3], i == n - 1 ? LEFT_CONNECTOR : TOP_CONNECTOR))
-        }
-        this.AddArrow(this.MakeArrow(blocks[3 * n], RIGHT_CONNECTOR, blocks[3 * n + 1], LEFT_CONNECTOR))
-    }
-    Diagram.prototype.InsertProgramTemplate = function(x, y) {
-        let block1 = new Block(x, y, 'начало', 100, 30, BEGIN_END_TYPE)
-        let block2 = new Block(x, y + GRID_SIZE * 2 + 40, 'вывод "Введите "', 140, 40, IN_OUT_TYPE)
-        let block3 = new Block(x, y + GRID_SIZE * 4 + 80, 'ввод ', 140, 40, IN_OUT_TYPE)
-        let block4 = new Block(x, y + GRID_SIZE * 16 + 120, 'конец ', 100, 30, BEGIN_END_TYPE)
-        this.AddBlock(block1)
-        this.AddBlock(block2)
-        this.AddBlock(block3)
-        this.AddBlock(block4)
-        this.AddArrow(this.MakeArrow(block1, BOTTOM_CONNECTOR, block2, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block2, BOTTOM_CONNECTOR, block3, TOP_CONNECTOR))
-        this.AddArrow(this.MakeArrow(block3, BOTTOM_CONNECTOR, block4, TOP_CONNECTOR))
     }
     Diagram.prototype.Clear = function(ctx, canvas, width, height) {
         ctx.fillStyle = BACKGROUND_COLOR[DARK_THEME]
