@@ -563,6 +563,7 @@
     }
     
     function Block(x, y, text, width, height, type = BLOCK_TYPE, isMenuBlock = false) {
+        this.speed = 0
         this.x = x
         this.y = y
         this.field = new TextField(text == '' && !isMenuBlock ? this.GetDefaultText(type) : text)
@@ -727,6 +728,7 @@
         ctx.rect(this.left * scale + x0, this.top * scale + y0, this.width * scale, this.height * scale)
         ctx.stroke()
         ctx.fill()
+        this.speed = 50
     }
     Block.prototype.DrawCondition = function(ctx, x0, y0, scale) {
         ctx.beginPath()
@@ -1229,12 +1231,15 @@
         this.FixPoints()
     }
     Block.prototype.CanSwapLabelsOrText = function() {
-        return this.type == CONDITION_TYPE || this.type == BEGIN_END_TYPE || this.type == IN_OUT_TYPE || this.type == LABEL_TYPE || this.type == FOR_LOOP_TYPE || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE
+        return this.type == CONDITION_TYPE || this.type == SWITCH_LEFT_TOP || this.type == BEGIN_END_TYPE || this.type == IN_OUT_TYPE || this.type == LABEL_TYPE || this.type == FOR_LOOP_TYPE || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE
     }
     Block.prototype.SwapLabelsOfText = function(ctrlKey) {
         if (this.type == CONDITION_TYPE) {
             this.labelsPosition = (this.labelsPosition + (ctrlKey ? -1 : 1) + 5) % 5
-            this.type = SWITCH_LEFT_TOP
+            this.type = SWITCH_LEFT_TOP 
+        } else if (this.type == SWITCH_LEFT_TOP) {
+            this.labelsPosition = (this.labelsPosition + (ctrlKey ? -1 : 1) + 5) % 5
+            this.type = CONDITION_TYPE 
         } else if (this.type == BEGIN_END_TYPE) {
             this.field.SwapTexts(['', 'вернуть ', 'начало', 'конец'], ['начало', 'начало', 'конец', 'вернуть '])
         } else if (this.type == IN_OUT_TYPE) {
@@ -1320,7 +1325,8 @@
             isBold: this.isBold,
             isItalic: this.isItalic,
             textAlign: this.textAlign,
-            labelsPosition: this.labelsPosition
+            labelsPosition: this.labelsPosition,
+            speed: this.speed
         }
     }
     
