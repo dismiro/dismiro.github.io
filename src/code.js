@@ -295,8 +295,10 @@
     const ACTION_CHANGE_ALIGNMENT = 'change-alignment'
     const ACTION_CHANGE_TYPE = 'change-type'
     const BLOCK_TYPE = 'Блок'
-    const CONDITION_TYPE = 'Условие'
+    const CONDITION_TYPE = 'Стрелка ПВ'
     const SWITCH_LEFT_TOP = 'Стрелка ЛВ'
+    const SWITCH_LEFT_DOWN = 'Стрелка ЛН'
+    const SWITCH_RIGTH_DOWN = 'Стрелка ПН'
     const BEGIN_END_TYPE = 'Начало / конец'
     const PROCEDURE_TYPE = 'Подпрограмма'
     const IN_OUT_TYPE = 'Ввод / вывод'
@@ -312,7 +314,7 @@
     const DECREASE_FONT = 'decrease-font'
     const CLEAR_FORMAT = 'clear'
     const BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, BEGIN_END_TYPE, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, LABEL_TYPE, TEXT_TYPE]
-    const ALL_BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, BEGIN_END_TYPE, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, FOR_LOOP_BEGIN_TYPE, FOR_LOOP_END_TYPE, LABEL_TYPE, TEXT_TYPE, SWITCH_LEFT_TOP]
+    const ALL_BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, BEGIN_END_TYPE, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, FOR_LOOP_BEGIN_TYPE, FOR_LOOP_END_TYPE, LABEL_TYPE, TEXT_TYPE, SWITCH_LEFT_TOP, SWITCH_LEFT_DOWN, SWITCH_RIGTH_DOWN]
     const BLOCK_WIDTHS = [100, 100, 100, 100, 120, 120, 100, 30, 80]
     const BLOCK_HEIGHTS = [40, 40, 30, 40, 40, 40, 40, 30, 20]
     const MENU_ITEMS = ['Сохранить схему (json)', 'Загрузить схему (json)', 'Сохранить схему (png)', 'Сохранить области (zip)', 'Сменить цветовую тему', 'Инструкция к редактору']
@@ -435,6 +437,8 @@
     const ARROW_SEGMENT_RADIUS = 6
     const ADD_NODE_AS_POINT = false
     const SAVE_WITH_BACKGROUND = true
+    const SWITCH_DX = 20
+    const SWITCHES = [CONDITION_TYPE , SWITCH_LEFT_TOP, SWITCH_LEFT_DOWN, SWITCH_RIGTH_DOWN]
     let REPLACE_MATH_RULES = [
         ["\\all", "∀ "],
         ["\\forall", "∀ "],
@@ -749,7 +753,7 @@
             ctx.fill()
             return
         } 
-        let dx = 25
+        let dx = SWITCH_DX
         let dy = this.height
         ctx.moveTo(this.x * scale + x0, (this.top - dy) * scale + y0)
         ctx.lineTo((this.x  + this.height) * scale + x0, (this.top - dy) * scale + y0)
@@ -764,13 +768,13 @@
         ctx.fill()
 
     }
-    Block.prototype.DrawSwitchLeft = function(ctx, x0, y0, scale) {
+    Block.prototype.DrawSwitchLeftTop = function(ctx, x0, y0, scale) {
         ctx.beginPath()
-        let dx = 15
-        let dy = this.height
-        ctx.moveTo((this.x - dy) * scale + x0, (this.top - dy) * scale + y0)
-        ctx.lineTo(this.x * scale + x0, (this.top - dy) * scale + y0)
-        ctx.lineTo((this.x + dy- dx) * scale + x0, (this.top) * scale + y0)
+        let dx = SWITCH_DX
+        let shift = this.height
+        ctx.moveTo((this.x - shift) * scale + x0, (this.top - shift) * scale + y0)
+        ctx.lineTo(this.x * scale + x0, (this.top - shift) * scale + y0)
+        ctx.lineTo((this.x + shift- dx) * scale + x0, (this.top) * scale + y0)
         ctx.lineTo(this.right * scale + x0, (this.top) * scale + y0)
         ctx.lineTo(this.right * scale + x0, (this.bottom) * scale + y0)
         ctx.lineTo(this.left * scale + x0, (this.bottom) * scale + y0)
@@ -780,6 +784,39 @@
         ctx.stroke()
         ctx.fill()
     }
+    Block.prototype.DrawSwitchLeftDown = function(ctx, x0, y0, scale) {
+        ctx.beginPath()
+        let dx = SWITCH_DX
+        let shift = this.height
+        ctx.moveTo((this.x - shift) * scale + x0, (this.bottom + shift) * scale + y0)
+        ctx.lineTo(this.x * scale + x0, (this.bottom + shift) * scale + y0)
+        ctx.lineTo((this.x + shift- dx) * scale + x0, (this.bottom) * scale + y0)
+        ctx.lineTo(this.right * scale + x0, (this.bottom) * scale + y0)
+        ctx.lineTo(this.right * scale + x0, (this.top) * scale + y0)
+        ctx.lineTo(this.left * scale + x0, (this.top) * scale + y0)
+        ctx.lineTo(this.left * scale + x0, (this.bottom) * scale + y0)
+        ctx.lineTo((this.x - dx)  * scale + x0, (this.bottom) * scale + y0)
+        ctx.closePath()
+        ctx.stroke()
+        ctx.fill()
+    }
+    Block.prototype.DrawSwitchRigthDown = function(ctx, x0, y0, scale) {
+    ctx.beginPath()
+    let dx = SWITCH_DX
+    let shift = this.height
+    ctx.moveTo(this.x * scale + x0, (this.bottom + shift) * scale + y0)
+    ctx.lineTo((this.x  + shift) * scale + x0, (this.bottom + shift) * scale + y0)
+    ctx.lineTo((this.x + this.height- dx) * scale + x0, this.bottom * scale + y0)
+    ctx.lineTo(this.right * scale + x0, this.bottom * scale + y0)
+    ctx.lineTo(this.right * scale + x0, this.top * scale + y0)
+    ctx.lineTo(this.left * scale + x0, this.top * scale + y0)
+    ctx.lineTo(this.left * scale + x0, this.bottom * scale + y0)
+    ctx.lineTo((this.x - dx)  * scale + x0, this.bottom * scale + y0)
+    ctx.closePath()
+    ctx.stroke()
+    ctx.fill()
+}
+
     Block.prototype.DrawBeginEnd = function(ctx, x0, y0, scale) {
         let radius = this.width > this.height ? this.height / 2 : 2 * GRID_SIZE
         ctx.beginPath()
@@ -1028,7 +1065,11 @@
         } else if (this.type == CONDITION_TYPE) {
             this.DrawCondition(ctx, x0, y0, scale)
         } else if (this.type == SWITCH_LEFT_TOP) {
-            this.DrawSwitchLeft(ctx, x0, y0, scale) 
+            this.DrawSwitchLeftTop(ctx, x0, y0, scale)
+        } else if (this.type == SWITCH_LEFT_DOWN) {
+            this.DrawSwitchLeftDown(ctx, x0, y0, scale) 
+        } else if (this.type == SWITCH_RIGTH_DOWN) {
+            this.DrawSwitchRigthDown(ctx, x0, y0, scale) 
         } else if (this.type == BEGIN_END_TYPE) {
             this.DrawBeginEnd(ctx, x0, y0, scale)
         } else if (this.type == PROCEDURE_TYPE) {
@@ -1053,7 +1094,7 @@
     Block.prototype.IsMouseHover = function(x, y) {
         if (x < this.left || x > this.right) return false
         if (y < this.top || y > this.bottom) return false
-        if (this.type == BLOCK_TYPE || this.type == PROCEDURE_TYPE || this.type == IN_OUT_TYPE || this.type == FOR_LOOP_TYPE || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE || this.type == DISPLAY_TYPE || this.type == TEXT_TYPE || this.type == SWITCH_LEFT_TOP) return true
+        if (this.type == BLOCK_TYPE || this.type == PROCEDURE_TYPE || this.type == IN_OUT_TYPE || this.type == FOR_LOOP_TYPE || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE || this.type == DISPLAY_TYPE || this.type == TEXT_TYPE || this.type == SWITCH_LEFT_TOP || this.type == SWITCH_LEFT_DOWN || this.type == SWITCH_RIGTH_DOWN) return true
         if (this.type == BEGIN_END_TYPE) {
             if (x >= this.left + this.height / 2 && x <= this.right - this.height / 2) return true
             let dx1 = x - (this.left + this.height / 2)
@@ -1208,15 +1249,16 @@
         this.FixPoints()
     }
     Block.prototype.CanSwapLabelsOrText = function() {
-        return this.type == CONDITION_TYPE || this.type == SWITCH_LEFT_TOP || this.type == BEGIN_END_TYPE || this.type == IN_OUT_TYPE || this.type == LABEL_TYPE || this.type == FOR_LOOP_TYPE || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE
+        return this.type == CONDITION_TYPE || this.type == SWITCH_LEFT_TOP || this.type == SWITCH_LEFT_DOWN || this.type == SWITCH_RIGTH_DOWN  || this.type == BEGIN_END_TYPE || this.type == IN_OUT_TYPE || this.type == LABEL_TYPE || this.type == FOR_LOOP_TYPE || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE
     }
     Block.prototype.SwapLabelsOfText = function(ctrlKey) {
-        if (this.type == CONDITION_TYPE) {
-            this.labelsPosition = (this.labelsPosition + (ctrlKey ? -1 : 1) + 5) % 5
-            this.type = SWITCH_LEFT_TOP 
-        } else if (this.type == SWITCH_LEFT_TOP) {
-            this.labelsPosition = (this.labelsPosition + (ctrlKey ? -1 : 1) + 5) % 5
-            this.type = CONDITION_TYPE 
+        if (SWITCHES.includes(this.type)) {
+            let index = SWITCHES.indexOf(this.type)
+            this.type = SWITCHES[(index + (ctrlKey ? -1 : 1)) % SWITCHES.length]
+        
+        // if (this.type == CONDITION_TYPE) {
+            // this.labelsPosition = (this.labelsPosition + (ctrlKey ? -1 : 1) + 5) % 5
+        //     this.type = SWITCH_LEFT_TOP 
         } else if (this.type == BEGIN_END_TYPE) {
             this.field.SwapTexts(['', 'вернуть ', 'начало', 'конец'], ['начало', 'начало', 'конец', 'вернуть '])
         } else if (this.type == IN_OUT_TYPE) {
