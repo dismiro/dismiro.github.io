@@ -316,7 +316,7 @@
     const BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, BEGIN_END_TYPE, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, LABEL_TYPE, TEXT_TYPE]
     const ALL_BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, BEGIN_END_TYPE, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, FOR_LOOP_BEGIN_TYPE, FOR_LOOP_END_TYPE, LABEL_TYPE, TEXT_TYPE, SWITCH_LEFT_TOP, SWITCH_LEFT_DOWN, SWITCH_RIGTH_DOWN]
     const BLOCK_WIDTHS = [100, 100, 100, 100, 120, 120, 100, 30, 80]
-    const BLOCK_HEIGHTS = [40, 40, 30, 40, 40, 40, 40, 30, 20]
+    const BLOCK_HEIGHTS = [40, 80, 30, 40, 40, 40, 40, 30, 20]
     const MENU_ITEMS = ['Сохранить схему (json)', 'Загрузить схему (json)', 'Сохранить схему (png)', 'Сохранить области (zip)', 'Сменить цветовую тему', 'Инструкция к редактору']
     const KEYBOARD_CHARACTERS = ['∀', '∃', '∄', '←', '→', '⇔', '≠', '≡', '≤', '≥', '∈', '∉', '∅', 'ℤ', 'ℕ', '∩', '∪', '⊂', '⊃', '⊆', '⊇', '∧', '∨', '²', '³', '⋅', 'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ', 'σ', 'τ', 'υ', 'χ', 'φ', 'ψ', 'ω']
     const KEYBOARD_CHARACTERS_PER_ROW = 25
@@ -568,6 +568,7 @@
     
     function Block(x, y, text, width, height, type = BLOCK_TYPE, isMenuBlock = false) {
         this.speed = 0
+        this.alfa = 0
         this.x = x
         this.y = y
         this.field = new TextField(text == '' && !isMenuBlock ? this.GetDefaultText(type) : text)
@@ -754,19 +755,26 @@
             return
         } 
         let dx = SWITCH_DX
-        let dy = this.height
-        ctx.moveTo(this.x * scale + x0, (this.top - dy) * scale + y0)
-        ctx.lineTo((this.x  + this.height) * scale + x0, (this.top - dy) * scale + y0)
-        ctx.lineTo((this.x + this.height- dx) * scale + x0, (this.top) * scale + y0)
-        ctx.lineTo(this.right * scale + x0, (this.top) * scale + y0)
-        ctx.lineTo(this.right * scale + x0, (this.bottom) * scale + y0)
-        ctx.lineTo(this.left * scale + x0, (this.bottom) * scale + y0)
-        ctx.lineTo(this.left * scale + x0, (this.top) * scale + y0)
-        ctx.lineTo((this.x - dx)  * scale + x0, (this.top) * scale + y0)
+        let height = this.height
+        let width = this.width
+        this.alfa = this.alfa + 1
+        let alfa = this.alfa
+        ctx.save()
+        ctx.translate(this.x * scale + x0,this.y*scale + y0);
+        ctx.rotate(alfa*Math.PI/180);
+        console.log(this.x)
+        ctx.moveTo(x0, (-height / 2) * scale + y0)
+        ctx.lineTo((height) * scale + x0, (- height / 2) * scale + y0)
+        ctx.lineTo((height- dx) * scale + x0, 0 * scale + y0)
+        ctx.lineTo(width / 2 * scale + x0, y0)
+        ctx.lineTo(width / 2 * scale + x0, height / 2 * scale + y0)
+        ctx.lineTo(-width / 2  * scale + x0, (height/2) * scale + y0)
+        ctx.lineTo(-width / 2  * scale + x0, y0)
+        ctx.lineTo((- dx)  * scale + x0,  y0)
         ctx.closePath()
         ctx.stroke()
         ctx.fill()
-
+        ctx.restore()
     }
     Block.prototype.DrawSwitchLeftTop = function(ctx, x0, y0, scale) {
         ctx.beginPath()
