@@ -1752,7 +1752,7 @@ function convertCombination(data, combinations) {
 }
 
 function loop() {
-const list = prompt("Введите индикацию")
+const list =prompt("Введите индикацию").split(/[.,+ ]+/)
 // console.log(JSON.stringify(list,null, 2))
 const fulltable = getDataFromFile('table2.json')
 let part = fulltable.filter((item) => list.includes(item.indication))
@@ -1769,8 +1769,8 @@ const data = combinations.slice(1).reduce((acc, combination) => {
   : Object.keys (combination)
   return {...acc, [currComb] : value };
 }, {});
-
-alert(JSON.stringify(convertCombination(data, combinations), null, 'Комбинация - ').replace(/[{}"]/g, ' '))
+const outputData = convertCombination(data, combinations)
+alert(JSON.stringify(outputData, null, 'Набор').replace(/[{}"]/g, ' '))
 loop()
 }
 loop()
