@@ -1,7 +1,4 @@
-.w-17 {
-    width: 19.15%!important;
+.col-5{
+    min-width: 420px
 }
-.container {
-    width: 1000px;
 
-}
