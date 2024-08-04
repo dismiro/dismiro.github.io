@@ -3,11 +3,16 @@ function clearSelection(collection){
     collection[i].classList.remove('active')
   } 
 }
+function clearAlert(element){
+  element.innerText = ''
+  element.classList.add('d-none')
+}
 
 function init(){
   const btns = document.getElementById("buttons").getElementsByClassName("btn-outline-primary");
   document.getElementById("typeMU").addEventListener("click", function() {
     clearSelection(btns)
+    clearAlert(document.getElementById('outputResult'))
     this.innerText = (this.innerText === 'Цифровой') ? 'Буквенный': 'Цифровой'
     const hiddenButtons = document.getElementsByClassName("hidden")
       for (let i = 0; i < hiddenButtons.length; i++) {
@@ -22,7 +27,9 @@ function init(){
       this.classList.toggle('active')
 
       console.log(selectionToString(document.getElementsByClassName('active')))
-      analyze(selectionToString(document.getElementsByClassName('active')))
+      const outputResult = document.getElementById('outputResult')
+      outputResult.classList.remove('d-none')
+      outputResult.innerText = analyze(selectionToString(document.getElementsByClassName('active')))
     });
   }
 }
@@ -54,7 +61,6 @@ function analyze(str) {
   const list =str.split(',')
   const fulltable = getDataFromFile('table2.json')
   let part = fulltable.filter((item) => list.includes(item.indication))
-  // console.log(JSON.stringify(part,null, 2))
   let keys = Object.keys(fulltable[0])
   const combinations = keys.map((key) => {
   return { [key] : part.map((item) => item[key])}
@@ -69,7 +75,9 @@ function analyze(str) {
   }, {});
   const outputData = convertCombination(data, combinations)
   console.log(JSON.stringify(outputData, null, 'Набор').replace(/[{}"]/g, ' '))
+  return JSON.stringify(outputData, null, 'Набор').replace(/[{}"]/g, ' ')
 }
+
 
 
 function getDataFromFile(filepath) {
