@@ -30,8 +30,35 @@ function init(){
       const outputResult = document.getElementById('outputResult')
       outputResult.classList.remove('d-none')
       outputResult.innerText = analyze(selectionToString(document.getElementsByClassName('active')))
+      
     });
   }
+
+  const li = document.getElementsByClassName("list-group-item ");
+  for (var i = 0; i < btns.length; i++) {
+    
+    btns[i].addEventListener("mouseover", function() {
+      const fulltable = getDataFromFile('table2.json')
+      const listIndications = fulltable.map((e) => e.indication)
+      const currentComb = fulltable[listIndications.indexOf(this.innerText)]
+    
+      for (i in currentComb){
+        if(i !=='indication'&& currentComb[i] === 1 ){
+          document.getElementById(i).classList.add('active')
+        }
+
+      }
+    });
+   
+    btns[i].addEventListener("mouseout", function() {
+      const removeList = document.getElementsByClassName("list-group-item ")
+      for (i in removeList){
+        removeList[i].classList.remove('active')
+      }
+    });
+    
+  }
+
 }
 
 function selectionToString(obj) {
