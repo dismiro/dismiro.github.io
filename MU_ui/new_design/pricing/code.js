@@ -3,13 +3,16 @@ function clearSelection(collection){
     collection[i].classList.remove('active')
   } 
 }
+
+
+
 function clearAlert(element){
   element.innerText = ''
   element.classList.add('d-none')
 }
 
 function init(){
-  const btns = document.getElementById("buttons").getElementsByClassName("btn-outline-light");
+  const btns = document.getElementById("buttons-NUM").getElementsByClassName("btn-outline-light");
   document.getElementById("typeMU").addEventListener("click", function() {
     clearSelection(btns)
     // clearAlert(document.getElementById('outputResult'))
@@ -25,13 +28,49 @@ function init(){
   for (var i = 0; i < btns.length; i++) {
     btns[i].addEventListener("click", function() {
       this.classList.toggle('active')
-
-      console.log(selectionToString(document.getElementsByClassName('active')))
+      const activeBtns = document.getElementById("buttons-NUM").getElementsByClassName("active");
       const outputResult = document.getElementById('outputResult')
-      outputResult.classList.remove('d-none')
-      outputResult.innerText = analyze(selectionToString(document.getElementsByClassName('active')))
-      
+      outputResult.innerHTML = ''
+      objData = analyze(selectionToString(activeBtns))
+      // console.log(objData)
+      for (let i in objData) {
+        const div = document.createElement('div')
+        div.className ='row py-1'
+        div.innerHTML = `<button type="button" class="btn btn-outline-light text-start w-100 py-1 added">${i} : ${objData[i]} </button>`
+        outputResult.append(div)
+      }
+      const addedLinks = outputResult.getElementsByClassName('added')
+      for (let i =0; i < addedLinks.length; i++) {
+        addedLinks[i].addEventListener('mouseover', function() {
+        this.classList.add('active')
+        const comb = addedLinks[i].innerText.split(': ')[1]
+        showComb(comb)
+
+        })
+        addedLinks[i].addEventListener("mouseout", function() {
+          const removeList = document.getElementsByClassName("layerMU ")
+          this.classList.remove('active')
+          for (i in removeList){
+            if(removeList[i].classList.contains('btn-outline-danger')){
+            removeList[i].classList.remove('btn-outline-danger')
+          }
+            removeList[i].classList.add('btn-outline-light')
+            removeList[i].classList.remove('active')
+
+          }
+        });
+      }
     });
+  }
+  function showComb(comb) {
+    const list = comb.split(',')
+    console.log(list)
+    for (i of list){
+      // document.getElementById(i).classList.add('active')
+      document.getElementById(i).classList.remove('btn-outline-light')
+      document.getElementById(i).classList.add('btn-outline-danger')
+      
+    }
   }
 
   const li = document.getElementsByClassName("layerMU ");
@@ -101,8 +140,9 @@ function analyze(str) {
     return {...acc, [currComb] : value };
   }, {});
   const outputData = convertCombination(data, combinations)
-  console.log(JSON.stringify(outputData, null, 'Набор').replace(/[{}"]/g, ' '))
-  return JSON.stringify(outputData, null, 'Набор').replace(/[{}"]/g, ' ')
+  // console.log(JSON.stringify(outputData, null, 'Набор').replace(/[{}"]/g, ' '))
+  return outputData
+
 }
 
 
