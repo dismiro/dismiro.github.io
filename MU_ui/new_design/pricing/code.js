@@ -54,11 +54,37 @@ function init(){
           }
           console.log(selectCombs.flat())
           showComb(selectCombs.flat())
-        })
-        
+          }) 
+          addedLinks[i].addEventListener('mouseover', function() {
+            HighlightCurrComb(this.innerText.split(': ')[1].split(','))
+          })
+
+          addedLinks[i].addEventListener('mouseout', function() {
+            turnOffHighlightCurrComb(this.innerText.split(': ')[1].split(','),selectCombs)
+          })
+
       }
     });
   }
+
+function HighlightCurrComb(comb){
+  for (i of comb){
+    document.getElementById(i).classList.add('active')
+    document.getElementById(i).classList.remove('btn-outline-light')
+    document.getElementById(i).classList.add('btn-outline-danger')
+  }
+}
+function turnOffHighlightCurrComb(comb,selectCombs){
+  for (i of comb){
+    document.getElementById(i).classList.remove('active')
+    if (!selectCombs.flat().includes(i)){
+    console.log(i)
+    document.getElementById(i).classList.remove('btn-outline-danger')
+    document.getElementById(i).classList.add('btn-outline-light')
+  }
+  }
+}
+
   function showComb(comb) {
     // const list = comb.split(',')
     // console.log(list)
