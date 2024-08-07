@@ -13,6 +13,22 @@ function makeMuNormal(collection){
     collection[i].classList.add('btn-outline-light')
   } 
 }
+function appendCollectoveWire() {
+  const div = document.createElement('div')
+  div.className ='row py-1'
+  div.innerHTML = `<button type="button" class="btn btn-outline-light text-start w-100 py-1 ">${`Обратный провод`} </button>`
+  outputResult.append(div)
+  
+}
+
+function createTotalButton(num) {
+  const div = document.createElement('div')
+  const total = num + 1 // + 1 collective wire
+  div.className ='row py-1'
+  div.innerHTML = `<button type="button" class="btn btn-outline-light text-start w-100 py-2 ">${`Всего жил: ${total}`} </button>`
+  outputResult.append(div)
+}
+
 
 
 function init(){
@@ -42,6 +58,8 @@ function init(){
         div.innerHTML = `<button type="button" class="btn btn-outline-light text-start w-100 py-1 added">${i} : ${objData[i]} </button>`
         outputResult.append(div)
       }
+      appendCollectoveWire()
+      createTotalButton(Object.keys(objData).length)
       const addedLinks = outputResult.getElementsByClassName('added')
         for (var i = 0; i < addedLinks.length; i++) {
           addedLinks[i].addEventListener('click', function() {
@@ -52,17 +70,14 @@ function init(){
             makeMuNormal(document.getElementsByClassName('layerMU'))
             selectCombs = selectCombs.filter((item) => !isEqual(this.innerText.split(': ')[1].split(','), item) )
           }
-          console.log(selectCombs.flat())
           showComb(selectCombs.flat())
           }) 
           addedLinks[i].addEventListener('mouseover', function() {
             HighlightCurrComb(this.innerText.split(': ')[1].split(','))
           })
-
           addedLinks[i].addEventListener('mouseout', function() {
             turnOffHighlightCurrComb(this.innerText.split(': ')[1].split(','),selectCombs)
           })
-
       }
     });
   }
@@ -78,7 +93,6 @@ function turnOffHighlightCurrComb(comb,selectCombs){
   for (i of comb){
     document.getElementById(i).classList.remove('active')
     if (!selectCombs.flat().includes(i)){
-    console.log(i)
     document.getElementById(i).classList.remove('btn-outline-danger')
     document.getElementById(i).classList.add('btn-outline-light')
   }
@@ -108,26 +122,23 @@ function turnOffHighlightCurrComb(comb,selectCombs){
         if(i !=='indication'&& currentComb[i] === 1 ){
           document.getElementById(i).classList.add('active')
         }
-
       }
     });
    
     btns[i].addEventListener("mouseout", function() {
       const removeList = document.getElementsByClassName("layerMU ")
-      for (i in removeList){
-        removeList[i].classList.remove('active')
+      for (let i = 0; i < removeList.length; i++){
+        if (removeList[i].classList.contains('active')) {
+          removeList[i].classList.remove('active')
+        }
       }
     });
-    
   }
-
 }
 
 function selectionToString(obj) {
   const outputData = []
-  for (let i = 0; i < obj.length; i++) {
-    outputData.push(obj[i].innerText) 
-  }
+  for (let i = 0; i < obj.length; i++) outputData.push(obj[i].innerText)
   return outputData.join(',')
 }
 
@@ -137,9 +148,7 @@ function convertCombination(data, combinations) {
     const comb = element.split('')
     const col = []
   for (let i in comb) {
-    if (comb[i] === '1'){
-      col.push(combinations[0].indication[i])
-   }
+    if (comb[i] === '1') col.push(combinations[0].indication[i])
   }
     newData[col.join()] = data[element].join()
   });
@@ -163,7 +172,6 @@ function analyze(str) {
     return {...acc, [currComb] : value };
   }, {});
   const outputData = convertCombination(data, combinations)
-  // console.log(JSON.stringify(outputData, null, 'Набор').replace(/[{}"]/g, ' '))
   return outputData
 
 }
