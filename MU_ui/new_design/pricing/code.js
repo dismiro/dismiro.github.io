@@ -1,38 +1,41 @@
+function isEqual(array1, array2) {
+  return JSON.stringify(array1) === JSON.stringify(array2);
+}
+
 function clearSelection(collection){
   for (let i = 0; i < collection.length; i++) {
     collection[i].classList.remove('active')
   } 
 }
-
-
-
-function clearAlert(element){
-  element.innerText = ''
-  element.classList.add('d-none')
+function makeMuNormal(collection){
+  for (let i = 0; i < collection.length; i++) {
+    collection[i].classList.remove('btn-outline-danger')
+    collection[i].classList.add('btn-outline-light')
+  } 
 }
 
+
 function init(){
+  
   const btns = document.getElementById("buttons-NUM").getElementsByClassName("btn-outline-light");
   document.getElementById("typeMU").addEventListener("click", function() {
     clearSelection(btns)
-    // clearAlert(document.getElementById('outputResult'))
     this.innerText = (this.innerText === 'Цифровой') ? 'Буквенный': 'Цифровой'
     const hiddenButtons = document.getElementsByClassName("hidden")
-      for (let i = 0; i < hiddenButtons.length; i++) {
-        hiddenButtons[i].classList.toggle('d-none')
-      } 
+    for (let i = 0; i < hiddenButtons.length; i++) hiddenButtons[i].classList.toggle('d-none')
   });
 
   clearSelection(btns)
 
   for (var i = 0; i < btns.length; i++) {
     btns[i].addEventListener("click", function() {
+      let selectCombs = [] 
+      makeMuNormal(document.getElementsByClassName('layerMU'))
       this.classList.toggle('active')
       const activeBtns = document.getElementById("buttons-NUM").getElementsByClassName("active");
       const outputResult = document.getElementById('outputResult')
       outputResult.innerHTML = ''
-      objData = analyze(selectionToString(activeBtns))
-      // console.log(objData)
+      const objData = analyze(selectionToString(activeBtns))
       for (let i in objData) {
         const div = document.createElement('div')
         div.className ='row py-1'
@@ -40,32 +43,26 @@ function init(){
         outputResult.append(div)
       }
       const addedLinks = outputResult.getElementsByClassName('added')
-      for (let i =0; i < addedLinks.length; i++) {
-        addedLinks[i].addEventListener('mouseover', function() {
-        this.classList.add('active')
-        const comb = addedLinks[i].innerText.split(': ')[1]
-        showComb(comb)
-
+        for (var i = 0; i < addedLinks.length; i++) {
+          addedLinks[i].addEventListener('click', function() {
+          this.classList.toggle('active')
+          if (this.classList.contains('active')) {
+            selectCombs.push(this.innerText.split(': ')[1].split(','))
+          }else {
+            makeMuNormal(document.getElementsByClassName('layerMU'))
+            selectCombs = selectCombs.filter((item) => !isEqual(this.innerText.split(': ')[1].split(','), item) )
+          }
+          console.log(selectCombs.flat())
+          showComb(selectCombs.flat())
         })
-        addedLinks[i].addEventListener("mouseout", function() {
-          const removeList = document.getElementsByClassName("layerMU ")
-          this.classList.remove('active')
-          for (i in removeList){
-            if(removeList[i].classList.contains('btn-outline-danger')){
-            removeList[i].classList.remove('btn-outline-danger')
-          }
-            removeList[i].classList.add('btn-outline-light')
-            removeList[i].classList.remove('active')
-
-          }
-        });
+        
       }
     });
   }
   function showComb(comb) {
-    const list = comb.split(',')
-    console.log(list)
-    for (i of list){
+    // const list = comb.split(',')
+    // console.log(list)
+    for (i of comb){
       // document.getElementById(i).classList.add('active')
       document.getElementById(i).classList.remove('btn-outline-light')
       document.getElementById(i).classList.add('btn-outline-danger')
