@@ -32,7 +32,11 @@ function createTotalButton(num) {
 
 
 function init(){
-  
+  const clearButton = document.getElementById('clearButton')
+  clearButton.addEventListener('click',function() {
+    clearSelection(btns)
+    makeMuNormal(document.getElementsByClassName('layerMU'))
+  })
   const btns = document.getElementById("buttons-NUM").getElementsByClassName("btn-outline-light");
   document.getElementById("typeMU").addEventListener("click", function() {
     clearSelection(btns)
