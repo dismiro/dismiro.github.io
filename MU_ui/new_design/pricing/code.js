@@ -37,6 +37,15 @@ function init(){
     clearSelection(btns)
     makeMuNormal(document.getElementsByClassName('layerMU'))
   })
+  clearButton.addEventListener('mouseover',function() {
+    clearButton.classList.remove('btn-outline-light')
+    clearButton.classList.add('btn-outline-danger')
+  })
+  clearButton.addEventListener('mouseout',function() {
+    clearButton.classList.remove('btn-outline-danger')
+    clearButton.classList.remove('active')
+    clearButton.classList.add('btn-outline-light')
+  })
   const btns = document.getElementById("buttons-NUM").getElementsByClassName("btn-outline-light");
   document.getElementById("typeMU").addEventListener("click", function() {
     clearSelection(btns)
