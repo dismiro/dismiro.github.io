@@ -1,130 +1,263 @@
 <!DOCTYPE html>
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#14191e">
-<meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="keywords" content="переезд, рассчет переезда, временные параметры переезда">
-<meta name="description" content="Данный редактор позволяет производить рассчет параметров переездной сигнализации.">
-<meta name="author" content="dismiro">
-<title>Онлайн калькулятор параметров переезда</title>
-<!-- <link rel="shortcut icon" href="https://programforyou.ru/favicon.ico?v=2" type="image/x-icon"> -->
+<html lang="en" data-bs-theme="light">
+  <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <title>Платформа автоматизации проектирования</title>
 
-<link rel="stylesheet" href ="./style/style.css"> 
-<link rel="stylesheet" href ="./style/style2.css"> 
+    <!-- SEO Meta Tags-->
+    <meta name="description" content="Платформа автоматизации проектирования">
+    <!-- <meta name="keywords" content="bootstrap"> -->
+    <meta name="author" content="dismiro">
 
-</head>
-<body oncontextmenu="return false;">
-<header>
-<div class="menu">
-<div class="menu-logo"><a href=""><img src="./images/logo.gif" alt="logo of Programforyou"></a></div>
-<div class="menu-items">
-<ul>
-<li><a href="">О нас</a></li>
-<li id="sub-menu-li"><a><span class="fa fa-caret-right"></span> Сервисы</a>
-<ul class="sub-menu">
-<li><a title="Вы сейчас на этой странице">Калькулятор параметров переезда</a></li>
-<!-- <li><a href="https://programforyou.ru/graph-redactor" target="_blank">Редактор графов</a></li> -->
-<li><a href="./MU/MU.html" target="_blank">Маршрутный указатель</a></li>
-<li><a href="./MU_ui/MU_ui.html" target="_blank">Маршрутный указатель Ui</a></li>
-<li><a href="./MU_ui/new_design/pricing/index.html" target="_blank">МУ новый дизайн</a></li>
-</ul>
-</li>
-<li><a href="">Контакты</a></li>
-</ul>
-</div>
-</div>
-</header>
-<canvas id="canvas" width="1370" height="854" style="width: 1370px; height: 854px; cursor: default;" title=""></canvas>
-<input id="input" type="file" accept=".json">
-<input id="source-input" type="file" accept=".cpp, .hpp, .c, .h, .pas">
-<input id="text-input" type="text">
-<img src="./images/keyboard.svg" class="icon" id="keyboard">
-<img src="./images/keyboard_dark.svg" class="icon" id="keyboard-dark">
-<img src="./images/keyboard_active.svg" class="icon" id="keyboard-active">
-<img src="./images/keyboard_active_dark.svg" class="icon" id="keyboard-active-dark">
-<img src="./images/trash.svg" class="icon" id="minus">
-<img src="./images/trash_dark.svg" class="icon" id="minus-dark">
-<img src="./images/trash_active.svg" class="icon" id="minus-active">
-<img src="./images/trash_active_dark.svg" class="icon" id="minus-active-dark">
-<img src="./images/undo.svg" class="icon" id="undo">
-<img src="./images/undo_dark.svg" class="icon" id="undo-dark">
-<img src="./images/undo_active.svg" class="icon" id="undo-active">
-<img src="./images/undo_active_dark.svg" class="icon" id="undo-active-dark">
-<img src="./images/redo.svg" class="icon" id="repeat">
-<img src="./images/redo_dark.svg" class="icon" id="repeat-dark">
-<img src="./images/redo_active.svg" class="icon" id="repeat-active">
-<img src="./images/redo_active_dark.svg" class="icon" id="repeat-active-dark">
-<img src="./images/zoom_out.svg" class="icon" id="zoom-out">
-<img src="./images/zoom_out_dark.svg" class="icon" id="zoom-out-dark">
-<img src="./images/zoom_out_active.svg" class="icon" id="zoom-out-active">
-<img src="./images/zoom_out_active_dark.svg" class="icon" id="zoom-out-active-dark">
-<img src="./images/zoom_in.svg" class="icon" id="zoom-in">
-<img src="./images/zoom_in_dark.svg" class="icon" id="zoom-in-dark">
-<img src="./images/zoom_in_active.svg" class="icon" id="zoom-in-active">
-<img src="./images/zoom_in_active_dark.svg" class="icon" id="zoom-in-active-dark">
-<img src="./images/grid.svg" class="icon" id="grid">
-<img src="./images/grid_dark.svg" class="icon" id="grid-dark">
-<img src="./images/grid_active.svg" class="icon" id="grid-active">
-<img src="./images/grid_active_dark.svg" class="icon" id="grid-active-dark">
-<img src="./images/hide_grid.svg" class="icon" id="hide-grid">
-<img src="./images/hide_grid_dark.svg" class="icon" id="hide-grid-dark">
-<img src="./images/hide_grid_active.svg" class="icon" id="hide-grid-active">
-<img src="./images/hide_grid_active_dark.svg" class="icon" id="hide-grid-active-dark">
-<img src="./images/download.svg" class="icon" id="download">
-<img src="./images/download_dark.svg" class="icon" id="download-dark">
-<img src="./images/download_active_dark.svg" class="icon" id="download-active-dark">
-<img src="./images/image.svg" class="icon" id="image">
-<img src="./images/image_dark.svg" class="icon" id="image-dark">
-<img src="./images/image_active_dark.svg" class="icon" id="image-active-dark">
-<img src="./images/areas.svg" class="icon" id="areas">
-<img src="./images/areas_dark.svg" class="icon" id="areas-dark">
-<img src="./images/areas_active_dark.svg" class="icon" id="areas-active-dark">
-<img src="./images/upload.svg" class="icon" id="upload">
-<img src="./images/upload_dark.svg" class="icon" id="upload-dark">
-<img src="./images/upload_active_dark.svg" class="icon" id="upload-active-dark">
-<img src="./images/theme.svg" class="icon" id="theme">
-<img src="./images/theme_dark.svg" class="icon" id="theme-dark">
-<img src="./images/theme_active_dark.svg" class="icon" id="theme-active-dark">
-<img src="./images/instruction.svg" class="icon" id="instruction">
-<img src="./images/instruction_dark.svg" class="icon" id="instruction-dark">
-<img src="./images/instruction_active_dark.svg" class="icon" id="instruction-active-dark">
-<img src="./images/block.svg" class="icon" id="block">
-<img src="./images/block_dark.svg" class="icon" id="block-dark">
-<img src="./images/arrow.svg" class="icon" id="arrow">
-<img src="./images/arrow_dark.svg" class="icon" id="arrow-dark">
-<img src="./images/edit.svg" class="icon" id="edit">
-<img src="./images/edit_dark.svg" class="icon" id="edit-dark">
-<img src="./images/edit_active_dark.svg" class="icon" id="edit-active-dark">
-<img src="./images/edit_active.svg" class="icon" id="edit-active">
-<img src="./images/bold.svg" class="icon" id="bold">
-<img src="./images/bold_dark.svg" class="icon" id="bold-dark">
-<img src="./images/bold_active_dark.svg" class="icon" id="bold-active-dark">
-<img src="./images/bold_active.svg" class="icon" id="bold-active">
-<img src="./images/italic.svg" class="icon" id="italic">
-<img src="./images/italic_dark.svg" class="icon" id="italic-dark">
-<img src="./images/italic_active_dark.svg" class="icon" id="italic-active-dark">
-<img src="./images/italic_active.svg" class="icon" id="italic-active">
-<img src="./images/increase_font.svg" class="icon" id="increase-font">
-<img src="./images/increase_font_dark.svg" class="icon" id="increase-font-dark">
-<img src="./images/increase_font_active_dark.svg" class="icon" id="increase-font-active-dark">
-<img src="./images/increase_font_active.svg" class="icon" id="increase-font-active">
-<img src="./images/decrease_font.svg" class="icon" id="decrease-font">
-<img src="./images/decrease_font_dark.svg" class="icon" id="decrease-font-dark">
-<img src="./images/decrease_font_active_dark.svg" class="icon" id="decrease-font-active-dark">
-<img src="./images/decrease_font_active.svg" class="icon" id="decrease-font-active">
-<img src="./images/left_align.svg" class="icon" id="left-align">
-<img src="./images/left_align_dark.svg" class="icon" id="left-align-dark">
-<img src="./images/left_align_active_dark.svg" class="icon" id="left-align-active-dark">
-<img src="./images/left_align_active.svg" class="icon" id="left-align-active">
-<img src="./images/center_align.svg" class="icon" id="center-align">
-<img src="./images/center_align_dark.svg" class="icon" id="center-align-dark">
-<img src="./images/center_align_active_dark.svg" class="icon" id="center-align-active-dark">
-<img src="./images/center_align_active.svg" class="icon" id="center-align-active">
-<img src="./images/change.svg" class="icon" id="change">
-<img src="./images/change_dark.svg" class="icon" id="change-dark">
-<img src="./images/change_active.svg" class="icon" id="change-active">
-<img src="./images/change_active_dark.svg" class="icon" id="change-active-dark">
+    <!-- Viewport-->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<script src = "src/code.js"></script>
-</body>
-</html>
+    <!-- Theme switcher (color modes) -->
+    <script src="./assets/theme-switcher.js"></script>
+
+    <!-- Favicon and Touch Icons
+    <link rel="apple-touch-icon" sizes="180x180" href="https://silicon.createx.studio/assets/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://silicon.createx.studio/assets/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="https://silicon.createx.studio/assets/favicon/favicon-16x16.png">
+    <link rel="manifest" href="https://silicon.createx.studio/assets/favicon/site.webmanifest">
+    <link rel="mask-icon" href="https://silicon.createx.studio/assets/favicon/safari-pinned-tab.svg" color="#6366f1">
+    <link rel="shortcut icon" href="https://silicon.createx.studio/assets/favicon/favicon.ico">
+    <meta name="msapplication-TileColor" content="#080032">
+    <meta name="msapplication-config" content="assets/favicon/browserconfig.xml">
+    <meta name="theme-color" content="#ffffff"> -->
+
+    <!-- Vendor Styles-->
+    <!-- <link rel="stylesheet" media="screen" href="./boxicons.min.css">
+    <link rel="stylesheet" media="screen" href="./swiper-bundle.min.css"> -->
+
+    <!-- Main Theme Styles + Bootstrap-->
+    <link rel="stylesheet" media="screen" href="./assets/theme.min.css">
+
+  </head>
+
+
+  <!-- Body -->
+  <body>
+    <!-- Page wrapper for sticky footer -->
+    <!-- Wraps everything except footer to push footer to the bottom of the page if there is little content -->
+    <main class="page-wrapper">
+
+
+      <!-- Navbar -->
+      <!-- Remove "fixed-top" class to make navigation bar scrollable with the page -->
+      <header class="header navbar navbar-expand-lg bg-light shadow-sm fixed-top">
+        <div class="container px-3">
+          <a href="https://dismiro.github.io" class="navbar-brand pe-3">
+            <img src="./assets/logo.svg" width="47" alt="S & I">
+            Signaling & Interlocking
+          </a>
+          <div id="navbarNav" class="offcanvas offcanvas-end">
+            <div class="offcanvas-header border-bottom">
+              <h5 class="offcanvas-title">Menu</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body">
+              <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item dropdown">
+                  <a href="https://silicon.createx.studio/#" class="nav-link dropdown-toggle active" data-bs-toggle="dropdown" aria-current="page">Сервисы</a>
+                  <div class="dropdown-menu p-0">
+                    <div class="d-lg-flex">
+                      <div class="mega-dropdown-column d-flex justify-content-center align-items-center rounded-3 rounded-end-0 px-0" style="margin: -1px; background-color: #f3f6ff;">
+                        <img src="./assets/images/landings.jpg" alt="Landings">
+                      </div>
+                      <div class="mega-dropdown-column pt-lg-3 pb-lg-4" style="--si-mega-dropdown-column-width: 15rem;">
+                        <ul class="list-unstyled mb-0">
+                          <li><a href="https://silicon.createx.studio/index.html" class="dropdown-item">Template Intro Page</a></li>
+                          <li><a href="https://silicon.createx.studio/landing-mobile-app-showcase-v1.html" class="dropdown-item">Mobile App Showcase v.1</a></li>
+                          <li><a href="https://silicon.createx.studio/landing-mobile-app-showcase-v2.html" class="dropdown-item">Mobile App Showcase v.2</a></li>
+                          <li><a href="https://silicon.createx.studio/landing-mobile-app-showcase-v3.html" class="dropdown-item">Mobile App Showcase v.3<span class="badge bg-success ms-2">New</span></a></li>
+
+                        </ul>
+                      </div>
+                      <div class="mega-dropdown-column pt-lg-3 pb-lg-4">
+                        <ul class="list-unstyled mb-0">
+                          <li><a href="https://silicon.createx.studio/landing-startup.html" class="dropdown-item d-flex align-items-center">Startup</a></li>
+                          <li><a href="https://silicon.createx.studio/landing-financial.html" class="dropdown-item">Financial Consulting</a></li>
+                          <li><a href="https://silicon.createx.studio/landing-online-courses.html" class="dropdown-item">Online Courses</a></li>
+                          <li><a href="https://silicon.createx.studio/landing-medical.html" class="dropdown-item">Medical</a></li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+                <li class="nav-item dropdown">
+                  <a href="https://silicon.createx.studio/#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">Справка</a>
+                  <ul class="dropdown-menu">
+                    <li><a href="https://silicon.createx.studio/account-details.html" class="dropdown-item">Account Details</a></li>
+                    <li><a href="https://silicon.createx.studio/account-security.html" class="dropdown-item">Security</a></li>
+                    <li><a href="https://silicon.createx.studio/account-notifications.html" class="dropdown-item">Notifications</a></li>
+                  </ul>
+                </li>
+                <li class="nav-item">
+                  <a href="https://silicon.createx.studio/docs/getting-started.html" class="nav-link">О нас</a>
+                </li>
+              </ul>
+            </div>
+            <div class="offcanvas-header border-top">
+              <a href="https://themes.getbootstrap.com/product/silicon-business-technology-template-ui-kit/" class="btn btn-primary w-100" target="_blank" rel="noopener">
+                <i class="bx bx-cart fs-4 lh-1 me-1"></i>
+                &nbsp;Buy now
+              </a>
+            </div>      
+          </div>
+          <div class="form-check form-switch mode-switch pe-lg-1 ms-auto me-4" data-bs-toggle="mode">
+            <input type="checkbox" class="form-check-input" id="theme-mode">
+            <label class="form-check-label d-none d-sm-block" for="theme-mode">Light</label>
+            <label class="form-check-label d-none d-sm-block" for="theme-mode">Dark</label>
+          </div>
+          <button type="button" class="navbar-toggler" data-bs-toggle="offcanvas" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+        </div>
+      </header>
+
+
+      <!-- Landings (Grid) -->
+      <section id="landings" class="container text-center pt-5 mt-2 mt-md-4 mt-lg-5">
+        <h2 class="h1 pt-2 pt-lg-0">Платформа автоматизации проектирования</h2>
+        <!-- <p class="fs-lg pb-2 pb-md-3 pb-lg-0 mb-4 mb-lg-5">Выберите необходимый модуль:</p> -->
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 py-2">
+          <div class="col card-hover shadow-none bg-none position-relative mb-4 mb-lg-5">
+            <img src="./assets/images/module_MU.jpg" class="b-block border rounded-3 shadow-sm" alt="Mobile App Showcase v.1">
+            <h3 class="h5 mt-4 mb-3 mb-lg-0">
+              <a href="./indicator/pricing/index.html" class="stretched-link">Маршрутный указатель</a>
+            </h3>
+          </div>
+          <div class="col card-hover shadow-none bg-none position-relative mb-4 mb-lg-5">
+            <img src="./assets/images/module_crossroad.jpg" class="b-block border rounded-3 shadow-sm" alt="Mobile App Showcase v.2">
+            <h3 class="h5 mt-4 mb-3 mb-lg-0">
+              <a href="./crossroad/index.html" class="stretched-link">Параметры извещения<span class="badge bg-danger fs-xs ms-2">В разработке</span></a>
+            </h3>
+          </div>
+          <div class="col card-hover shadow-none bg-none position-relative mb-4 mb-lg-5">
+            <img src="./assets/images/module_battary.jpg" class="b-block border rounded-3 shadow-sm" alt="Mobile App Showcase v.3">
+            <h3 class="h5 mt-4 mb-3 mb-lg-0">
+              <a href="#" class="stretched-link">Батарейный шкаф<span class="badge bg-danger fs-xs ms-2">В разработке</span></a>
+            </h3>
+          </div>
+          <!-- <div class="col card-hover shadow-none bg-none position-relative mb-4 mb-lg-5">
+            <img src="./product-landing.jpg" class="b-block border rounded-3 shadow-sm" alt="Product Landing">
+            <h3 class="h5 mt-4 mb-3 mb-lg-0">
+              <a href="https://silicon.createx.studio/landing-product.html" class="d-flex justify-content-center align-items-center stretched-link">Product Landing</a>
+            </h3>
+          </div>
+          <div class="col card-hover shadow-none bg-none position-relative mb-4 mb-lg-5">
+            <img src="./saas-v1.jpg" class="b-block border rounded-3 shadow-sm" alt="SaaS v.1">
+            <h3 class="h5 mt-4 mb-3 mb-lg-0">
+              <a href="https://silicon.createx.studio/landing-saas-v1.html" class="stretched-link">SaaS v.1</a>
+            </h3>
+          </div> -->
+          <!-- <div class="col position-relative mb-4 mb-lg-5">
+            <div class="position-relative">
+              <img src="./assets/images/placeholder.jpg" class="b-block border rounded-3 shadow-sm" alt="Placeholder">
+              <div class="position-absolute" style="top: 38.4%; padding-left: 15.38%; padding-right: 15.38%;">
+                <img src="./assets/images/wireframe.svg" class="placeholder placeholder-wave bg-transparent opacity-80" alt="">
+              </div>
+            </div>
+            <h3 class="h5 mt-4 mb-3 mb-lg-0">
+              <span class="nav-link justify-content-center fw-bold pe-none p-0">Ведется разработка</span>
+            </h3>
+          </div>
+          <div class="col position-relative mb-4 mb-lg-5">
+            <div class="position-relative">
+              <img src="./assets/images/placeholder.jpg" class="b-block border rounded-3 shadow-sm" alt="Placeholder">
+              <div class="position-absolute" style="top: 38.4%; padding-left: 15.38%; padding-right: 15.38%;">
+                <img src="./assets/images/wireframe.svg" class="placeholder placeholder-wave bg-transparent opacity-80" alt="">
+              </div>
+            </div>
+            <h3 class="h5 mt-4 mb-3 mb-lg-0">
+              <span class="nav-link justify-content-center fw-bold pe-none p-0">Ведется разработка</span>
+            </h3>
+          </div> -->
+        </div>
+        
+      </section>
+
+
+      <!-- More features (Grid) -->
+      <section class="container pt-4 pb-5 py-lg-5">
+        <h2 class="h1 text-center pt-1 pt-md-3 pt-lg-4 pb-3 pb-md-4 mb-0 mb-lg-3">More Silicon Features</h2>
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-2 g-lg-3 g-xl-4 pb-md-3 pb-lg-5">
+
+          <!-- Item -->
+          <div class="col">
+            <div class="card h-100 bg-transparent border-0">
+              <div class="bg-secondary rounded-3 w-auto lh-1 p-2 mt-4 ms-4 me-auto">
+                <i class="bx bxl-bootstrap fs-2 text-gradient-primary" style="padding: .375rem;"></i>
+              </div>
+              <div class="card-body">
+                <h3 class="h6">Built with Bootstrap 5</h3>
+                <p class="fs-sm mb-0">Silicon is&nbsp;the powerful front-end solution based on&nbsp;Bootstrap 5&nbsp;— the world’s&nbsp;most popular responsive, mobile-first front-end component library.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item -->
+          <div class="col">
+            <div class="card h-100 bg-transparent border-0">
+              <div class="bg-secondary rounded-3 w-auto lh-1 p-2 mt-4 ms-4 me-auto">
+                <i class="bx bx-file fs-2 text-gradient-primary" style="padding: .375rem;"></i>
+              </div>
+              <div class="card-body">
+                <h3 class="h6">Detailed Documentation</h3>
+                <p class="fs-sm mb-0">Download package includes the documentation that covers all crucial information about how to get started, customize template and components usage.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item -->
+          <div class="col">
+            <div class="card h-100 bg-transparent border-0">
+              <div class="bg-secondary rounded-3 w-auto lh-1 p-2 mt-4 ms-4 me-auto">
+                <i class="bx bx-mobile fs-2 text-gradient-primary" style="padding: .375rem;"></i>
+              </div>
+              <div class="card-body">
+                <h3 class="h6">Mobile Freindly Interface</h3>
+                <p class="fs-sm mb-0">It's not a surprise that nowadays over 80% of users surf the inernet using their mobile devices. Silicon is 100% responsive and optimized for small touch screens.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item -->
+          <div class="col">
+            <div class="card h-100 bg-transparent border-0">
+              <div class="bg-secondary rounded-3 w-auto lh-1 p-2 mt-4 ms-4 me-auto">
+                <svg class="m-1" xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="none"><g clip-path="url(#D)"><path d="M6.706 11.335c0-4.925 4.007-8.932 8.932-8.932s8.932 4.007 8.932 8.932a9 9 0 0 1-.169 1.73l2.358.463c.142-.723.214-1.461.214-2.193A11.35 11.35 0 0 0 15.638 0 11.35 11.35 0 0 0 4.303 11.335c0 2.566.883 5.081 2.486 7.082l1.875-1.503a8.83 8.83 0 0 1-1.958-5.579z" fill="url(#A)"></path><path d="M15.638 6.407c2.716 0 4.927 2.21 4.927 4.927h2.403a7.34 7.34 0 0 0-7.33-7.33 7.34 7.34 0 0 0-7.33 7.33 7.33 7.33 0 0 0 .959 3.623l2.088-1.19c-.421-.739-.643-1.581-.643-2.433 0-2.716 2.21-4.927 4.926-4.927z" fill="url(#B)"></path><path d="M28.375 17.3a3.31 3.31 0 0 0-1.06.173 3.33 3.33 0 0 0-3.186-2.374c-.392 0-.767.069-1.116.193a3.33 3.33 0 0 0-3.129-2.203c-.32 0-.628.046-.921.131v-1.884a3.33 3.33 0 0 0-3.324-3.324 3.33 3.33 0 0 0-3.324 3.324v6.998c-.293-.084-.602-.131-.921-.131a3.33 3.33 0 0 0-3.324 3.324v6.236a8.25 8.25 0 0 0 8.237 8.237h7.157a8.25 8.25 0 0 0 8.237-8.237v-7.14a3.33 3.33 0 0 0-3.324-3.324zm.921 10.464c0 3.217-2.617 5.834-5.834 5.834h-7.157c-3.217 0-5.834-2.617-5.834-5.834v-6.236c0-.508.413-.921.921-.921s.921.413.921.921v4.852h2.403V11.336c0-.508.413-.921.921-.921s.921.413.921.921v5.077 3.526.684h2.403v-.684-3.526c0-.508.413-.921.921-.921s.921.413.921.921v4.211h2.403v-2.201c0-.508.413-.921.921-.921s.921.413.921.921v2.201h2.403c0-.508.413-.921.921-.921s.921.413.921.921v7.14z" fill="url(#C)"></path></g><defs><lineargradient id="A" x1="4.303" y1="9.252" x2="26.973" y2="9.252" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6366f1"></stop><stop offset=".5" stop-color="#8b5cf6"></stop><stop offset="1" stop-color="#d946ef"></stop></lineargradient><lineargradient id="B" x1="8.309" y1="9.506" x2="22.968" y2="9.506" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6366f1"></stop><stop offset=".5" stop-color="#8b5cf6"></stop><stop offset="1" stop-color="#d946ef"></stop></lineargradient><lineargradient id="C" x1="8.068" y1="22.073" x2="31.7" y2="22.073" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6366f1"></stop><stop offset=".5" stop-color="#8b5cf6"></stop><stop offset="1" stop-color="#d946ef"></stop></lineargradient><clippath id="D"><path fill="#fff" d="M0 0h36v36H0z"></path></clippath></defs></svg>
+              </div>
+              <div class="card-body">
+                <h3 class="h6">Touch-Enabled Sliders</h3>
+                <p class="fs-sm mb-0">In the era of touch screens it's important to ensure great user experience on mobile, especially when it comes to such frequently used interface component as slider.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+
+
+    <!-- Footer -->
+    <footer class="footer border-top pt-2 pb-4 pb-lg-5">
+      <div class="container text-center pt-2 pt-md-4 pt-lg-5 pb-xl-3">
+
+        <div class="pt-2 mt-lg-3 mt-xl-4">
+          <p class="text-muted mb-0">© All rights reserved. Made with <i class="bx bx-heart d-inline-block fs-lg text-gradient-primary align-middle mt-n1 mx-1"></i> by&nbsp; <a href="https://createx.studio/" class="text-muted" target="_blank" rel="noopener">Createx Studio</a></p>
+        </div>
+      </div>
+    </footer>
+
+
+    <!-- Vendor Scripts -->
+    <!-- <script src="./rellax.min.js"></script> -->
+    <!-- <script src="./lottie-player.js"></script> -->
+    <!-- <script src="./swiper-bundle.min.js"></script> -->
+
+    <!-- Main Theme Script -->
+    <script src="./assets/theme.min.js"></script>
+  
+</body></html>
