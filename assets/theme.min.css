@@ -16070,7 +16070,7 @@ html:not([dir=rtl]) .range-slider-ui.noUi-horizontal .noUi-handle {
 }
 
 .btn-outline-warning {
-    --si-btn-border-color: rgba(255, 186, 8, 0.35);
+    --si-btn-border-color: rgba(255, 186, 8, 0.5);
     --si-btn-disabled-border-color: rgba(255, 186, 8, 0.35)
 }
 
