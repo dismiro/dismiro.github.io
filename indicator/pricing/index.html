@@ -28,7 +28,7 @@
 .card {
   min-width: 255px;
   min-height: 420px;
-  word-break: break-all;
+  /* word-break: break-all; */
 }
 .btn {
   --si-btn-padding-x: 0.75rem;
@@ -36,8 +36,14 @@
   --si-btn-font-size:1rem;
   --si-btn-font-weight:400;
   --si-btn-line-height:1.3;
-  white-space: normal;
- word-wrap: normal;
+  /* white-space: normal; */
+ /* word-wrap: normal; */
+}
+.added {
+
+    white-space: normal;
+    word-break: break-all;
+
 }
 .btn-outline-light {
     --si-btn-border-color: rgba(255, 255, 255, .85);
@@ -56,6 +62,9 @@
     --si-btn-active-bg: #0b0f19e0; 
     --si-btn-active-border-color: #0b0f19e0;
 }
+
+
+
 
 
     </style> 
@@ -537,31 +546,18 @@
   </section>
   </main>
 
-  <footer class="pt-4 my-md-5 pt-md-5 border-top">
+  <!-- <footer class="pt-4 my-md-5 pt-md-5 border-top"> -->
+    <footer class="footer py-3 border-top">
+      
     <div class="row">
-      <div class="col-12 col-md">
-        <img class="mb-2" src="../assets/brand/bootstrap-logo.svg" alt="" width="24" height="19">
-        <small class="d-block mb-3 text-body-secondary">&copy; 2017–2024</small>
+      <div class="col-2 mb-4">
+        <img class="mb-2" src="../../assets/logo.svg" alt="" width="30" height="19">
+        <small class="d-block mb-3 text-body-secondary">&copy; 2024</small>
       </div>
-      <div class="col-6 col-md">
-        <h5>Features</h5>
-        <ul class="list-unstyled text-small">
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="#">Cool stuff</a></li>
-        </ul>
-      </div>
-      <div class="col-6 col-md">
-        <h5>Resources</h5>
-        <ul class="list-unstyled text-small">
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="#">Resource</a></li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="#">Resource name</a></li>
-        </ul>
-      </div>
-      <div class="col-6 col-md">
-        <h5>About</h5>
-        <ul class="list-unstyled text-small">
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="#">Team</a></li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="#">Locations</a></li>
-        </ul>
+      <div class="col-10 col-md">
+        <p>Расчеты выполнены на основании методических указаний по проектированию устройств автоматики и телемеханики: <br/>
+          И-317-08 "Указатели маршрутные светодиодные"
+        </p>
       </div>
     </div>
   </footer>
