@@ -1,50 +1,183 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
-  <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    
-    <title>Платформа автоматизации проектирования</title>
+<!doctype html>
+<html lang="en" data-bs-theme="auto">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="">
+  <title>Маршрутный указатель</title>
 
-    <!-- SEO Meta Tags-->
-    <meta name="description" content="Платформа автоматизации проектирования">
-    <!-- <meta name="keywords" content="bootstrap"> -->
-    <meta name="author" content="dismiro">
+  <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@3"> -->
+  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+  <link href="../assets/theme.min.css" rel="stylesheet">
+  <!-- <link href="./assets/dist/css/bootstrap.min.css" rel="stylesheet"> -->
 
-    <!-- Viewport-->
-    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Theme switcher (color modes) -->
-    <!-- <script src="../assets/theme-switcher.js"></script> -->
-    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+  <style>
+  .container { 
+      max-width: 1050px;
+  }
 
-    <!-- Vendor Styles-->
-    <!-- <link rel="stylesheet" media="screen" href="./boxicons.min.css">
-    <link rel="stylesheet" media="screen" href="./swiper-bundle.min.css"> -->
+  .pricing-header {
+    max-width: 700px;
+  } 
+  .card-body{
+    min-width: 250px;
+  } 
+  .card {
+    min-width: 255px;
+    min-height: 420px;
+    /* word-break: break-all; */
+  }
+  .btn {
+    --si-btn-padding-x: 0.75rem;
+    --si-btn-padding-y: 0.375rem;
+    --si-btn-font-size:1rem;
+    --si-btn-font-weight:400;
+    --si-btn-line-height:1.3;
+    /* white-space: normal; */
+  /* word-wrap: normal; */
+  }
+  .added {
 
-    <!-- Main Theme Styles + Bootstrap-->
-    <link rel="stylesheet" media="screen" href="../assets/theme.min.css">
+      white-space: normal;
+      word-break: break-all;
+
+  }
+  .btn-outline-light {
+      --si-btn-border-color: rgba(255, 255, 255, .85);
+  }
+  .btn-outline-danger {
+      --si-btn-border-color: rgb(236, 31, 31);
+  }
+  [data-bs-theme=light] .btn-outline-light {
+    --si-btn-color: #0b0f19e0;
+      --si-btn-border-color: #0b0f19e0;
+      --si-btn-hover-color: #fff;
+      --si-btn-hover-bg: #0b0f19e0;
+      --si-btn-hover-border-color: #0b0f19e0;
+      --si-btn-focus-shadow-rgb: 11, 15, 25;
+      --si-btn-active-color: #fff;
+      --si-btn-active-bg: #0b0f19e0; 
+      --si-btn-active-border-color: #0b0f19e0;
+  }
+    </style> 
 
   </head>
-<body>
-    <!-- Добавьте этот код на каждой странице -->
-<div id="navbar">
-    <div class="form-check form-switch mode-switch pe-lg-1 ms-auto me-4" data-bs-toggle="mode">
-        <input type="checkbox" class="form-check-input" id="theme-mode">
-        <label class="form-check-label d-none d-sm-block" for="theme-mode">Светлая</label>
-        <label class="form-check-label d-none d-sm-block" for="theme-mode">Темная</label>
+  <body>
+
+    <header class="header navbar navbar-expand-lg bg-light shadow-sm fixed-top">
+      <div class="container px-3">
+        <a href="https://dismiro.github.io" class="navbar-brand pe-3">
+          <img src="../assets/logo.svg" width="47" alt="S & I    ">
+          Signaling & Interlocking
+        </a>
+        <div id="navbarNav" class="offcanvas offcanvas-end">
+          <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title">Меню</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+              <li class="nav-item dropdown">
+                <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-current="page">Сервисы</a>
+                <div class="dropdown-menu p-0">
+                  <div class="d-lg-flex">
+                    <div class="mega-dropdown-column d-flex justify-content-center align-items-center rounded-3 rounded-end-0 px-0" style="margin: -1px; background-color: #f3f6ff;">
+                      <img src="../assets/images/landings.jpg" alt="Landings">
+                    </div>
+                    <div class="mega-dropdown-column pt-lg-3 pb-lg-4" style="--si-mega-dropdown-column-width: 25rem;">
+                      <ul class="list-unstyled mb-0">
+                        <li><a href="../index.html" class="dropdown-item">Главная страница</a></li>
+                        <li><a href="#" class="dropdown-item">Жильность кабеля к МУ <span class="badge bg-success ms-2">Готово</span></a></li>
+                        <li><a href="../crossroad/index.html" class="dropdown-item">Параметры извещения переезд <span class="badge bg-warning ms-2">В разработке</span></a></li>
+                        <li><a href="../battery_parameters/index.html" class="dropdown-item">Расчет емкости аккумуляторов<span class="badge bg-warning ms-2">В разработке</span></a></li>
+
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </li>
+              <li class="nav-item dropdown">
+                <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">Справка</a>
+                <ul class="dropdown-menu">
+                  <li><a href="../help.html" class="dropdown-item">Вся платформа</a></li>
+                  <li><a href="./help.html" class="dropdown-item">Этот модуль</a></li>
+                </ul>
+              </li>
+              <li class="nav-item">
+                <a href="../about.html" class="nav-link">О нас</a>
+              </li>
+            </ul>
+          </div>
+]
+        </div>
+        <div class="form-check form-switch mode-switch pe-lg-1 ms-auto me-4" data-bs-toggle="mode">
+          <input type="checkbox" class="form-check-input" id="theme-mode">
+          <label class="form-check-label d-none d-sm-block" for="theme-mode">Светлая</label>
+          <label class="form-check-label d-none d-sm-block" for="theme-mode">Темная</label>
+        </div>
+        <button type="button" class="navbar-toggler" data-bs-toggle="offcanvas" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
       </div>
-      <button type="button" class="navbar-toggler" data-bs-toggle="offcanvas" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
+    </header>
 
+
+
+    
+
+
+<div class="container">
+  <main>
+    <section id="landings" class="container text-center pt-5 mt-2 mt-md-4 mt-lg-5">
+      <h2 class="h1 pt-2 pt-lg-0">Расчет емкости аккумуляторов<br> в батарейных шкафах</h2>
+    <div class="row mb-3 text-center">
+      <div class="col-md-8 ">
+        <div class="card mb-4 rounded-3 shadow-sm">
+          <div class="card-header py-2">
+            <h4 class="my-1 fw-normal">Исходные данные:</h4>
+          </div>
+          <div class="card-body">
+            
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card mb-4 rounded-3 shadow-sm">
+          <div class="card-header py-2">
+            <h4 class="my-1 fw-normal">Результаты расчета:</h4>
+          </div>
+          <div class="card-body">
+            <div id="outputResult">
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+  </main>
+
+    <footer class="footer py-3 border-top" >
+      
+    <div class="row">
+      <div class="col-2 mb-4">
+        <img class="mb-2" src="../assets/logo.svg" alt="" width="30" height="19">
+        <small class="d-block mb-3 text-body-secondary">&copy; 2024</small>
+      </div>
+      <div class="col-10 col-md">
+        <p>Расчеты выполнены на основании методических указаний по проектированию устройств автоматики и телемеханики: <br/>
+          *****"
+        </p>
+      </div>
+    </div>
+  </footer>
 </div>
-<script src="./assets/js/navigation.js"></script>
-<script src="../assets/theme-switcher.js"></script>
- 
-
-
-
 
 <script src="../assets/theme.min.js"></script>
+<script src="../assets/theme-switcher.js"></script>
+<!-- <script src="./assets/js/code.js"></script> -->
 
-</body>
+    </body>
 </html>
