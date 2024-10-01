@@ -3,7 +3,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="">
-  <title>Маршрутный указатель</title>
+  <title>Расчет емкости аккумуляторов</title>
 
   <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@3"> -->
   <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
@@ -12,7 +12,7 @@
 
 
   <style>
-  .container { 
+  .main-container { 
       max-width: 1050px;
   }
 
@@ -87,7 +87,7 @@
                     <div class="mega-dropdown-column pt-lg-3 pb-lg-4" style="--si-mega-dropdown-column-width: 25rem;">
                       <ul class="list-unstyled mb-0">
                         <li><a href="../index.html" class="dropdown-item">Главная страница</a></li>
-                        <li><a href="#" class="dropdown-item">Жильность кабеля к МУ <span class="badge bg-success ms-2">Готово</span></a></li>
+                        <li><a href="../indicator/index.html" class="dropdown-item">Жильность кабеля к МУ <span class="badge bg-success ms-2">Готово</span></a></li>
                         <li><a href="../crossroad/index.html" class="dropdown-item">Параметры извещения переезд <span class="badge bg-warning ms-2">В разработке</span></a></li>
                         <li><a href="../battery_parameters/index.html" class="dropdown-item">Расчет емкости аккумуляторов<span class="badge bg-warning ms-2">В разработке</span></a></li>
 
@@ -108,7 +108,6 @@
               </li>
             </ul>
           </div>
-]
         </div>
         <div class="form-check form-switch mode-switch pe-lg-1 ms-auto me-4" data-bs-toggle="mode">
           <input type="checkbox" class="form-check-input" id="theme-mode">
@@ -126,24 +125,37 @@
     
 
 
-<div class="container">
+<div class="container main-container">
   <main>
     <section id="landings" class="container text-center pt-5 mt-2 mt-md-4 mt-lg-5">
-      <h2 class="h1 pt-2 pt-lg-0">Расчет емкости аккумуляторов<br> в батарейных шкафах</h2>
+      <h2 class="h1 pt-2 pt-lg-0">Расчет емкости аккумуляторов<br>в батарейных шкафах</h2>
     <div class="row mb-3 text-center">
       <div class="col-md-8 ">
-        <div class="card mb-4 rounded-3 shadow-sm">
+        <div class="card mb-4 rounded-3 shadow">
           <div class="card-header py-2">
             <h4 class="my-1 fw-normal">Исходные данные:</h4>
           </div>
           <div class="card-body">
-            
+            <div class="btn-group dropdown">
+              <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                Добавить устройство
+              </button>
+              <div class="dropdown-menu my-1">
+                <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-whatever="Переездной светофор">Переездной светофор</a>
+                <a href="#" class="dropdown-item">Заградительный светофор</a>
+                <a href="#" class="dropdown-item">Извещатель</a>
+                <a href="#" class="dropdown-item">Шлагбаум</a>
+                <a href="#" class="dropdown-item">Шкаф</a>
+                <div class="dropdown-divider"></div>
+                <a href="#" class="dropdown-item">Другое...</a>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="col-md-4">
-        <div class="card mb-4 rounded-3 shadow-sm">
+        <div class="card mb-4 rounded-3 shadow">
           <div class="card-header py-2">
             <h4 class="my-1 fw-normal">Результаты расчета:</h4>
           </div>
@@ -156,6 +168,31 @@
       </div>
 
     </div>
+
+    <!-- Default modal -->
+<div class="modal fade" id="modalId" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Введите параметры устройства:</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <h6>Здесь какой то текст....</h6>
+        
+          <div class="mb-3 row">
+            <input type="text" class="form-control col-8" id="recipient-name">
+            <input type="text" class="form-control col-4" id="">
+
+          </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-success btn-sm " data-bs-dismiss="modal">Добавить</button>
+      </div>
+    </div>
+  </div>
+</div>
   </section>
   </main>
 
@@ -168,7 +205,7 @@
       </div>
       <div class="col-10 col-md">
         <p>Расчеты выполнены на основании методических указаний по проектированию устройств автоматики и телемеханики: <br/>
-          *****"
+          *****"switcher
         </p>
       </div>
     </div>
@@ -177,6 +214,7 @@
 
 <script src="../assets/theme.min.js"></script>
 <script src="../assets/theme-switcher.js"></script>
+<script src="./assets/js/modal.js"></script>
 <!-- <script src="./assets/js/code.js"></script> -->
 
     </body>
