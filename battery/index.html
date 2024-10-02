@@ -169,30 +169,60 @@
 
     </div>
 
-    <!-- Default modal -->
-<div class="modal fade" id="modalId" tabindex="-1" role="dialog">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Введите параметры устройства:</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <h6>Здесь какой то текст....</h6>
-        
-          <div class="mb-3 row">
-            <input type="text" class="form-control col-8" id="recipient-name">
-            <input type="text" class="form-control col-4" id="">
-
+    <!--  modal window -->
+    <div class="modal fade" id="modalId" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Введите параметры устройства:</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
-        <button type="button" class="btn btn-success btn-sm " data-bs-dismiss="modal">Добавить</button>
-      </div>
-    </div>
-  </div>
-</div>
+          <div class="modal-body">
+            <div class="container-fluid">
+              <div class="row">
+                <p id="count">Переездной светофор</p>
+              </div>
+              <div class="row">
+                <div class="col-md-8">
+                  <span> Количество устройств:</span>
+                  <!-- <input type="text" class="form-control" id="recipient-name"> -->
+                </div>
+                <div class="col-md-4 mb-2 ">
+                  <input type="text" class="form-control" id="">
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-8">
+                  <span> Ток нагрузки одного устройства,А:</span>
+                  <!-- <input type="text" class="form-control" id="recipient-name"> -->
+                </div>
+                <div class="col-md-4">
+                  <input type="text" class="form-control" id="">
+                </div>
+              </div>
+              <!-- <div class="row">
+                <div class="col-md-6 ms-auto">.col-md-6 .ms-auto</div>
+              </div> -->
+              <!-- <div class="row">
+                <div class="col-sm-9">
+                  Level 1: .col-sm-9
+                  <div class="row">
+                    <div class="col-8 col-sm-6">
+                      Level 2: .col-8 .col-sm-6
+                    </div>
+                    <div class="col-4 col-sm-6">
+                      Level 2: .col-4 .col-sm-6
+                    </div>
+                  </div>
+                </div>
+              </div> -->
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+            <button type="button" class="btn btn-success btn-sm " data-bs-dismiss="modal">Добавить</button>
+          </div>
+    
   </section>
   </main>
 
@@ -205,7 +235,7 @@
       </div>
       <div class="col-10 col-md">
         <p>Расчеты выполнены на основании методических указаний по проектированию устройств автоматики и телемеханики: <br/>
-          *****"switcher
+          *****
         </p>
       </div>
     </div>
