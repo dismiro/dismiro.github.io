@@ -136,16 +136,17 @@
             <h4 class="my-1 fw-normal">Исходные данные:</h4>
           </div>
           <div class="card-body">
+            <div id="device-list"></div>
             <div class="btn-group dropdown">
               <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 Добавить устройство
               </button>
               <div class="dropdown-menu my-1">
-                <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-whatever="Переездной светофор">Переездной светофор</a>
-                <a href="#" class="dropdown-item">Заградительный светофор</a>
-                <a href="#" class="dropdown-item">Извещатель</a>
-                <a href="#" class="dropdown-item">Шлагбаум</a>
-                <a href="#" class="dropdown-item">Шкаф</a>
+                <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Переездной светофор">Переездной светофор</a>
+                <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Заградительный светофор">Заградительный светофор</a>
+                <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Извещатель">Извещатель</a>
+                <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Шлагбаум">Шлагбаум</a>
+                <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Шкаф">Шкаф</a>
                 <div class="dropdown-divider"></div>
                 <a href="#" class="dropdown-item">Другое...</a>
               </div>
@@ -179,50 +180,48 @@
           </div>
           <div class="modal-body">
             <div class="container-fluid">
-              <div class="row">
-                <p id="count">Переездной светофор</p>
-              </div>
-              <div class="row">
-                <div class="col-md-8">
-                  <span> Количество устройств:</span>
-                  <!-- <input type="text" class="form-control" id="recipient-name"> -->
-                </div>
-                <div class="col-md-4 mb-2 ">
-                  <input type="text" class="form-control" id="">
-                </div>
-              </div>
-              <div class="row">
-                <div class="col-md-8">
-                  <span> Ток нагрузки одного устройства, А:</span>
-                  <!-- <input type="text" class="form-control" id="recipient-name"> -->
-                </div>
-                <div class="col-md-4">
-                  <input type="text" class="form-control" id="">
-                </div>
-              </div>
-              <!-- <div class="row">
-                <div class="col-md-6 ms-auto">.col-md-6 .ms-auto</div>
-              </div> -->
-              <!-- <div class="row">
-                <div class="col-sm-9">
-                  Level 1: .col-sm-9
-                  <div class="row">
-                    <div class="col-8 col-sm-6">
-                      Level 2: .col-8 .col-sm-6
-                    </div>
-                    <div class="col-4 col-sm-6">
-                      Level 2: .col-4 .col-sm-6
-                    </div>
-                  </div>
-                </div>
-              </div> -->
+
+<!-- Forms validation: status text -->
+<form class="needs-validation" id="modalForm" novalidate>
+  <div class="row">
+    <div class="col-9 mb-3 text-start">
+      <label for="NameDevice" class="form-label">Название устройства</label>
+      <input class="form-control" type="text" id="NameDevice" placeholder="Название устройства" value="" required>
+      <!-- <div class="valid-feedback">Looks good!</div> -->
+    </div>
+    <div class="col-3 mb-3 text-start">
+      <label for="validationCustom02" class="form-label">Количество</label>
+      <input class="form-control" type="number" id="validationCustom02" placeholder="" value="1" required>
+      <!-- <div class="valid-feedback">Looks good!</div> -->
+    </div>
+
+  </div>
+  <div class="row">
+    <div class="col-6 mb-3 text-start">
+      <label for="validationCustom03" class="form-label">Потребляемый ток</label>
+      <select class="form-select" id="validationCustom03" required>
+        <option value="">Выберите значение...</option>
+        <option value="1 А">1 Ампер</option>
+        <option value="2 А">2 Ампера</option>
+      </select>
+      <div class="invalid-feedback">Пожалуйста введите значение.</div>
+      <!-- <div class="valid-feedback">Looks good!</div> -->
+    </div>
+    <div class="col-6 mb-3 text-start">
+      <label for="validationCustom04" class="form-label">Параметр</label>
+      <input class="form-control" type="text" id="validationCustom04" placeholder="Параметр" value="*" required>
+      <div class="invalid-feedback">Пустое поле.</div>
+      <!-- <div class="valid-feedback">Looks good!</div> -->
+    </div>
+  </div>
+
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
-            <button type="button" class="btn btn-success btn-sm " data-bs-dismiss="modal">Добавить</button>
+            <button id="submitModal" type="submit" class="btn btn-success btn-sm " >Добавить</button>
           </div>
-    
+        </form>
   </section>
   </main>
 
@@ -246,6 +245,8 @@
 <script src="../assets/theme-switcher.js"></script>
 <script src="./assets/js/modal.js"></script>
 <!-- <script src="./assets/js/code.js"></script> -->
+
+
 
     </body>
 </html>
