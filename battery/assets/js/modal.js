@@ -45,10 +45,26 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
           // form.classList.add('was-validated')
 
           const deviceList = document.getElementById('device-list')
-          const div = document.createElement('div')
-          div.className ='row py-1'
-          div.innerHTML = `<button type="button" class="btn btn-outline-light text-start w-100 py-1 added">"Оборудование"<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></button>`
-          deviceList.append(div)
+          // const div = document.createElement('div')
+          // div.className ='row py-1'
+          const formData = new FormData(modalForm)
+          const nameDevice = formData.get('NameDevice');
+          const count = formData.get('CountDevice');
+          const li = `<li class="list-group-item d-flex align-items-center">${nameDevice}
+          <span class="badge rounded-3 bg-secondary ms-auto">${count}</span>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+        </li>`
+          deviceList.insertAdjacentHTML('beforeend', li)
+        //   div.innerHTML = `
+        //   <li class="list-group-item d-flex align-items-center">${nameDevice}
+        //   <span class="badge rounded-3 bg-secondary ms-auto">${count}</span>
+        // </li>`
+        
+          //   div.innerHTML = `<div class="alert alert-secondary alert-dismissible fade show" role="alert">
+        //   <strong>${nameDevice}</strong> x ${count}
+        //   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+        // </div>`
+          // deviceList.append(div)
           // exampleModal.style.display = 'none';
 
 
