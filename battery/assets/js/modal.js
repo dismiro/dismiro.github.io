@@ -1,13 +1,10 @@
 var exampleModal = document.getElementById('modalId')
+
 exampleModal.addEventListener('show.bs.modal', function (event) {
   // Button that triggered the modal
   var button = event.relatedTarget
   // Extract info from data-bs-* attributes
   var recipient = button.getAttribute('data-bs-device')
-  // If necessary, you could initiate an AJAX request here
-  // and then do the updating in a callback.
-  //
-  // Update the modal's content.
   var modalTitle = exampleModal.querySelector('#NameDevice')
   // var modalBodyInput = exampleModal.querySelector('#device')
   // console.log(exampleModal)
@@ -15,6 +12,11 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
   modalTitle.value = recipient
 // modalBodyInput.textContent = recipient
   // modalBodyInput.value = recipient
+})
+
+exampleModal.addEventListener('hide.bs.modal', function (event) {
+  // alert('close')
+  modalForm.classList.remove('was-validated')
 })
 
 
@@ -41,32 +43,33 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
             console.log('unvalidate')
             return
         }
-      
-          // form.classList.add('was-validated')
-
+          modalForm.classList.add('was-validated')
           const deviceList = document.getElementById('device-list')
           // const div = document.createElement('div')
           // div.className ='row py-1'
           const formData = new FormData(modalForm)
           const nameDevice = formData.get('NameDevice');
           const count = formData.get('CountDevice');
-          const li = `<li class="list-group-item d-flex align-items-center">${nameDevice}
-          <span class="badge rounded-3 bg-secondary ms-auto">${count}</span>
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+          const li = `<li class="list-group-item d-flex align-items-center py-2">${nameDevice}
+          <span class="badge rounded-3 bg-secondary ms-auto me-2">${count} шт. </span>
+          <i class='bx bx-edit-alt fs-4 opacity-70 edit'></i>
+          <i id="yourElemId" class='bx bx-trash fs-4 opacity-70 ms-2 remove'></i>
         </li>`
           deviceList.insertAdjacentHTML('beforeend', li)
-        //   div.innerHTML = `
-        //   <li class="list-group-item d-flex align-items-center">${nameDevice}
-        //   <span class="badge rounded-3 bg-secondary ms-auto">${count}</span>
-        // </li>`
-        
-          //   div.innerHTML = `<div class="alert alert-secondary alert-dismissible fade show" role="alert">
-        //   <strong>${nameDevice}</strong> x ${count}
-        //   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
-        // </div>`
-          // deviceList.append(div)
-          // exampleModal.style.display = 'none';
-
-
 
         }, false)
+const deviceList = document.getElementById('device-list')
+deviceList.addEventListener('mouseover', function(event) {
+  const classList = event.target.classList.value;
+  if (classList.includes('edit')) event.target.classList.add('text-success-emphasis')
+  if (classList.includes('remove')) event.target.classList.add('text-danger')
+})
+deviceList.addEventListener('mouseout', function(event) {
+  const classList = event.target.classList.value;
+  if (classList.includes('edit')) event.target.classList.remove('text-success-emphasis')
+  if (classList.includes('remove')) event.target.classList.remove('text-danger')
+})
+deviceList.addEventListener('click', function(event) {
+  const classList = event.target.classList.value;
+  if (classList.includes('remove')) event.target.parentNode.remove()
+})
