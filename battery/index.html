@@ -140,13 +140,10 @@
               <div class="col-8 rounded-3 border">
                 <div>
                   <h5 class="my-1 fw-normal">Перечень устройств:</h5>
-
-                  <!-- List group with icons and badges -->
-    <ul class="list-group list-group"id="device-list">
-    </ul>
-  </div>
+                   <ul class="list-group list-group"id="device-list">
+                   </ul>
+               </div>
                 <div class="w-100 py-1">
-
                   <button type="button" class="btn btn-outline-secondary w-100 mb-2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     Добавить устройство
                   </button>
@@ -160,9 +157,50 @@
                     <a href="#" class="dropdown-item">Другое...</a>
                   </div>
                 </div>
-    
+              </div>
 
+              <div class="col-4 border border-start-0 rounded-3">
+                <div>
+                  <h5 class="my-1 fw-normal">Настройки:</h5>
+               </div>
+                <div class="w-100 py-1">
+                        <!-- Forms validation: status text -->
+                        <form class="needs-validation" id="Form" novalidate>
+                          <div class="row">
+                            <div class="mb-2 text-start">
+                              <label for="formManufacturer" class="form-label ">Производитель:</label>
+                              <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" >
+                                <option value="">Выберите...</option>
+                                <option value="НовАК">НовАК</option>
+                                <option value="Другой">Другой</option>
+                              </select>
+                              <div class="invalid-feedback">Пожалуйста введите значение.</div>
+                              <!-- <div class="valid-feedback">Looks good!</div> -->
+                            </div>
+                          </div>
+
+                          <div class="row">
+                            <div class="mb-2 text-start">
+                              <label for="typeAcc" class="form-label ">Тип аккумуляторов:</label>
+                              <select class="form-select form-select-sm" name="manufacturer" id="typeAcc" >
+                                <option value="">Выберите...</option>
+                                <option value="АСК">АСК</option>
+                                <option value="OPzS">OPzS</option>
+                                <option value="Другой">Другой</option>
+                                
+                              </select>
+                              <div class="invalid-feedback">Пожалуйста введите значение.</div>
+                              <!-- <div class="valid-feedback">Looks good!</div> -->
+                            </div>
+                          </div>
+
+                          <div class="row">
+                          <button id="submitModal" type="submit" class="btn btn-outline-success btn-sm rounded-1" >Выполнить расчет:</button>
                         </div>
+                          </form>
+                </div>
+              </div>
+
           </div>
           </div>
         </div>
@@ -175,7 +213,24 @@
           </div>
           <div class="card-body">
             <div id="outputResult">
-
+              <ul class="list-unstyled fs-sm text-start pt-2">
+                <li class="mb-1">
+                  <span class="fw-semibold">Количество устройств:</span> ***шт
+                </li>
+                <li class="mb-1">
+                  <span class="fw-semibold">Потребляемый ток:</span> ***шт
+                </li>
+                <li class="mb-1">
+                  <span class="fw-semibold">Количество аккумуляторов:</span> ***шт
+                </li>
+                <li class="mb-1">
+                  <span class="fw-semibold">Серия аккумулятора:</span> ***
+                </li>
+                <li class="mb-1">
+                  <span class="fw-semibold">Номинальная емкость:</span> ***
+                </li>
+                
+              </ul>
             </div>
           </div>
         </div>
