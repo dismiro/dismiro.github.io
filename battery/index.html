@@ -137,7 +137,7 @@
           </div>
           <div class="card-body py-2">
             <div class="row">  
-              <div class="col-8 rounded-3 border">
+              <div class="col-8 rounded-3 border px-1">
                 <div>
                   <h5 class="my-1 fw-normal">Перечень устройств:</h5>
                    <ul class="list-group list-group"id="device-list">
@@ -159,48 +159,48 @@
                 </div>
               </div>
 
-              <div class="col-4 border border-start-0 rounded-3">
+              <div class="col-4 px-0">
+                <div class="border rounded-3 ms-1">
+                <form class="needs-validation" id="Form" novalidate>
                 <div>
                   <h5 class="my-1 fw-normal">Настройки:</h5>
                </div>
-                <div class="w-100 py-1">
-                        <!-- Forms validation: status text -->
-                        <form class="needs-validation" id="Form" novalidate>
-                          <div class="row">
-                            <div class="mb-2 text-start">
-                              <label for="formManufacturer" class="form-label ">Производитель:</label>
-                              <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" >
-                                <option value="">Выберите...</option>
-                                <option value="НовАК">НовАК</option>
-                                <option value="Другой">Другой</option>
-                              </select>
-                              <div class="invalid-feedback">Пожалуйста введите значение.</div>
-                              <!-- <div class="valid-feedback">Looks good!</div> -->
-                            </div>
-                          </div>
+                <div class=" py-1 mx-1">
+                  <div class="row">
+                    <div class="mb-2 text-start">
+                      <label for="formManufacturer" class="form-label ">Производитель:</label>
+                      <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" >
+                        <option value="">Выберите...</option>
+                        <option value="НовАК">НовАК</option>
+                        <option value="Другой">Другой</option>
+                      </select>
+                      <div class="invalid-feedback">Пожалуйста введите значение.</div>
+                      <!-- <div class="valid-feedback">Looks good!</div> -->
+                    </div>
+                  </div>
 
-                          <div class="row">
-                            <div class="mb-2 text-start">
-                              <label for="typeAcc" class="form-label ">Тип аккумуляторов:</label>
-                              <select class="form-select form-select-sm" name="manufacturer" id="typeAcc" >
-                                <option value="">Выберите...</option>
-                                <option value="АСК">АСК</option>
-                                <option value="OPzS">OPzS</option>
-                                <option value="Другой">Другой</option>
-                                
-                              </select>
-                              <div class="invalid-feedback">Пожалуйста введите значение.</div>
-                              <!-- <div class="valid-feedback">Looks good!</div> -->
-                            </div>
-                          </div>
-
-                          <div class="row">
-                          <button id="submitModal" type="submit" class="btn btn-outline-success btn-sm rounded-1" >Выполнить расчет:</button>
-                        </div>
-                          </form>
+                  <div class="row">
+                    <div class="mb-2 text-start">
+                      <label for="typeAcc" class="form-label ">Тип аккумуляторов:</label>
+                      <select class="form-select form-select-sm" name="manufacturer" id="typeAcc" >
+                        <option value="">Выберите...</option>
+                        <option value="АСК">АСК</option>
+                        <option value="OPzS">OPzS</option>
+                        <option value="Другой">Другой</option>
+                      </select>
+                      <div class="invalid-feedback">Пожалуйста введите значение.</div>
+                      <!-- <div class="valid-feedback">Looks good!</div> -->
+                    </div>
+                  </div>
                 </div>
+              </form>
+            </div>
               </div>
 
+          </div>
+
+          <div class="row mt-1">
+            <button id="submitModal" type="submit" class="btn btn-outline-success rounded-3" >Выполнить расчет:</button>
           </div>
           </div>
         </div>
