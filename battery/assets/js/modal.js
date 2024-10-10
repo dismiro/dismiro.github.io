@@ -56,7 +56,7 @@ exampleModal.addEventListener('hide.bs.modal', function (event) {
           <i id="yourElemId" class='bx bx-trash fs-4 opacity-70 ms-2 remove'></i>
         </li>`
           deviceList.insertAdjacentHTML('beforeend', li)
-
+          $('#modalId').modal('hide');
         }, false)
 const deviceList = document.getElementById('device-list')
 deviceList.addEventListener('mouseover', function(event) {
