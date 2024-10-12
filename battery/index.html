@@ -161,7 +161,7 @@
 
               <div class="col-4 px-0">
                 <div class="border rounded-3 ms-1">
-                <form class="needs-validation" id="Form" novalidate>
+                <form class="needs-validation" id="settingForm" novalidate>
                 <div>
                   <h5 class="my-1 fw-normal">Настройки:</h5>
                </div>
@@ -169,12 +169,12 @@
                   <div class="row">
                     <div class="mb-2 text-start">
                       <label for="formManufacturer" class="form-label ">Производитель:</label>
-                      <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" >
+                      <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" required>
                         <option value="">Выберите...</option>
                         <option value="НовАК">НовАК</option>
                         <option value="Другой">Другой</option>
                       </select>
-                      <div class="invalid-feedback">Пожалуйста введите значение.</div>
+                      <div class="invalid-feedback">Выберите значение.</div>
                       <!-- <div class="valid-feedback">Looks good!</div> -->
                     </div>
                   </div>
@@ -182,13 +182,13 @@
                   <div class="row">
                     <div class="mb-2 text-start">
                       <label for="typeAcc" class="form-label ">Тип аккумуляторов:</label>
-                      <select class="form-select form-select-sm" name="manufacturer" id="typeAcc" >
+                      <select class="form-select form-select-sm" name="manufacturer" id="typeAcc" required>
                         <option value="">Выберите...</option>
                         <option value="АСК">АСК</option>
                         <option value="OPzS">OPzS</option>
                         <option value="Другой">Другой</option>
                       </select>
-                      <div class="invalid-feedback">Пожалуйста введите значение.</div>
+                      <div class="invalid-feedback">Выберите тип аккумулятора</div>
                       <!-- <div class="valid-feedback">Looks good!</div> -->
                     </div>
                   </div>
@@ -196,11 +196,9 @@
               </form>
             </div>
               </div>
-
           </div>
-
           <div class="row mt-1">
-            <button id="submitModal" type="submit" class="btn btn-outline-success rounded-3" >Выполнить расчет:</button>
+            <button type="submit" form="settingForm" class="btn btn-outline-success rounded-3" >Выполнить расчет:</button>
           </div>
           </div>
         </div>
@@ -212,24 +210,8 @@
             <h4 class="my-1 fw-normal">Результаты расчета:</h4>
           </div>
           <div class="card-body">
-            <div id="outputResult">
-              <ul class="list-unstyled fs-sm text-start pt-2">
-                <li class="mb-1">
-                  <span class="fw-semibold">Количество устройств:</span> ***шт
-                </li>
-                <li class="mb-1">
-                  <span class="fw-semibold">Потребляемый ток:</span> ***шт
-                </li>
-                <li class="mb-1">
-                  <span class="fw-semibold">Количество аккумуляторов:</span> ***шт
-                </li>
-                <li class="mb-1">
-                  <span class="fw-semibold">Серия аккумулятора:</span> ***
-                </li>
-                <li class="mb-1">
-                  <span class="fw-semibold">Номинальная емкость:</span> ***
-                </li>
-                
+            <div>
+              <ul class="list-unstyled fs-sm text-start pt-2" id="outputResult">
               </ul>
             </div>
           </div>
@@ -269,8 +251,8 @@
       <label for="validationCustom03" class="form-label">Потребляемый ток</label>
       <select class="form-select" name="amperage" id="validationCustom03" required>
         <option value="">Выберите значение...</option>
-        <option value="1 А">1 Ампер</option>
-        <option value="2 А">2 Ампера</option>
+        <option value="1">1 Ампер</option>
+        <option value="2">2 Ампера</option>
       </select>
       <div class="invalid-feedback">Пожалуйста введите значение.</div>
       <!-- <div class="valid-feedback">Looks good!</div> -->
