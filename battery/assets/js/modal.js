@@ -107,8 +107,10 @@ settingForm.addEventListener('submit', function (event) {
         const list = Array.from(document.getElementById('device-list').children)
         outputResult.appendChild(makeOutputRow('Количество устройств', countDevices(list)))
         outputResult.appendChild(makeOutputRow('Потребляемый ток', sumAmperage(list), 'А'))
-
-
+        outputResult.appendChild(makeOutputRow('Расчетная емкость(8ч.)', sumAmperage(list) * 8, 'А/ч'))
+        outputResult.appendChild(makeOutputRow('Коэффициент 0,42', Math.round(sumAmperage(list) * 8 / 0.42 * 100) /100, 'А/ч'))
+        outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 100) /100), 'А/ч'))
+        outputResult.appendChild(makeOutputRow('Коэффициент 1,25', (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 1.25* 100) /100), 'А/ч'))
 
       }, false)
 

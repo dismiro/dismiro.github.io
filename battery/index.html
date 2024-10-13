@@ -150,7 +150,7 @@
                   <div class="dropdown-menu my-1">
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Переездной светофор">Переездной светофор</a>
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Заградительный светофор">Заградительный светофор</a>
-                    <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Извещатель">Извещатель</a>
+                    <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Акустичесикй извещатель">Акустичесикй извещатель</a>
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Шлагбаум">Шлагбаум</a>
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Шкаф">Шкаф</a>
                     <div class="dropdown-divider"></div>
@@ -161,16 +161,17 @@
 
               <div class="col-4 px-0">
                 <div class="border rounded-3 ms-1">
-                <form class="needs-validation" id="settingForm" novalidate>
+
                 <div>
                   <h5 class="my-1 fw-normal">Настройки:</h5>
                </div>
                 <div class=" py-1 mx-1">
+                  <form class="" id="settingForm" novalidate>
                   <div class="row">
                     <div class="mb-2 text-start">
                       <label for="formManufacturer" class="form-label ">Производитель:</label>
-                      <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" required>
-                        <option value="">Выберите...</option>
+                      <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" >
+                        <!-- <option value="">Выберите...</option> -->
                         <option value="НовАК">НовАК</option>
                         <option value="Другой">Другой</option>
                       </select>
@@ -182,8 +183,8 @@
                   <div class="row">
                     <div class="mb-2 text-start">
                       <label for="typeAcc" class="form-label ">Тип аккумуляторов:</label>
-                      <select class="form-select form-select-sm" name="manufacturer" id="typeAcc" required>
-                        <option value="">Выберите...</option>
+                      <select class="form-select form-select-sm" name="manufacturer" id="typeAcc">
+                        <!-- <option value="">Выберите...</option> -->
                         <option value="АСК">АСК</option>
                         <option value="OPzS">OPzS</option>
                         <option value="Другой">Другой</option>
@@ -192,8 +193,43 @@
                       <!-- <div class="valid-feedback">Looks good!</div> -->
                     </div>
                   </div>
+
+                  <div class="row">
+                    <div class="mb-2 text-start">
+                      <label for="state" class="form-label ">Состояние переезда:</label>
+                      <select class="form-select form-select-sm" name="state" id="state">
+                        <!-- <option value="">Выберите...</option> -->
+                        <option value="open">Открыт</option>
+                        <option value="close">Закрыт</option>
+                      </select>
+                      <!-- <div class="invalid-feedback">Выберите тип аккумулятора</div> -->
+                      <!-- <div class="valid-feedback">Looks good!</div> -->
+                    </div>
+                  </div>
+
+                  <div class="row">
+                    <div class="mb-2 text-start">
+                      <label for="location" class="form-label ">Размещение:</label>
+                      <select class="form-select form-select-sm" name="location" id="location">
+                        <!-- <option value="">Выберите...</option> -->
+                        <option value="inside">Шкаф</option>
+                        <option value="outside">МАП/ЭЦ-ТМ/Пост ЭЦ</option>
+                      </select>
+                    </div>
+                  </div>
+                </form>
+                  <div class="row">
+                    <div class="mb-2 text-start">
+                      <button class="btn btn-outline-secondary mt-1 py-0 w-100">Настройки
+                        <i class='bx bx-cog fs-4 opacity-70 ms-1'></i>
+                        <!-- <img  class="ms-2" src="./assets/images/setting.svg" alt="SVG Image"> -->
+                      </button>
+
+                    </div>
+                  </div>
+                  
                 </div>
-              </form>
+
             </div>
               </div>
           </div>
@@ -211,7 +247,7 @@
           </div>
           <div class="card-body">
             <div>
-              <ul class="list-unstyled fs-sm text-start pt-2" id="outputResult">
+              <ul class="list-unstyled fs-sm text-start" id="outputResult">
               </ul>
             </div>
           </div>
