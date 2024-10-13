@@ -163,5 +163,6 @@ function loadTable(path) {
 
 function findAcc(capacity) {
   const table = document.getElementById('typeAcc').table
-  return table.filter((item) => item.capacity >= capacity)[0].name
+  const searchValue =  table.filter((item) => item.capacity >= capacity)[0]
+  return `${searchValue.name} - ${searchValue.capacity}А/ч ` 
 }

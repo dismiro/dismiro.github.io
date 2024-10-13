@@ -1,0 +1,191 @@
+[
+  {
+    "name": "2OPzS100",
+    "capacity": 108,
+    "length": 103,
+    "width": 206,
+    "height": 399
+  },
+  {
+    "name": "3OPzS150",
+    "capacity": 162,
+    "length": 103,
+    "width": 206,
+    "height": 399
+  },
+  {
+    "name": "4OPzS200",
+    "capacity": 216,
+    "length": 103,
+    "width": 206,
+    "height": 399
+  },
+  {
+    "name": "5OPzS250",
+    "capacity": 270,
+    "length": 124,
+    "width": 206,
+    "height": 399
+  },
+  {
+    "name": "6OPzS300",
+    "capacity": 324,
+    "length": 145,
+    "width": 206,
+    "height": 399
+  },
+  {
+    "name": "5OPzS350",
+    "capacity": 390,
+    "length": 124,
+    "width": 206,
+    "height": 520
+  },
+  {
+    "name": "6OPzS420",
+    "capacity": 468,
+    "length": 145,
+    "width": 206,
+    "height": 520
+  },
+  {
+    "name": "7OPzS490",
+    "capacity": 546,
+    "length": 166,
+    "width": 206,
+    "height": 520
+  },
+  {
+    "name": "6OPzS600",
+    "capacity": 660,
+    "length": 145,
+    "width": 206,
+    "height": 695
+  },
+  {
+    "name": "7OPzS700",
+    "capacity": 817,
+    "length": 191,
+    "width": 210,
+    "height": 695
+  },
+  {
+    "name": "8OPzS800",
+    "capacity": 880,
+    "length": 191,
+    "width": 210,
+    "height": 695
+  },
+  {
+    "name": "9OPzS900",
+    "capacity": 1040,
+    "length": 233,
+    "width": 210,
+    "height": 695
+  },
+  {
+    "name": "10OPzS1000",
+    "capacity": 1100,
+    "length": 233,
+    "width": 210,
+    "height": 695
+  },
+  {
+    "name": "11OPzS1100",
+    "capacity": 1260,
+    "length": 275,
+    "width": 210,
+    "height": 695
+  },
+  {
+    "name": "12OPzS1200",
+    "capacity": 1320,
+    "length": 275,
+    "width": 210,
+    "height": 695
+  },
+  {
+    "name": "11OPzS1375",
+    "capacity": 1590,
+    "length": 275,
+    "width": 210,
+    "height": 845
+  },
+  {
+    "name": "12OPzS1500",
+    "capacity": 1680,
+    "length": 275,
+    "width": 210,
+    "height": 845
+  },
+  {
+    "name": "13OPzS1625",
+    "capacity": 1910,
+    "length": 275,
+    "width": 210,
+    "height": 835
+  },
+  {
+    "name": "14OPzS1750",
+    "capacity": 2040,
+    "length": 399,
+    "width": 214,
+    "height": 820
+  },
+  {
+    "name": "15OPzS1875",
+    "capacity": 2150,
+    "length": 399,
+    "width": 214,
+    "height": 820
+  },
+  {
+    "name": "16OPzS2000",
+    "capacity": 2240,
+    "length": 399,
+    "width": 214,
+    "height": 820
+  },
+  {
+    "name": "17OPzS2125",
+    "capacity": 2470,
+    "length": 487,
+    "width": 212,
+    "height": 820
+  },
+  {
+    "name": "18OPzS2250",
+    "capacity": 2600,
+    "length": 487,
+    "width": 212,
+    "height": 820
+  },
+  {
+    "name": "19OPzS2375",
+    "capacity": 2710,
+    "length": 487,
+    "width": 212,
+    "height": 820
+  },
+  {
+    "name": "20OPzS2500",
+    "capacity": 2800,
+    "length": 487,
+    "width": 212,
+    "height": 820
+  },
+  {
+    "name": "22OPzS2750",
+    "capacity": 3150,
+    "length": 576,
+    "width": 212,
+    "height": 820
+  },
+  {
+    "name": "24OPzS3000",
+    "capacity": 3360,
+    "length": 576,
+    "width": 212,
+    "height": 820
+  }
+]
