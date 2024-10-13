@@ -1,0 +1,205 @@
+[
+  {
+    "name": "АСК 2",
+    "capacity": 52,
+    "length": 90,
+    "width": 160,
+    "height": 350
+  },
+  {
+    "name": "АСК 3",
+    "capacity": 77,
+    "length": 90,
+    "width": 160,
+    "height": 350
+  },
+  {
+    "name": "АСК 4",
+    "capacity": 104,
+    "length": 90,
+    "width": 160,
+    "height": 350
+  },
+  {
+    "name": "АСК 5",
+    "capacity": 130,
+    "length": 90,
+    "width": 160,
+    "height": 350
+  },
+  {
+    "name": "АСК 6",
+    "capacity": 155,
+    "length": 90,
+    "width": 160,
+    "height": 350
+  },
+  {
+    "name": "АСК 7",
+    "capacity": 181,
+    "length": 122,
+    "width": 189,
+    "height": 381.5
+  },
+  {
+    "name": "АСК 8",
+    "capacity": 207,
+    "length": 122,
+    "width": 189,
+    "height": 381.5
+  },
+  {
+    "name": "АСК 9",
+    "capacity": 234,
+    "length": 122,
+    "width": 189,
+    "height": 381.5
+  },
+  {
+    "name": "АСК 10",
+    "capacity": 259,
+    "length": 160,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 11",
+    "capacity": 284,
+    "length": 160,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 12",
+    "capacity": 311,
+    "length": 160,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 13",
+    "capacity": 337,
+    "length": 198,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 14",
+    "capacity": 363,
+    "length": 198,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 15",
+    "capacity": 388,
+    "length": 198,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 16",
+    "capacity": 414,
+    "length": 198,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 17",
+    "capacity": 440,
+    "length": 236,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 18",
+    "capacity": 466,
+    "length": 236,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 19",
+    "capacity": 492,
+    "length": 236,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 20",
+    "capacity": 516,
+    "length": 236,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 21",
+    "capacity": 543,
+    "length": 247,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 22",
+    "capacity": 570,
+    "length": 247,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 23",
+    "capacity": 595,
+    "length": 350,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 24",
+    "capacity": 622,
+    "length": 350,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 25",
+    "capacity": 647,
+    "length": 350,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 26",
+    "capacity": 673,
+    "length": 350,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 27",
+    "capacity": 699,
+    "length": 350,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 28",
+    "capacity": 724,
+    "length": 350,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 29",
+    "capacity": 751,
+    "length": 350,
+    "width": 189,
+    "height": 384
+  },
+  {
+    "name": "АСК 30",
+    "capacity": 777,
+    "length": 350,
+    "width": 189,
+    "height": 384
+  }
+]

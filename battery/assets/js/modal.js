@@ -1,3 +1,8 @@
+
+document.addEventListener("DOMContentLoaded", (event) => {
+  loadTable(`./assets/tabs/${document.getElementById('typeAcc').value}.json`)
+});
+
 var exampleModal = document.getElementById('modalId')
 
 exampleModal.addEventListener('show.bs.modal', function (event) {
@@ -93,6 +98,7 @@ deviceList.addEventListener('click', function(event) {
   if (classList.includes('remove')) event.target.parentNode.remove()
 })
 
+
 var settingForm = document.getElementById('settingForm')
 settingForm.addEventListener('submit', function (event) {
   event.preventDefault()    
@@ -111,8 +117,19 @@ settingForm.addEventListener('submit', function (event) {
         outputResult.appendChild(makeOutputRow('Коэффициент 0,42', Math.round(sumAmperage(list) * 8 / 0.42 * 100) /100, 'А/ч'))
         outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 100) /100), 'А/ч'))
         outputResult.appendChild(makeOutputRow('Коэффициент 1,25', (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 1.25* 100) /100), 'А/ч'))
-
+        // loadTable('./assets/tabs/ACK.json')
+        const type = document.getElementById('typeAcc')
+        console.log(type.table)
+        const capacity = (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 1.25* 100) /100)
+        outputResult.appendChild(makeOutputRow('Аккумулятор', (findAcc(capacity)),''))
+        
+        
       }, false)
+
+document.getElementById('typeAcc').addEventListener('change', function() {
+  // alert(this.value)
+  loadTable(`./assets/tabs/${this.value}.json`)
+})
 
 function makeOutputRow(text, num, dim='шт.') {
   const li = document.createElement('li')
@@ -131,4 +148,20 @@ return list.reduce((acc,item) => acc + Number(item.data.count), 0);
 }
 function sumAmperage(list) {
   return list.reduce((acc,item) => acc + (item.data.amperage * item.data.count), 0);
+}
+function loadTable(path) {
+  fetch(path)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Ошибка в fetch: ' + response.statusText);
+    }
+    return response.json();
+  })
+  .then(jsonData => document.getElementById('typeAcc').table = jsonData)
+  .catch(error => console.error('Ошибка при исполнении запроса: ', error));
+}
+
+function findAcc(capacity) {
+  const table = document.getElementById('typeAcc').table
+  return table.filter((item) => item.capacity >= capacity)[0].name
 }
