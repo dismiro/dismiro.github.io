@@ -277,7 +277,14 @@
     </div>
     <div class="col-3 mb-3 text-start">
       <label for="validationCustom02" class="form-label">Количество</label>
-      <input class="form-control" type="number" name="CountDevice" id="validationCustom02" placeholder="" value="1" required>
+      <!-- <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups"> -->
+        <div class="btn-group btn-group-sm border" role="group" aria-label="First group">
+          <button id="buttonMinus" class="btn btn-secondary px-2 py-0" type="button"><span class="fs-4 my-0 mx-0">-</span></button>
+          <button id="numCount" class="btn btn-secondary py-0 fs-7 fw-semibold" type="button" contenteditable="true">1</button>
+          <button id="buttonPlus" class="btn btn-secondary px-2 py-0" type="button"><span class='fs-4 my-0 mx-0'>+</span></button>
+        </div>
+      <!-- </div> -->
+      <!-- <input class="form-control" type="number" name="CountDevice" id="validationCustom02" placeholder="" value="1" required> -->
       <!-- <div class="valid-feedback">Looks good!</div> -->
     </div>
 

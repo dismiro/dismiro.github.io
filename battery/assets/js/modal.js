@@ -21,6 +21,7 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
 
 exampleModal.addEventListener('hidden.bs.modal', function (event) {
   modalForm.reset()
+  document.getElementById('numCount').textContent = 1
   modalForm.classList.remove('was-validated')
 })
 
@@ -52,7 +53,8 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
           const deviceList = document.getElementById('device-list')
           const formData = new FormData(modalForm)
           const nameDevice = formData.get('NameDevice');
-          const count = formData.get('CountDevice');
+          // const count = formData.get('CountDevice');
+          const count = parseInt(document.getElementById('numCount').textContent);
           const amperage = formData.get('amperage');
           
           const li1 = document.createElement('li')
@@ -168,3 +170,16 @@ function findAcc(capacity) {
   const searchValue =  table.filter((item) => item.capacity >= capacity)[0]
   return `${searchValue.name} - ${searchValue.capacity}А/ч ` 
 }
+
+
+
+const numCount = document.getElementById('numCount');
+const plusBtn = document.getElementById('buttonPlus');
+const minusBtn = document.getElementById('buttonMinus');
+plusBtn.addEventListener('click',  function() {
+  numCount.textContent = parseInt(numCount.textContent) + 1;
+})
+minusBtn.addEventListener('click', function() {
+  let num =  parseInt(numCount.textContent)
+  if (num > 0)  numCount.textContent = num - 1;
+})
