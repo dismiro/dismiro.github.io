@@ -53,6 +53,8 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
           const formData = new FormData(modalForm)
           const nameDevice = formData.get('NameDevice');
           const count = formData.get('CountDevice');
+          const amperage = formData.get('amperage');
+          
           const li1 = document.createElement('li')
           const span = document.createElement('span')
           const edit = document.createElement('i')
@@ -60,7 +62,7 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
           li1.classList.add('list-group-item', 'd-flex', 'align-items-center', 'py-2')
           li1.textContent = `${nameDevice}`
           span.classList.add('badge', 'rounded-3', 'bg-secondary', 'ms-auto', 'me-2')
-          span.textContent= `${count} шт.`
+          span.textContent= `${amperage}А х ${count} шт.`
           edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-70', 'edit')
           remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-70', 'ms-2', 'remove')
           li1.appendChild(span)
