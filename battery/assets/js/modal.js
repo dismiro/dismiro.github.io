@@ -77,7 +77,7 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
         // </li>`
         // deviceList.insertAdjacentHTML('beforeend', li)
         li1.data = {name: formData.get('NameDevice'),
-                    count: formData.get('CountDevice'),
+                    count: count,
                     amperage: formData.get('amperage')
       }
           deviceList.appendChild(li1)
