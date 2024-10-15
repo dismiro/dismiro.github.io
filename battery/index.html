@@ -59,6 +59,13 @@
       --si-btn-active-bg: #0b0f19e0; 
       --si-btn-active-border-color: #0b0f19e0;
   }
+  .canEdit[contenteditable="true"] {
+    padding: 1px;
+    outline: 1px dashed #CCC;
+}
+  .canEdit[contenteditable="true"]:focus, .canEdit[contenteditable="true"]:hover{
+    outline: 2px dashed #2B8BAD;
+}
     </style> 
 
   </head>
@@ -147,10 +154,10 @@
                   <button type="button" class="btn btn-outline-secondary w-100 mb-2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     Добавить устройство
                   </button>
-                  <div class="dropdown-menu my-1">
+                  <div id="devicesToAdded"class="dropdown-menu my-1">
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Переездной светофор">Переездной светофор</a>
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Заградительный светофор">Заградительный светофор</a>
-                    <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Акустичесикй извещатель">Акустичесикй извещатель</a>
+                    <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Акустический извещатель">Акустический извещатель</a>
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Шлагбаум">Шлагбаум</a>
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId" data-bs-device="Шкаф">Шкаф</a>
                     <div class="dropdown-divider"></div>
@@ -264,15 +271,18 @@
             <h5 class="modal-title">Введите параметры устройства:</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div class="modal-body">
+          <div class="modal-body px-3">
             <div class="container-fluid">
 
 <!-- Forms validation: status text -->
 <form class="needs-validation" id="modalForm" novalidate>
   <div class="row">
     <div class="col-9 mb-3 text-start">
-      <label for="NameDevice" class="form-label">Название устройства</label>
-      <input class="form-control" type="text" name="NameDevice" id="NameDevice" placeholder="Название устройства" value="" required>
+      <label for="" class="form-label">Название устройства</label>
+      <div class="canEdit rounded-2" id="NameDeviceDiv" contenteditable="false">
+        <h4 class="my-0" id="NameDevice"></h4>
+      </div>
+      <!-- <input class="form-control" type="text" name="NameDevice" id="NameDevice" placeholder="Название устройства" value="" required> -->
       <!-- <div class="valid-feedback">Looks good!</div> -->
     </div>
     <div class="col-3 mb-3 text-start">
@@ -292,25 +302,31 @@
   <div class="row">
     <div class="col-6 mb-3 text-start">
       <label for="validationCustom03" class="form-label">Потребляемый ток</label>
-      <select class="form-select" name="amperage" id="validationCustom03" required>
+      <div class="canEdit rounded-2" id="NameDeviceDiv" contenteditable="false">
+        
+        <p class="mb-1"><span class="">Переезд закрыт: </span><span id="amperageClosed" class="canEdit rounded-2">1.25</span> А</p>
+        <p class="mb-1"><span class="">Переезд открыт: </span><span id="amperageOpened" class="canEdit rounded-2">0.1</span> А</p>
+      </div>
+
+      <!-- <select class="form-select" name="amperage" id="validationCustom03" required>
         <option value="">Выберите значение...</option>
         <option value="1">1 Ампер</option>
         <option value="2">2 Ампера</option>
       </select>
-      <div class="invalid-feedback">Пожалуйста введите значение.</div>
+      <div class="invalid-feedback">Пожалуйста введите значение.</div> -->
       <!-- <div class="valid-feedback">Looks good!</div> -->
     </div>
-    <div class="col-6 mb-3 text-start">
-      <label for="validationCustom04" class="form-label">Параметр</label>
-      <input class="form-control" type="text" id="validationCustom04" placeholder="Параметр" value="*" required>
-      <div class="invalid-feedback">Пустое поле.</div>
-      <!-- <div class="valid-feedback">Looks good!</div> -->
-    </div>
+  
   </div>
 
             </div>
           </div>
           <div class="modal-footer">
+            <button id="canEdit"type="button" class="btn btn-secondary btn-icon btn-sm py-0 " >
+              <i class='bx bx-edit-alt'></i>
+              <!-- <button type="button" class="btn btn-secondary btn-sm py-0" > Редактировать
+                <i class='bx bx-edit-alt fs-4 py-0 '></i> -->
+            </button>
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
             <button id="submitModal" type="submit" class="btn btn-success btn-sm " >Добавить</button>
           </div>

@@ -52,10 +52,11 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
           modalForm.classList.add('was-validated')
           const deviceList = document.getElementById('device-list')
           const formData = new FormData(modalForm)
-          const nameDevice = formData.get('NameDevice');
+          const nameDevice = document.getElementById('NameDevice').textContent
           // const count = formData.get('CountDevice');
           const count = parseInt(document.getElementById('numCount').textContent);
-          const amperage = formData.get('amperage');
+          const amperageClosed = parseFloat(document.getElementById('amperageClosed').textContent);;
+          const amperageOpened = parseFloat(document.getElementById('amperageOpened').textContent);;
           
           const li1 = document.createElement('li')
           const span = document.createElement('span')
@@ -64,7 +65,7 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
           li1.classList.add('list-group-item', 'd-flex', 'align-items-center', 'py-2')
           li1.textContent = `${nameDevice}`
           span.classList.add('badge', 'rounded-3', 'bg-secondary', 'ms-auto', 'me-2')
-          span.textContent= `${amperage}А х ${count} шт.`
+          span.textContent= `${amperageClosed} А х ${count} шт.`
           edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-70', 'edit')
           remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-70', 'ms-2', 'remove')
           li1.appendChild(span)
@@ -76,9 +77,11 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
         //   <i class='bx bx-trash fs-4 opacity-70 ms-2 remove'></i>
         // </li>`
         // deviceList.insertAdjacentHTML('beforeend', li)
-        li1.data = {name: formData.get('NameDevice'),
+        li1.data = {name: nameDevice,
                     count: count,
-                    amperage: formData.get('amperage')
+                    amperage: amperageClosed,
+                    amperageOpened: amperageOpened
+                    
       }
           deviceList.appendChild(li1)
 
@@ -183,3 +186,15 @@ minusBtn.addEventListener('click', function() {
   let num =  parseInt(numCount.textContent)
   if (num > 0)  numCount.textContent = num - 1;
 })
+
+document.getElementById('devicesToAdded').addEventListener('click', function(event) {
+document.getElementById('NameDevice').textContent = event.target.textContent
+})
+
+document.getElementById('canEdit').addEventListener('click', function(event) {
+  this.classList.toggle('active')
+  const editable = document.getElementById('NameDeviceDiv').contentEditable
+  document.getElementById('NameDeviceDiv').contentEditable = editable !== 'true'? 'true':'false'
+  document.getElementById('amperageClosed').contentEditable = editable !== 'true'? 'true':'false'
+  document.getElementById('amperageOpened').contentEditable = editable !== 'true'? 'true':'false'
+  })
