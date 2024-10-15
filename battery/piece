@@ -1,0 +1,11 @@
+  .canEdit[contenteditable="true"] {
+    padding: 1px;
+    outline: 1px dashed #CCC;
+}
+  .canEdit[contenteditable="true"]:focus, .canEdit[contenteditable="true"]:hover{
+    outline: 2px dashed #2B8BAD;
+}
+
+<div class="canEdit" id="example-one" contenteditable="true">
+        <h4 id="NameDevice">Переездной светофор</h4>
+      </div>
