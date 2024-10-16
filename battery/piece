@@ -1,11 +1,6 @@
-  .canEdit[contenteditable="true"] {
-    padding: 1px;
-    outline: 1px dashed #CCC;
-}
-  .canEdit[contenteditable="true"]:focus, .canEdit[contenteditable="true"]:hover{
-    outline: 2px dashed #2B8BAD;
-}
-
-<div class="canEdit" id="example-one" contenteditable="true">
-        <h4 id="NameDevice">Переездной светофор</h4>
-      </div>
+Переездной светофор - 1,25 / 0,05 А
+Извещатель  0,2 / 0 А
+Релейный шкаф 0,25 А
+Шлагбаум 0 / 2 А
+Щиток ЩПС 0,02 А
+Заградительный светофор 2,08 / 0,036
