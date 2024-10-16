@@ -201,18 +201,18 @@
                     </div>
                   </div>
 
-                  <div class="row">
-                    <div class="mb-2 text-start">
-                      <label for="state" class="form-label ">Состояние переезда:</label>
-                      <select class="form-select form-select-sm" name="state" id="state">
+                  <!-- <div class="row"> -->
+                    <!-- <div class="mb-2 text-start"> -->
+                      <!-- <label for="state" class="form-label ">Состояние переезда:</label> -->
+                      <!-- <select class="form-select form-select-sm" name="state" id="state"> -->
                         <!-- <option value="">Выберите...</option> -->
-                        <option value="open">Открыт</option>
-                        <option value="close">Закрыт</option>
-                      </select>
+                        <!-- <option value="open">Открыт</option> -->
+                        <!-- <option value="close">Закрыт</option> -->
+                      <!-- </select> -->
                       <!-- <div class="invalid-feedback">Выберите тип аккумулятора</div> -->
                       <!-- <div class="valid-feedback">Looks good!</div> -->
-                    </div>
-                  </div>
+                    <!-- </div> -->
+                  <!-- </div> -->
 
                   <div class="row">
                     <div class="mb-2 text-start">
@@ -285,39 +285,70 @@
       <!-- <input class="form-control" type="text" name="NameDevice" id="NameDevice" placeholder="Название устройства" value="" required> -->
       <!-- <div class="valid-feedback">Looks good!</div> -->
     </div>
-    <div class="col-3 mb-3 text-start">
-      <label for="validationCustom02" class="form-label">Количество</label>
-      <!-- <div class="btn-toolbar" role="toolbar" aria-label="Toolbar with button groups"> -->
-        <div class="btn-group btn-group-sm border" role="group" aria-label="First group">
-          <button id="buttonMinus" class="btn btn-secondary px-2 py-0" type="button"><span class="fs-4 my-0 mx-0">-</span></button>
-          <button id="numCount" class="btn btn-secondary py-0 fs-7 fw-semibold" type="button" contenteditable="true">1</button>
-          <button id="buttonPlus" class="btn btn-secondary px-2 py-0" type="button"><span class='fs-4 my-0 mx-0'>+</span></button>
-        </div>
-      <!-- </div> -->
-      <!-- <input class="form-control" type="number" name="CountDevice" id="validationCustom02" placeholder="" value="1" required> -->
-      <!-- <div class="valid-feedback">Looks good!</div> -->
-    </div>
 
   </div>
   <div class="row">
-    <div class="col-6 mb-3 text-start">
-      <label for="validationCustom03" class="form-label">Потребляемый ток</label>
+    <div class="col-8 mb-3 text-start">
+      <label for="" class="form-label">Потребляемый ток</label>
       <div class="canEdit rounded-2" id="NameDeviceDiv" contenteditable="false">
-        
-        <p class="mb-1"><span class="">Переезд закрыт: </span><span id="amperageClosed" class="canEdit rounded-2">1.25</span> А</p>
-        <p class="mb-1"><span class="">Переезд открыт: </span><span id="amperageOpened" class="canEdit rounded-2">0.1</span> А</p>
+        <ul class="list-group list-group-flush ps-0">
+          <li class="list-group-item text-dark d-flex justify-content-between align-items-center ps-0 py-0">
+            Переезд открыт :
+            <span class="badge rounded-3 bg-secondary fs-6 mb-1"><span id="amperageClosed" class="canEdit rounded-2">1.25</span> А</span>
+          </li>
+          <li class="list-group-item text-dark d-flex justify-content-between align-items-center ps-0 pt-0 mt-1">
+            Переезд закрыт :         
+            <span class="badge rounded-3 bg-secondary fs-6"><span id="amperageOpened" class="canEdit rounded-2">0.1</span> А</span>
+          </li>
+        </ul>
       </div>
-
-      <!-- <select class="form-select" name="amperage" id="validationCustom03" required>
-        <option value="">Выберите значение...</option>
-        <option value="1">1 Ампер</option>
-        <option value="2">2 Ампера</option>
-      </select>
-      <div class="invalid-feedback">Пожалуйста введите значение.</div> -->
-      <!-- <div class="valid-feedback">Looks good!</div> -->
     </div>
-  
+    <div class="col-4 mb-3 text-start">
+      <label for="" class="form-label">Подключен к:</label>
+      <div class="btn-group-sm" id="">
+        <div class=" py-1">
+          <button type="button" class="btn btn-secondary dropdown-toggle w-100 mb-2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Батарея №1
+          </button>
+          <div class="dropdown-menu my-1">
+            <a href="#" class="dropdown-item">Батарея №1</a>
+            <a href="#" class="dropdown-item">Батарея №2</a>
+          </div>
+        </div>
+        
+      </div>
+    </div>
   </div>
+  <div class="row">
+  <div class="col-9 mb-3 text-start">
+    <label for="" class="form-label">Настройки</label>
+    <div class="canEdit rounded-2" id="NameDeviceDiv" contenteditable="false">
+      <ul class="list-group list-group-flush ps-0">
+        <li class="list-group-item text-dark d-flex justify-content-between align-items-center ps-0 py-0">
+          <div class="form-check form-switch mb-2 ">
+            <input class="form-check-input" type="checkbox" id="customSwitch2" checked="">
+            <label class="form-check-label" for="customSwitch2">Подключен к полюсам батареи при наличии внешнего питания</label>
+          </div>
+        </li>
+        <!-- <li class="list-group-item text-dark d-flex justify-content-between align-items-center ps-0 pt-0 mt-1">
+          Переезд закрыт :         
+          <span class="badge rounded-3 bg-secondary fs-6"><span id="amperageOpened" class="canEdit rounded-2">0.1</span> А</span>
+        </li> -->
+      </ul>
+    </div>
+  </div>
+  <div class="col-3 mb-3 text-start">
+    <label for="validationCustom02" class="form-label">Количество</label>
+      <div class="btn-group btn-group-sm border" role="group" aria-label="First group">
+        <button id="buttonMinus" class="btn btn-secondary px-2 py-0" type="button"><span class="fs-4 my-0 mx-0">-</span></button>
+        <button id="numCount" class="btn btn-secondary py-0 fs-7 fw-semibold" type="button" contenteditable="true">1</button>
+        <button id="buttonPlus" class="btn btn-secondary px-2 py-0" type="button"><span class='fs-4 my-0 mx-0'>+</span></button>
+      </div>
+    <!-- </div> -->
+    <!-- <input class="form-control" type="number" name="CountDevice" id="validationCustom02" placeholder="" value="1" required> -->
+    <!-- <div class="valid-feedback">Looks good!</div> -->
+  </div>
+</div>
 
             </div>
           </div>
