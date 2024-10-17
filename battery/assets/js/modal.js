@@ -6,40 +6,18 @@ document.addEventListener("DOMContentLoaded", (event) => {
 var exampleModal = document.getElementById('modalId')
 
 exampleModal.addEventListener('show.bs.modal', function (event) {
-  // Button that triggered the modal
   var button = event.relatedTarget
-  // Extract info from data-bs-* attributes
   var recipient = button.getAttribute('data-bs-device')
   var modalTitle = exampleModal.querySelector('#NameDevice')
-  // var modalBodyInput = exampleModal.querySelector('#device')
-  // console.log(exampleModal)
-
   modalTitle.value = recipient
-// modalBodyInput.textContent = recipient
-  // modalBodyInput.value = recipient
 })
 
 exampleModal.addEventListener('hidden.bs.modal', function (event) {
-  modalForm.reset()
+  // modalForm.reset()
   document.getElementById('numCount').textContent = 1
-  modalForm.classList.remove('was-validated')
+  // modalForm.classList.remove('was-validated')
 })
 
-
-
-  // const forms = document.querySelectorAll('.needs-validation')
-  // console.log
-  // Array.from(forms)
-  //   .forEach(function (form) {
-  //     form.addEventListener('submit', function (event) {
-  //     if (!form.checkValidity()) {
-  //         event.preventDefault()
-  //         event.stopPropagation()
-  //     }
-    
-  //       form.classList.add('was-validated')
-  //     }, false)
-  //   })
   var modalForm = document.getElementById('modalForm')
   modalForm.addEventListener('submit', function (event) {
     event.preventDefault()    
@@ -53,7 +31,6 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
           const deviceList = document.getElementById('device-list')
           const formData = new FormData(modalForm)
           const nameDevice = document.getElementById('NameDevice').textContent
-          // const count = formData.get('CountDevice');
           const count = parseInt(document.getElementById('numCount').textContent);
           const amperageClosed = parseFloat(document.getElementById('amperageClosed').textContent);;
           const amperageOpened = parseFloat(document.getElementById('amperageOpened').textContent);;

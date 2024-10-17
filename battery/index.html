@@ -173,67 +173,27 @@
                   <h5 class="my-1 fw-normal">Настройки:</h5>
                </div>
                 <div class=" py-1 mx-1">
-                  <form class="" id="settingForm" novalidate>
-                  <div class="row">
-                    <div class="mb-2 text-start">
-                      <label for="formManufacturer" class="form-label ">Производитель:</label>
-                      <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" >
-                        <!-- <option value="">Выберите...</option> -->
-                        <option value="НовАК">НовАК</option>
-                        <option value="Другой">Другой</option>
-                      </select>
-                      <div class="invalid-feedback">Выберите значение.</div>
-                      <!-- <div class="valid-feedback">Looks good!</div> -->
+                  <form class="" id="settingMainForm" novalidate>
+                    <div class="row">
+                      <div class="mb-2 text-start">
+                        <label for="" class="form-label ">Групп аккумуляторов:</label>
+                        <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" >
+                          <option value="1">Одна группа (7шт.)</option>
+                          <option value="2">Две группы (14шт.)</option>
+                          <option value="3">Три группы (21шт.)</option>
+                          <option value="4">Четыре группы (28шт)</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
-
+                  </form>
                   <div class="row">
                     <div class="mb-2 text-start">
-                      <label for="typeAcc" class="form-label ">Тип аккумуляторов:</label>
-                      <select class="form-select form-select-sm" name="manufacturer" id="typeAcc">
-                        <!-- <option value="">Выберите...</option> -->
-                        <option value="ACK">АСК</option>
-                        <option value="OPzS">OPzS</option>
-                        <option value="Другой">Другой</option>
-                      </select>
-                      <div class="invalid-feedback">Выберите тип аккумулятора</div>
-                      <!-- <div class="valid-feedback">Looks good!</div> -->
-                    </div>
-                  </div>
-
-                  <!-- <div class="row"> -->
-                    <!-- <div class="mb-2 text-start"> -->
-                      <!-- <label for="state" class="form-label ">Состояние переезда:</label> -->
-                      <!-- <select class="form-select form-select-sm" name="state" id="state"> -->
-                        <!-- <option value="">Выберите...</option> -->
-                        <!-- <option value="open">Открыт</option> -->
-                        <!-- <option value="close">Закрыт</option> -->
-                      <!-- </select> -->
-                      <!-- <div class="invalid-feedback">Выберите тип аккумулятора</div> -->
-                      <!-- <div class="valid-feedback">Looks good!</div> -->
-                    <!-- </div> -->
-                  <!-- </div> -->
-
-                  <div class="row">
-                    <div class="mb-2 text-start">
-                      <label for="location" class="form-label ">Размещение:</label>
-                      <select class="form-select form-select-sm" name="location" id="location">
-                        <!-- <option value="">Выберите...</option> -->
-                        <option value="inside">Шкаф</option>
-                        <option value="outside">МАП/ЭЦ-ТМ/Пост ЭЦ</option>
-                      </select>
-                    </div>
-                  </div>
-                </form>
-                  <div class="row">
-                    <div class="mb-2 text-start">
-                      <button class="btn btn-outline-secondary mt-1 py-0 w-100">Настройки
+                      <button class="btn btn-outline-secondary mt-1 py-0 w-100" data-bs-toggle="modal" data-bs-target="#settingsModal" >Настройки
                         <i class='bx bx-cog fs-4 opacity-70 ms-1'></i>
-                        <!-- <img  class="ms-2" src="./assets/images/setting.svg" alt="SVG Image"> -->
                       </button>
-
                     </div>
-                  </div>
+                  
+                </div>
                   
                 </div>
 
@@ -263,6 +223,70 @@
 
     </div>
 
+
+
+    <!-- Vertically centered modal -->
+<div class="modal fade" id="settingsModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Настройки:</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body px-3">
+        <div class="container-fluid">
+          <div class="col-6">
+            <form class="" id="settingForm" novalidate>
+              <div class="row">
+                <div class="mb-2 text-start">
+                  <label for="formManufacturer" class="form-label ">Производитель:</label>
+                  <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" >
+                    <!-- <option value="">Выберите...</option> -->
+                    <option value="НовАК">НовАК</option>
+                    <option value="Другой">Другой</option>
+                  </select>
+                  <div class="invalid-feedback">Выберите значение.</div>
+                  <!-- <div class="valid-feedback">Looks good!</div> -->
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="mb-2 text-start">
+                  <label for="typeAcc" class="form-label ">Тип аккумуляторов:</label>
+                  <select class="form-select form-select-sm" name="manufacturer" id="typeAcc">
+                    <option value="ACK">АСК</option>
+                    <option value="OPzS">OPzS</option>
+                    <option value="Другой">Другой</option>
+                  </select>
+                  <div class="invalid-feedback">Выберите тип аккумулятора</div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="mb-2 text-start">
+                  <label for="location" class="form-label ">Размещение:</label>
+                  <select class="form-select form-select-sm" name="location" id="location">
+                    <option value="inside">Шкаф</option>
+                    <option value="outside">МАП/ЭЦ-ТМ/Пост ЭЦ</option>
+                  </select>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <!-- <button id="canEdit" type="button" class="btn btn-secondary btn-icon btn-sm py-0 " >
+          <i class='bx bx-edit-alt'></i>
+        </button> -->
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+        <button id="saveSetting" type="button" class="btn btn-success btn-sm" >Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
     <!--  modal window -->
     <div class="modal fade" id="modalId" tabindex="-1" role="dialog">
       <div class="modal-dialog modal-dialog-centered" role="document">
@@ -282,8 +306,6 @@
       <div class="canEdit rounded-2" id="NameDeviceDiv" contenteditable="false">
         <h4 class="my-0" id="NameDevice"></h4>
       </div>
-      <!-- <input class="form-control" type="text" name="NameDevice" id="NameDevice" placeholder="Название устройства" value="" required> -->
-      <!-- <div class="valid-feedback">Looks good!</div> -->
     </div>
 
   </div>
@@ -345,8 +367,6 @@
         <button id="buttonPlus" class="btn btn-secondary px-2 py-0" type="button"><span class='fs-4 my-0 mx-0'>+</span></button>
       </div>
     <!-- </div> -->
-    <!-- <input class="form-control" type="number" name="CountDevice" id="validationCustom02" placeholder="" value="1" required> -->
-    <!-- <div class="valid-feedback">Looks good!</div> -->
   </div>
 </div>
 
