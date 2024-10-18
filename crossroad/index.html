@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#14191e">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="keywords" content="переезд, рассчет переезда, временные параметры переезда">
+<meta name="description" content="Данный редактор позволяет производить рассчет параметров переездной сигнализации.">
+<meta name="author" content="dismiro">
+<title>Онлайн калькулятор параметров переезда</title>
+<!-- <link rel="shortcut icon" href="https://programforyou.ru/favicon.ico?v=2" type="image/x-icon"> -->
+
+<link rel="stylesheet" href ="./style/style.css"> 
+<link rel="stylesheet" href ="./style/style2.css"> 
+
+</head>
+<body oncontextmenu="return false;">
+<header>
+<div class="menu">
+<div class="menu-logo"><a href=""><img src="./images/logo.gif" alt="logo of Programforyou"></a></div>
+<div class="menu-items">
+<ul>
+<li><a href="">О нас</a></li>
+<li id="sub-menu-li"><a><span class="fa fa-caret-right"></span> Сервисы</a>
+<ul class="sub-menu">
+<li><a title="Вы сейчас на этой странице">Калькулятор параметров переезда</a></li>
+<!-- <li><a href="https://programforyou.ru/graph-redactor" target="_blank">Редактор графов</a></li> -->
+<li><a href="../MU_ui/new_design/pricing/index.html" target="_blank">МУ новый дизайн</a></li>
+</ul>
+</li>
+<li><a href="">Контакты</a></li>
+</ul>
+</div>
+</div>
+</header>
+<canvas id="canvas" width="1370" height="854" style="width: 1370px; height: 854px; cursor: default;" title=""></canvas>
+<input id="input" type="file" accept=".json">
+<input id="source-input" type="file" accept=".cpp, .hpp, .c, .h, .pas">
+<input id="text-input" type="text">
+<img src="./images/keyboard.svg" class="icon" id="keyboard">
+<img src="./images/keyboard_dark.svg" class="icon" id="keyboard-dark">
+<img src="./images/keyboard_active.svg" class="icon" id="keyboard-active">
+<img src="./images/keyboard_active_dark.svg" class="icon" id="keyboard-active-dark">
+<img src="./images/trash.svg" class="icon" id="minus">
+<img src="./images/trash_dark.svg" class="icon" id="minus-dark">
+<img src="./images/trash_active.svg" class="icon" id="minus-active">
+<img src="./images/trash_active_dark.svg" class="icon" id="minus-active-dark">
+<img src="./images/undo.svg" class="icon" id="undo">
+<img src="./images/undo_dark.svg" class="icon" id="undo-dark">
+<img src="./images/undo_active.svg" class="icon" id="undo-active">
+<img src="./images/undo_active_dark.svg" class="icon" id="undo-active-dark">
+<img src="./images/redo.svg" class="icon" id="repeat">
+<img src="./images/redo_dark.svg" class="icon" id="repeat-dark">
+<img src="./images/redo_active.svg" class="icon" id="repeat-active">
+<img src="./images/redo_active_dark.svg" class="icon" id="repeat-active-dark">
+<img src="./images/zoom_out.svg" class="icon" id="zoom-out">
+<img src="./images/zoom_out_dark.svg" class="icon" id="zoom-out-dark">
+<img src="./images/zoom_out_active.svg" class="icon" id="zoom-out-active">
+<img src="./images/zoom_out_active_dark.svg" class="icon" id="zoom-out-active-dark">
+<img src="./images/zoom_in.svg" class="icon" id="zoom-in">
+<img src="./images/zoom_in_dark.svg" class="icon" id="zoom-in-dark">
+<img src="./images/zoom_in_active.svg" class="icon" id="zoom-in-active">
+<img src="./images/zoom_in_active_dark.svg" class="icon" id="zoom-in-active-dark">
+<img src="./images/grid.svg" class="icon" id="grid">
+<img src="./images/grid_dark.svg" class="icon" id="grid-dark">
+<img src="./images/grid_active.svg" class="icon" id="grid-active">
+<img src="./images/grid_active_dark.svg" class="icon" id="grid-active-dark">
+<img src="./images/hide_grid.svg" class="icon" id="hide-grid">
+<img src="./images/hide_grid_dark.svg" class="icon" id="hide-grid-dark">
+<img src="./images/hide_grid_active.svg" class="icon" id="hide-grid-active">
+<img src="./images/hide_grid_active_dark.svg" class="icon" id="hide-grid-active-dark">
+<img src="./images/download.svg" class="icon" id="download">
+<img src="./images/download_dark.svg" class="icon" id="download-dark">
+<img src="./images/download_active_dark.svg" class="icon" id="download-active-dark">
+<img src="./images/image.svg" class="icon" id="image">
+<img src="./images/image_dark.svg" class="icon" id="image-dark">
+<img src="./images/image_active_dark.svg" class="icon" id="image-active-dark">
+<img src="./images/areas.svg" class="icon" id="areas">
+<img src="./images/areas_dark.svg" class="icon" id="areas-dark">
+<img src="./images/areas_active_dark.svg" class="icon" id="areas-active-dark">
+<img src="./images/upload.svg" class="icon" id="upload">
+<img src="./images/upload_dark.svg" class="icon" id="upload-dark">
+<img src="./images/upload_active_dark.svg" class="icon" id="upload-active-dark">
+<img src="./images/theme.svg" class="icon" id="theme">
+<img src="./images/theme_dark.svg" class="icon" id="theme-dark">
+<img src="./images/theme_active_dark.svg" class="icon" id="theme-active-dark">
+<img src="./images/instruction.svg" class="icon" id="instruction">
+<img src="./images/instruction_dark.svg" class="icon" id="instruction-dark">
+<img src="./images/instruction_active_dark.svg" class="icon" id="instruction-active-dark">
+<img src="./images/block.svg" class="icon" id="block">
+<img src="./images/block_dark.svg" class="icon" id="block-dark">
+<img src="./images/arrow.svg" class="icon" id="arrow">
+<img src="./images/arrow_dark.svg" class="icon" id="arrow-dark">
+<img src="./images/edit.svg" class="icon" id="edit">
+<img src="./images/edit_dark.svg" class="icon" id="edit-dark">
+<img src="./images/edit_active_dark.svg" class="icon" id="edit-active-dark">
+<img src="./images/edit_active.svg" class="icon" id="edit-active">
+<img src="./images/bold.svg" class="icon" id="bold">
+<img src="./images/bold_dark.svg" class="icon" id="bold-dark">
+<img src="./images/bold_active_dark.svg" class="icon" id="bold-active-dark">
+<img src="./images/bold_active.svg" class="icon" id="bold-active">
+<img src="./images/italic.svg" class="icon" id="italic">
+<img src="./images/italic_dark.svg" class="icon" id="italic-dark">
+<img src="./images/italic_active_dark.svg" class="icon" id="italic-active-dark">
+<img src="./images/italic_active.svg" class="icon" id="italic-active">
+<img src="./images/increase_font.svg" class="icon" id="increase-font">
+<img src="./images/increase_font_dark.svg" class="icon" id="increase-font-dark">
+<img src="./images/increase_font_active_dark.svg" class="icon" id="increase-font-active-dark">
+<img src="./images/increase_font_active.svg" class="icon" id="increase-font-active">
+<img src="./images/decrease_font.svg" class="icon" id="decrease-font">
+<img src="./images/decrease_font_dark.svg" class="icon" id="decrease-font-dark">
+<img src="./images/decrease_font_active_dark.svg" class="icon" id="decrease-font-active-dark">
+<img src="./images/decrease_font_active.svg" class="icon" id="decrease-font-active">
+<img src="./images/left_align.svg" class="icon" id="left-align">
+<img src="./images/left_align_dark.svg" class="icon" id="left-align-dark">
+<img src="./images/left_align_active_dark.svg" class="icon" id="left-align-active-dark">
+<img src="./images/left_align_active.svg" class="icon" id="left-align-active">
+<img src="./images/center_align.svg" class="icon" id="center-align">
+<img src="./images/center_align_dark.svg" class="icon" id="center-align-dark">
+<img src="./images/center_align_active_dark.svg" class="icon" id="center-align-active-dark">
+<img src="./images/center_align_active.svg" class="icon" id="center-align-active">
+<img src="./images/change.svg" class="icon" id="change">
+<img src="./images/change_dark.svg" class="icon" id="change-dark">
+<img src="./images/change_active.svg" class="icon" id="change-active">
+<img src="./images/change_active_dark.svg" class="icon" id="change-active-dark">
+
+<script src = "src/code.js"></script>
+</body>
+</html>
