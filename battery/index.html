@@ -14,7 +14,7 @@
 
   <style>
   .main-container { 
-      max-width: 1050px;
+      max-width: 1200px;
   }
 
   .pricing-header {
@@ -145,7 +145,7 @@
           </div>
           <div class="card-body py-2">
             <div class="row">  
-              <div class="col-8 rounded-3 border px-1">
+              <div class="col-9 rounded-3 border px-1">
                 <div>
                   <h5 class="my-1 fw-normal">Перечень устройств:</h5>
                    <ul class="list-group list-group"id="device-list">
@@ -167,35 +167,38 @@
                 </div>
               </div>
 
-              <div class="col-4 px-0">
+              <div class="col-3 px-0">
                 <div class="border rounded-3 ms-1">
 
                 <div>
-                  <h5 class="my-1 fw-normal">Настройки:</h5>
+                  <h5 class="my-1 fw-normal">Конфигурация:</h5>
                </div>
-                <div class=" py-1 mx-1">
-                  <form class="" id="settingMainForm" novalidate>
-                    <div class="row">
-                      <div class="mb-2 text-start">
-                        <label for="" class="form-label ">Групп аккумуляторов:</label>
-                        <select class="form-select form-select-sm" name="manufacturer" id="formManufacturer" >
-                          <option value="1">Одна группа (7шт.)</option>
-                          <option value="2">Две группы (14шт.)</option>
-                          <option value="3">Три группы (21шт.)</option>
-                          <option value="4">Четыре группы (28шт)</option>
-                        </select>
-                      </div>
+                <div class=" py-0 mx-1">
+                    
+                  <div class="row">
+                    <div class="mt- mb-2 text-start">
+                      <button class="btn btn-outline-secondary mt-1 py-0 w-100" >Шаблоны
+                        <i class='bx bx-file fs-4 opacity-70 ms-1'></i>
+                      </button>
                     </div>
-                  </form>
+                  </div>  
+
                   <div class="row">
                     <div class="mb-2 text-start">
                       <button class="btn btn-outline-secondary mt-1 py-0 w-100" data-bs-toggle="modal" data-bs-target="#settingsModal" >Настройки
                         <i class='bx bx-cog fs-4 opacity-70 ms-1'></i>
                       </button>
                     </div>
-                  
-                </div>
-                  
+                  </div>
+
+                <div class="row">
+                  <div class="mb-2 text-start">
+                    <button class="btn btn-outline-secondary mt-1 py-0 w-100" data-bs-toggle="modal" data-bs-target="#settingsModal" >Расширенные
+                      <i class='bx bx-slider-alt fs-4 opacity-70 ms-1'></i>
+                    </button>
+                  </div>
+                </div> 
+                
                 </div>
 
             </div>
@@ -236,7 +239,6 @@
       </div>
       <div class="modal-body px-3">
         <div class="container-fluid">
-          <div class="col-6">
             <form class="" id="settingForm" novalidate>
               <div class="row">
                 <div class="mb-2 text-start">
@@ -272,8 +274,18 @@
                   </select>
                 </div>
               </div>
+              <div class="row">
+                <div class="mb-2 text-start">
+                  <label for="countGroups" class="form-label ">Группы аккумуляторов:</label>
+                  <select class="form-select form-select-sm" name="countGroups" id="countGroups" >
+                    <option value="1">Одна группа (7шт.)</option>
+                    <option value="2">Две группы (14шт.)</option>
+                    <option value="3">Три группы (21шт.)</option>
+                    <option value="4">Четыре группы (28шт)</option>
+                  </select>
+                </div>
+              </div>
             </form>
-          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -327,19 +339,19 @@
       </div>
     </div>
     <div class="col-4 mb-3 text-start">
+      <div id='selectGroup' class='py-0 px-0 d-none'>
       <label for="" class="form-label">Подключен к:</label>
       <div class="btn-group-sm" id="">
         <div class=" py-1">
           <button type="button" class="btn btn-secondary dropdown-toggle w-100 mb-2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
           Батарея №1
           </button>
-          <div class="dropdown-menu my-1">
-            <a href="#" class="dropdown-item">Батарея №1</a>
-            <a href="#" class="dropdown-item">Батарея №2</a>
+          <div class="dropdown-menu my-1" id = 'listGroups'>
           </div>
         </div>
         
       </div>
+    </div>
     </div>
   </div>
   <div class="row">

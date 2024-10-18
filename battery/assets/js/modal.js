@@ -34,18 +34,21 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
           const count = parseInt(document.getElementById('numCount').textContent);
           const amperageClosed = parseFloat(document.getElementById('amperageClosed').textContent);;
           const amperageOpened = parseFloat(document.getElementById('amperageOpened').textContent);;
-          
+          const groupNumber = 1
           const li1 = document.createElement('li')
           const span = document.createElement('span')
+          const group = document.createElement('i')
           const edit = document.createElement('i')
           const remove = document.createElement('i')
           li1.classList.add('list-group-item', 'd-flex', 'align-items-center', 'py-2')
           li1.textContent = `${nameDevice}`
           span.classList.add('badge', 'rounded-3', 'bg-secondary', 'ms-auto', 'me-2')
           span.textContent= `${amperageClosed} А х ${count} шт.`
-          edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-70', 'edit')
-          remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-70', 'ms-2', 'remove')
+          group.classList.add('bi', `bi-${groupNumber}-square`, 'fs-4', 'opacity-80', 'ms-2')
+          edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-80', 'ms-2', 'edit')
+          remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80', 'ms-2', 'remove')
           li1.appendChild(span)
+          li1.appendChild(group)
           li1.appendChild(edit)
           li1.appendChild(remove)
         //   const li = `<li class="list-group-item d-flex align-items-center py-2" data-amperage="0.1">${nameDevice}
@@ -175,3 +178,23 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
   document.getElementById('amperageClosed').contentEditable = editable !== 'true'? 'true':'false'
   document.getElementById('amperageOpened').contentEditable = editable !== 'true'? 'true':'false'
   })
+
+document.getElementById('countGroups').addEventListener('change', function() {
+  const listGroups = document.getElementById('listGroups')
+  const selectGroup = document.getElementById('selectGroup')
+
+  selectGroup
+  listGroups.innerHTML=''
+  const countGroups = parseInt(this.value)
+  if(countGroups == 1){
+    selectGroup.classList.add('d-none')
+  } else {
+    selectGroup.classList.remove('d-none')
+  }
+  for (let i = 1; i <= countGroups; i++){
+    const a = document.createElement('a')
+    a.classList.add('dropdown-item')
+    a.textContent = 'Батарея №'+ i
+    listGroups.appendChild(a)
+  }
+})
