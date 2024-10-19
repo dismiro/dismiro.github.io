@@ -4,8 +4,8 @@ document.addEventListener("DOMContentLoaded", (event) => {
 });
 
 var exampleModal = document.getElementById('modalId')
-
 exampleModal.addEventListener('show.bs.modal', function (event) {
+  // console.log(event)
   var button = event.relatedTarget
   var recipient = button.getAttribute('data-bs-device')
   var modalTitle = exampleModal.querySelector('#NameDevice')
@@ -13,9 +13,7 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
 })
 
 exampleModal.addEventListener('hidden.bs.modal', function (event) {
-  // modalForm.reset()
   document.getElementById('numCount').textContent = 1
-  // modalForm.classList.remove('was-validated')
 })
 
   var modalForm = document.getElementById('modalForm')
@@ -34,7 +32,7 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
           const count = parseInt(document.getElementById('numCount').textContent);
           const amperageClosed = parseFloat(document.getElementById('amperageClosed').textContent);;
           const amperageOpened = parseFloat(document.getElementById('amperageOpened').textContent);;
-          const groupNumber = 1
+          const groupNumber = parseInt(document.getElementById('groupBtn').value)
           const li1 = document.createElement('li')
           const span = document.createElement('span')
           const group = document.createElement('i')
@@ -51,21 +49,13 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
           li1.appendChild(group)
           li1.appendChild(edit)
           li1.appendChild(remove)
-        //   const li = `<li class="list-group-item d-flex align-items-center py-2" data-amperage="0.1">${nameDevice}
-        //   <span class="badge rounded-3 bg-secondary ms-auto me-2">${count} шт. </span>
-        //   <i class='bx bx-edit-alt fs-4 opacity-70 edit'></i>
-        //   <i class='bx bx-trash fs-4 opacity-70 ms-2 remove'></i>
-        // </li>`
-        // deviceList.insertAdjacentHTML('beforeend', li)
         li1.data = {name: nameDevice,
                     count: count,
                     amperage: amperageClosed,
-                    amperageOpened: amperageOpened
-                    
+                    amperageOpened: amperageOpened,
+                    groupNumber: groupNumber   
       }
           deviceList.appendChild(li1)
-
-          
           $('#modalId').modal('hide');
         }, false)
 const deviceList = document.getElementById('device-list')
@@ -94,27 +84,21 @@ settingForm.addEventListener('submit', function (event) {
           console.log('unvalidate')
           return
       }
-      // settingForm.classList.remove('was-validated')
         const outputResult = document.getElementById('outputResult')
         outputResult.innerHTML= ''
         const list = Array.from(document.getElementById('device-list').children)
         outputResult.appendChild(makeOutputRow('Количество устройств', countDevices(list)))
         outputResult.appendChild(makeOutputRow('Потребляемый ток', sumAmperage(list), 'А'))
-        outputResult.appendChild(makeOutputRow('Расчетная емкость(8ч.)', sumAmperage(list) * 8, 'А/ч'))
+        outputResult.appendChild(makeOutputRow('Расч. емкость(8ч.)', sumAmperage(list) * 8, 'А/ч'))
         outputResult.appendChild(makeOutputRow('Коэффициент 0,42', Math.round(sumAmperage(list) * 8 / 0.42 * 100) /100, 'А/ч'))
         outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 100) /100), 'А/ч'))
         outputResult.appendChild(makeOutputRow('Коэффициент 1,25', (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 1.25* 100) /100), 'А/ч'))
-        // loadTable('./assets/tabs/ACK.json')
         const type = document.getElementById('typeAcc')
-        console.log(type.table)
         const capacity = (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 1.25* 100) /100)
         outputResult.appendChild(makeOutputRow('Аккумулятор', (findAcc(capacity)),''))
-        
-        
       }, false)
 
 document.getElementById('typeAcc').addEventListener('change', function() {
-  // alert(this.value)
   loadTable(`./assets/tabs/${this.value}.json`)
 })
 
@@ -195,6 +179,12 @@ document.getElementById('countGroups').addEventListener('change', function() {
     const a = document.createElement('a')
     a.classList.add('dropdown-item')
     a.textContent = 'Батарея №'+ i
+    a.value = i
     listGroups.appendChild(a)
   }
+})
+document.getElementById('listGroups').addEventListener('click', function(event) {
+  const groupBtn = document.getElementById('groupBtn') 
+  groupBtn.textContent =  event.target.textContent
+  groupBtn.value =  event.target.value
 })
