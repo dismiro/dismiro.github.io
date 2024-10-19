@@ -5,11 +5,25 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
 var exampleModal = document.getElementById('modalId')
 exampleModal.addEventListener('show.bs.modal', function (event) {
-  // console.log(event)
-  var button = event.relatedTarget
-  var recipient = button.getAttribute('data-bs-device')
-  var modalTitle = exampleModal.querySelector('#NameDevice')
-  modalTitle.value = recipient
+  // console.log(event.relatedTarget.parentNode.data)
+  const target = event.relatedTarget
+  const title = exampleModal.querySelector('#NameDevice')
+  const count = exampleModal.querySelector('#numCount')
+  const amperageClosed = exampleModal.querySelector('#amperageClosed')
+  const amperageOpened = exampleModal.querySelector('#amperageOpened')
+  const alwaysConnected = exampleModal.querySelector('#alwaysConnected')
+  
+  
+  if (target.dataset.role==="create"){
+  title.textContent = target.getAttribute('data-bs-device')
+  } else if (target.dataset.role==="edit") {
+    const data = target.parentNode.data
+    title.textContent = data.name
+    count.textContent = data.count
+    amperageClosed.textContent = data.amperageClosed
+    amperageOpened.textContent = data.amperageOpened
+    alwaysConnected.checked = data.alwaysConnected
+  }
 })
 
 exampleModal.addEventListener('hidden.bs.modal', function (event) {
@@ -25,35 +39,53 @@ exampleModal.addEventListener('hidden.bs.modal', function (event) {
             console.log('unvalidate')
             return
         }
-          modalForm.classList.add('was-validated')
+          // modalForm.classList.add('was-validated')
           const deviceList = document.getElementById('device-list')
-          const formData = new FormData(modalForm)
+          // const formData = new FormData(modalForm)
           const nameDevice = document.getElementById('NameDevice').textContent
           const count = parseInt(document.getElementById('numCount').textContent);
           const amperageClosed = parseFloat(document.getElementById('amperageClosed').textContent);;
           const amperageOpened = parseFloat(document.getElementById('amperageOpened').textContent);;
           const groupNumber = parseInt(document.getElementById('groupBtn').value)
+          const alwaysConnected = document.getElementById('alwaysConnected').checked
           const li1 = document.createElement('li')
           const span = document.createElement('span')
           const group = document.createElement('i')
+          const groupBtn = document.createElement('button')
           const edit = document.createElement('i')
+          const editBtn = document.createElement('button')
           const remove = document.createElement('i')
+          const removeBtn = document.createElement('button')
           li1.classList.add('list-group-item', 'd-flex', 'align-items-center', 'py-2')
           li1.textContent = `${nameDevice}`
           span.classList.add('badge', 'rounded-3', 'bg-secondary', 'ms-auto', 'me-2')
           span.textContent= `${amperageClosed} А х ${count} шт.`
-          group.classList.add('bi', `bi-${groupNumber}-square`, 'fs-4', 'opacity-80', 'ms-2')
-          edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-80', 'ms-2', 'edit')
-          remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80', 'ms-2', 'remove')
+          group.classList.add('bi', `bi-${groupNumber}-square`, 'fs-4', 'opacity-80')
+          edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-80', 'edit')
+          remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80', 'remove')
+
+          groupBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
+          groupBtn.append(group)
+          editBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
+          editBtn.append(edit)
+          removeBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
+          removeBtn.append(remove)
+
+          editBtn.setAttribute('data-bs-toggle','modal')
+          editBtn.setAttribute('data-bs-target','#modalId')
+          editBtn.setAttribute('data-role','edit')
+
           li1.appendChild(span)
-          li1.appendChild(group)
-          li1.appendChild(edit)
-          li1.appendChild(remove)
+          li1.appendChild(groupBtn)
+          li1.appendChild(editBtn)
+          li1.appendChild(removeBtn)
+          
         li1.data = {name: nameDevice,
                     count: count,
-                    amperage: amperageClosed,
+                    amperageClosed: amperageClosed,
                     amperageOpened: amperageOpened,
-                    groupNumber: groupNumber   
+                    groupNumber: groupNumber,
+                    alwaysConnected: alwaysConnected   
       }
           deviceList.appendChild(li1)
           $('#modalId').modal('hide');
@@ -71,8 +103,8 @@ deviceList.addEventListener('mouseout', function(event) {
 })
 deviceList.addEventListener('click', function(event) {
   const classList = event.target.classList.value;
-  if (classList.includes('edit'))  console.log(event.target.parentNode.data)
-  if (classList.includes('remove')) event.target.parentNode.remove()
+  if (classList.includes('edit'))  console.log(event.target.parentNode.parentNode.data)
+  if (classList.includes('remove')) event.target.parentNode.parentNode.remove()
 })
 
 
