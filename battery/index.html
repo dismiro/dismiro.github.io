@@ -178,7 +178,7 @@
                   <div class="row">
                     <div class="mt- mb-2 text-start">
                       <button class="btn btn-outline-secondary mt-1 py-0 w-100" >Шаблоны
-                        <i class='bx bx-file fs-4 opacity-70 ms-1'></i>
+                        <i class='bx bx-file fs-4 opacity-80 ms-1'></i>
                       </button>
                     </div>
                   </div>  
@@ -186,7 +186,7 @@
                   <div class="row">
                     <div class="mb-2 text-start">
                       <button class="btn btn-outline-secondary mt-1 py-0 w-100" data-bs-toggle="modal" data-bs-target="#settingsModal" >Настройки
-                        <i class='bx bx-cog fs-4 opacity-70 ms-1'></i>
+                        <i class='bx bx-cog fs-4 opacity-80 ms-1'></i>
                       </button>
                     </div>
                   </div>
@@ -194,7 +194,7 @@
                 <div class="row">
                   <div class="mb-2 text-start">
                     <button class="btn btn-outline-secondary mt-1 py-0 w-100" data-bs-toggle="modal" data-bs-target="#settingsModal" >Расширенные
-                      <i class='bx bx-slider-alt fs-4 opacity-70 ms-1'></i>
+                      <i class='bx bx-slider-alt fs-4 opacity-80 ms-1'></i>
                     </button>
                   </div>
                 </div> 
@@ -293,7 +293,7 @@
           <i class='bx bx-edit-alt'></i>
         </button> -->
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
-        <button id="saveSetting" type="button" class="btn btn-success btn-sm" >Сохранить</button>
+        <button id="saveSetting" type="button" class="btn btn-success btn-sm" data-bs-dismiss="modal" >Сохранить</button>
       </div>
     </div>
   </div>
@@ -392,7 +392,8 @@
                 <i class='bx bx-edit-alt fs-4 py-0 '></i> -->
             </button>
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
-            <button id="submitModal" type="submit" class="btn btn-success btn-sm " >Добавить</button>
+            <button id="submitModal" type="button" class="btn btn-success btn-sm " >Добавить</button>
+            <button id="saveEditBtn" type="button" class="btn btn-success  btn-sm d-none" data-bs-dismiss="modal" >Сохранить</button>
           </div>
         </form>
   </section>

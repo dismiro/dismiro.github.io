@@ -12,10 +12,16 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
   const amperageClosed = exampleModal.querySelector('#amperageClosed')
   const amperageOpened = exampleModal.querySelector('#amperageOpened')
   const alwaysConnected = exampleModal.querySelector('#alwaysConnected')
+  const groupBtn = document.getElementById('groupBtn') 
+  const saveEditBtn = document.getElementById('saveEditBtn')
+  const addBtn = document.getElementById('submitModal')
   
   
   if (target.dataset.role==="create"){
   title.textContent = target.getAttribute('data-bs-device')
+  saveEditBtn.classList.add('d-none')
+  addBtn.classList.remove('d-none')
+  
   } else if (target.dataset.role==="edit") {
     const data = target.parentNode.data
     title.textContent = data.name
@@ -23,71 +29,26 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
     amperageClosed.textContent = data.amperageClosed
     amperageOpened.textContent = data.amperageOpened
     alwaysConnected.checked = data.alwaysConnected
+    groupBtn.textContent = 'Батарея №'+ data.groupNumber
+    groupBtn.value =  data.groupNumber
+    saveEditBtn.classList.remove('d-none')
+    saveEditBtn.editedElement = event.relatedTarget.parentNode
+    addBtn.classList.add('d-none')
+    // console.log(saveEditBtn.editedElement )
   }
 })
 
 exampleModal.addEventListener('hidden.bs.modal', function (event) {
   document.getElementById('numCount').textContent = 1
+
+  
 })
 
   var modalForm = document.getElementById('modalForm')
-  modalForm.addEventListener('submit', function (event) {
-    event.preventDefault()    
-    if (!modalForm.checkValidity()) {
-            
-            event.stopPropagation()
-            console.log('unvalidate')
-            return
-        }
-          // modalForm.classList.add('was-validated')
+  document.getElementById('submitModal').addEventListener('click', function (event) {
+    // event.preventDefault()    
           const deviceList = document.getElementById('device-list')
-          // const formData = new FormData(modalForm)
-          const nameDevice = document.getElementById('NameDevice').textContent
-          const count = parseInt(document.getElementById('numCount').textContent);
-          const amperageClosed = parseFloat(document.getElementById('amperageClosed').textContent);;
-          const amperageOpened = parseFloat(document.getElementById('amperageOpened').textContent);;
-          const groupNumber = parseInt(document.getElementById('groupBtn').value)
-          const alwaysConnected = document.getElementById('alwaysConnected').checked
-          const li1 = document.createElement('li')
-          const span = document.createElement('span')
-          const group = document.createElement('i')
-          const groupBtn = document.createElement('button')
-          const edit = document.createElement('i')
-          const editBtn = document.createElement('button')
-          const remove = document.createElement('i')
-          const removeBtn = document.createElement('button')
-          li1.classList.add('list-group-item', 'd-flex', 'align-items-center', 'py-2')
-          li1.textContent = `${nameDevice}`
-          span.classList.add('badge', 'rounded-3', 'bg-secondary', 'ms-auto', 'me-2')
-          span.textContent= `${amperageClosed} А х ${count} шт.`
-          group.classList.add('bi', `bi-${groupNumber}-square`, 'fs-4', 'opacity-80')
-          edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-80', 'edit')
-          remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80', 'remove')
-
-          groupBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
-          groupBtn.append(group)
-          editBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
-          editBtn.append(edit)
-          removeBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
-          removeBtn.append(remove)
-
-          editBtn.setAttribute('data-bs-toggle','modal')
-          editBtn.setAttribute('data-bs-target','#modalId')
-          editBtn.setAttribute('data-role','edit')
-
-          li1.appendChild(span)
-          li1.appendChild(groupBtn)
-          li1.appendChild(editBtn)
-          li1.appendChild(removeBtn)
-          
-        li1.data = {name: nameDevice,
-                    count: count,
-                    amperageClosed: amperageClosed,
-                    amperageOpened: amperageOpened,
-                    groupNumber: groupNumber,
-                    alwaysConnected: alwaysConnected   
-      }
-          deviceList.appendChild(li1)
+          deviceList.appendChild(fillDevice())
           $('#modalId').modal('hide');
         }, false)
 const deviceList = document.getElementById('device-list')
@@ -103,7 +64,6 @@ deviceList.addEventListener('mouseout', function(event) {
 })
 deviceList.addEventListener('click', function(event) {
   const classList = event.target.classList.value;
-  if (classList.includes('edit'))  console.log(event.target.parentNode.parentNode.data)
   if (classList.includes('remove')) event.target.parentNode.parentNode.remove()
 })
 
@@ -125,7 +85,7 @@ settingForm.addEventListener('submit', function (event) {
         outputResult.appendChild(makeOutputRow('Коэффициент 0,42', Math.round(sumAmperage(list) * 8 / 0.42 * 100) /100, 'А/ч'))
         outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 100) /100), 'А/ч'))
         outputResult.appendChild(makeOutputRow('Коэффициент 1,25', (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 1.25* 100) /100), 'А/ч'))
-        const type = document.getElementById('typeAcc')
+        // const type = document.getElementById('typeAcc')
         const capacity = (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 1.25* 100) /100)
         outputResult.appendChild(makeOutputRow('Аккумулятор', (findAcc(capacity)),''))
       }, false)
@@ -150,7 +110,7 @@ function countDevices(list) {
 return list.reduce((acc,item) => acc + Number(item.data.count), 0);
 }
 function sumAmperage(list) {
-  return list.reduce((acc,item) => acc + (item.data.amperage * item.data.count), 0);
+  return list.reduce((acc,item) => acc + (item.data.amperageClosed * item.data.count), 0);
 }
 function loadTable(path) {
   fetch(path)
@@ -220,3 +180,58 @@ document.getElementById('listGroups').addEventListener('click', function(event) 
   groupBtn.textContent =  event.target.textContent
   groupBtn.value =  event.target.value
 })
+
+document.getElementById('saveEditBtn').addEventListener('click', function(event) {
+  const li = this.editedElement
+  li.replaceWith(fillDevice())
+})
+
+function fillDevice() {
+  const deviceList = document.getElementById('device-list')
+          const nameDevice = document.getElementById('NameDevice').textContent
+          const count = parseInt(document.getElementById('numCount').textContent);
+          const amperageClosed = parseFloat(document.getElementById('amperageClosed').textContent);;
+          const amperageOpened = parseFloat(document.getElementById('amperageOpened').textContent);;
+          const groupNumber = parseInt(document.getElementById('groupBtn').value)
+          const alwaysConnected = document.getElementById('alwaysConnected').checked
+          const li1 = document.createElement('li')
+          const span = document.createElement('span')
+          const group = document.createElement('i')
+          const groupBtn = document.createElement('button')
+          const edit = document.createElement('i')
+          const editBtn = document.createElement('button')
+          const remove = document.createElement('i')
+          const removeBtn = document.createElement('button')
+          li1.classList.add('list-group-item', 'd-flex', 'align-items-center', 'py-2')
+          li1.textContent = `${nameDevice}`
+          span.classList.add('badge', 'rounded-3', 'bg-secondary', 'ms-auto', 'me-2')
+          span.textContent= `${amperageClosed} А х ${count} шт.`
+          group.classList.add('bi', `bi-${groupNumber}-square`, 'fs-4', 'opacity-80')
+          edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-80', 'edit')
+          remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80', 'remove')
+
+          groupBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
+          groupBtn.append(group)
+          editBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
+          editBtn.append(edit)
+          removeBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
+          removeBtn.append(remove)
+
+          editBtn.setAttribute('data-bs-toggle','modal')
+          editBtn.setAttribute('data-bs-target','#modalId')
+          editBtn.setAttribute('data-role','edit')
+
+          li1.appendChild(span)
+          li1.appendChild(groupBtn)
+          li1.appendChild(editBtn)
+          li1.appendChild(removeBtn)
+          
+        li1.data = {name: nameDevice,
+                    count: count,
+                    amperageClosed: amperageClosed,
+                    amperageOpened: amperageOpened,
+                    groupNumber: groupNumber,
+                    alwaysConnected: alwaysConnected   
+      }
+  return li1
+}
