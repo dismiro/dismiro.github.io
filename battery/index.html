@@ -193,7 +193,7 @@
 
                 <div class="row">
                   <div class="mb-2 text-start">
-                    <button class="btn btn-outline-secondary mt-1 py-0 w-100" data-bs-toggle="modal" data-bs-target="#settingsModal" >Расширенные
+                    <button class="btn btn-outline-secondary mt-1 py-0 w-100" data-bs-toggle="modal" data-bs-target="#advancedSettingModal" >Расширенные
                       <i class='bx bx-slider-alt fs-4 opacity-80 ms-1'></i>
                     </button>
                   </div>
@@ -298,6 +298,54 @@
     </div>
   </div>
 </div>
+
+
+
+
+
+    <!-- Vertically centered modal -->
+    <div class="modal fade" id="advancedSettingModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Расширенные настройки:</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body px-3">
+            <div class="container-fluid">
+                <form class="" id="advancedSettingForm" novalidate>
+                  <div class="row">
+                    <div class="col-4 border rounded-3 bg-secondary shadow-sm">
+                     <div class="mb-2 text-start">
+                      <label for="formManufacturer" class="form-label">Параметры РТА:</label>
+                      <div class="input-group">
+                        <span class="input-group-text px-1 py-0">
+                          <i class="bx bxs-battery-charging mx-1  fs-4"></i>
+                        </span>
+                        <input class="form-control form-control-sm range-slider-value-min" type="number" value="10">
+                      </div>
+                      <div class="input-group mt-2">
+                        <span class="input-group-text px-1 py-0">
+                          <i class="bx bxs-battery mx-1  fs-4"></i>
+                        </span>
+                        <input class="form-control form-control-sm range-slider-value-min" type="number" value="6">
+                      </div>
+                      <!-- <div class="valid-feedback">Looks good!</div> -->
+                    </div>
+                  </div>
+                </div>
+
+                </form>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+            <button id="" type="button" class="btn btn-success btn-sm" data-bs-dismiss="modal" >Сохранить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
 
     <!--  modal window -->
