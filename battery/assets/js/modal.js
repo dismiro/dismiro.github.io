@@ -19,6 +19,10 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
   
   if (target.dataset.role==="create"){
   title.textContent = target.getAttribute('data-bs-device')
+  count.textContent = target.getAttribute('data-count')
+  amperageClosed.textContent = target.getAttribute('data-amperageClosed')
+  amperageOpened.textContent = target.getAttribute('data-amperageOpened')
+  alwaysConnected.checked = target.getAttribute('data-alwaysConnected')
   saveEditBtn.classList.add('d-none')
   addBtn.classList.remove('d-none')
   
