@@ -44,17 +44,16 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
 
 exampleModal.addEventListener('hidden.bs.modal', function (event) {
   document.getElementById('numCount').textContent = 1
-
-  
 })
 
-  var modalForm = document.getElementById('modalForm')
-  document.getElementById('submitModal').addEventListener('click', function (event) {
-    // event.preventDefault()    
-          const deviceList = document.getElementById('device-list')
-          deviceList.appendChild(fillDevice())
-          $('#modalId').modal('hide');
-        }, false)
+var modalForm = document.getElementById('modalForm')
+document.getElementById('submitModal').addEventListener('click', function (event) {
+  // event.preventDefault()    
+        const deviceList = document.getElementById('device-list')
+        deviceList.appendChild(fillDevice())
+        // $('#modalId').modal('hide');
+      }, false)
+
 const deviceList = document.getElementById('device-list')
 deviceList.addEventListener('mouseover', function(event) {
   const classList = event.target.classList.value;
@@ -83,15 +82,27 @@ settingForm.addEventListener('submit', function (event) {
         const outputResult = document.getElementById('outputResult')
         outputResult.innerHTML= ''
         const list = Array.from(document.getElementById('device-list').children)
+        let amperage = 0
+        if (sumAmperage(list, 'Closed') >= sumAmperage(list, 'Opened')) {
+          outputResult.appendChild(makeOutputRow('Состояние переезда', 'Закрыт',''))
+          amperage = sumAmperage(list, 'Closed') 
+        } else {
+          outputResult.appendChild(makeOutputRow('Состояние переезда', 'Открыт',''))
+          amperage = sumAmperage(list, 'Opened') 
+        }
         outputResult.appendChild(makeOutputRow('Количество устройств', countDevices(list)))
-        outputResult.appendChild(makeOutputRow('Потребляемый ток', sumAmperage(list), 'А'))
-        outputResult.appendChild(makeOutputRow('Расч. емкость(8ч.)', sumAmperage(list) * 8, 'А/ч'))
-        outputResult.appendChild(makeOutputRow('Коэффициент 0,42', Math.round(sumAmperage(list) * 8 / 0.42 * 100) /100, 'А/ч'))
-        outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 100) /100), 'А/ч'))
-        outputResult.appendChild(makeOutputRow('Коэффициент 1,25', (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 1.25* 100) /100), 'А/ч'))
-        // const type = document.getElementById('typeAcc')
-        const capacity = (Math.round(sumAmperage(list) * 8 / 0.42 / 0.8 * 1.25* 100) /100)
+ 
+        outputResult.appendChild(makeOutputRow('Потребляемый ток', Math.round(amperage*100)/100, 'А'))
+        outputResult.appendChild(makeOutputRow('Расч. емкость(8ч.)', Math.round(amperage * 8 * 100)/100, 'А/ч'))
+        outputResult.appendChild(makeOutputRow('Коэффициент 0,42', Math.round(amperage * 8 / 0.42 * 100) /100, 'А/ч'))
+        outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(amperage * 8 / 0.42 / 0.8 * 100) /100), 'А/ч'))
+        outputResult.appendChild(makeOutputRow('Коэффициент 1,25', (Math.round(amperage * 8 / 0.42 / 0.8 * 1.25* 100) /100), 'А/ч'))
+        const capacity = (Math.round(amperage * 8 / 0.42 / 0.8 * 1.25* 100) /100)
         outputResult.appendChild(makeOutputRow('Аккумулятор', (findAcc(capacity)),''))
+        // checkMaxCapacity(list, 100)
+
+        
+
       }, false)
 
 document.getElementById('typeAcc').addEventListener('change', function() {
@@ -113,8 +124,8 @@ function makeOutputRow(text, num, dim='шт.') {
 function countDevices(list) {
 return list.reduce((acc,item) => acc + Number(item.data.count), 0);
 }
-function sumAmperage(list) {
-  return list.reduce((acc,item) => acc + (item.data.amperageClosed * item.data.count), 0);
+function sumAmperage(list, state='Closed') {
+  return list.reduce((acc,item) => acc + (item.data['amperage' + state] * item.data.count), 0);
 }
 function loadTable(path) {
   fetch(path)
@@ -133,7 +144,14 @@ function findAcc(capacity) {
   const searchValue =  table.filter((item) => item.capacity >= capacity)[0]
   return `${searchValue.name} - ${searchValue.capacity}А/ч ` 
 }
+function checkMaxCapacity(list, capacity) {
 
+  const table = document.getElementById('typeAcc').table
+  const searchValue =  table.filter((item) => item.capacity >= capacity)[0]
+  console.log(Math.round(list.filter((item) => item.data.alwaysConnected ===true)
+                  .reduce((acc, item) =>  acc + item.data.amperageOpened, 0) * 36 * 1000) / 1000)
+
+}
 
 
 const numCount = document.getElementById('numCount');

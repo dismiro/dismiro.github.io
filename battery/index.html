@@ -157,8 +157,8 @@
                   </button>
                   <div id="devicesToAdded"class="dropdown-menu my-1">
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId"
-                      data-bs-device="Переездной светофор" data-count = '2' data-amperageClosed = '1.30'
-                      data-amperageOpened = '0.05' data-alwaysConnected='true' data-role='create'>
+                      data-bs-device="Переездной светофор" data-count = '2' data-amperageClosed = '1.3'
+                      data-amperageOpened = '0.1' data-alwaysConnected='true' data-role='create'>
                       Переездной светофор</a>
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId"
                       data-bs-device="Заградительный светофор" data-count = '1' data-amperageClosed = '2.08'
@@ -169,8 +169,8 @@
                      data-amperageOpened = '0' data-alwaysConnected='' data-role='create'>
                      Акустический извещатель</a>
                      <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId"
-                     data-bs-device="Щиток ЩПС" data-count = '1' data-amperageClosed = '0.02'
-                     data-amperageOpened = '0.02' data-alwaysConnected='true' data-role='create'>
+                     data-bs-device="Щиток ЩПС" data-count = '1' data-amperageClosed = '0.2'
+                     data-amperageOpened = '0.2' data-alwaysConnected='true' data-role='create'>
                       Щиток ЩПС</a>
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId"
                      data-bs-device="Шлагбаум" data-count = '2' data-amperageClosed = '0'
@@ -336,20 +336,19 @@
                   <div class="row">
                     <div class="col-4 border rounded-3 bg-secondary shadow-sm">
                      <div class="mb-2 text-start">
-                      <label for="" class="form-label">Параметры РТА:</label>
+                      <label for="chargerBoost" class="form-label">Параметры РТА1:</label>
                       <div class="input-group">
                         <span class="input-group-text px-1 py-0">
-                          <i class="bx bxs-battery-charging mx-1  fs-4"></i>
+                          <i class="bx bxs-battery-charging mx-1 fs-4" data-bs-toggle="tooltip" data-bs-placement="top" data-html="true" title="Ток заряда батареи при форсированном режиме работы РТА1"></i>
                         </span>
-                        <input class="form-control form-control-sm range-slider-value-min" type="number" value="10">
+                        <input class="form-control form-control-sm" id="chargerBoost" type="number" value="10">
                       </div>
                       <div class="input-group mt-2">
                         <span class="input-group-text px-1 py-0">
-                          <i class="bx bxs-battery mx-1  fs-4"></i>
+                          <i class="bx bxs-battery mx-1 fs-4"  data-bs-toggle="tooltip" data-bs-placement="top" data-html="true"  title="Ток заряда батареи при нормальном режиме работы РТА1"></i>
                         </span>
-                        <input class="form-control form-control-sm range-slider-value-min" type="number" value="6">
+                        <input class="form-control form-control-sm " id="chargerNorm" type="number" value="6">
                       </div>
-                      <!-- <div class="valid-feedback">Looks good!</div> -->
                     </div>
                   </div>
                 </div>
@@ -429,7 +428,7 @@
         <li class="list-group-item text-dark d-flex justify-content-between align-items-center ps-0 py-0">
           <div class="form-check form-switch mb-2 ">
             <input class="form-check-input" type="checkbox" id="alwaysConnected" checked="">
-            <label class="form-check-label" for="customSwitch2">Подключен к полюсам батареи при наличии внешнего питания</label>
+            <label class="form-check-label" for="alwaysConnected">Подключен к полюсам батареи при наличии внешнего питания</label>
           </div>
         </li>
         <!-- <li class="list-group-item text-dark d-flex justify-content-between align-items-center ps-0 pt-0 mt-1">
@@ -459,7 +458,7 @@
                 <i class='bx bx-edit-alt fs-4 py-0 '></i> -->
             </button>
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
-            <button id="submitModal" type="button" class="btn btn-success btn-sm " >Добавить</button>
+            <button id="submitModal" type="button" class="btn btn-success btn-sm" data-bs-dismiss="modal" >Добавить</button>
             <button id="saveEditBtn" type="button" class="btn btn-success  btn-sm d-none" data-bs-dismiss="modal" >Сохранить</button>
           </div>
         </form>
@@ -474,7 +473,7 @@
         <small class="d-block mb-3 text-body-secondary">&copy; 2024</small>
       </div>
       <div class="col-10 col-md">
-        <p>Расчеты выполнены на основании методики представленной в указании ГТСС:<br> 1247/1994 от 02 июня 2022г
+        <p>Расчеты выполнены на основании методики представленной в указании ГТСС:<br> 1247/1994 от 02 июня 2022г.
         </p>
       </div>
     </div>
