@@ -158,7 +158,7 @@
                   <div id="devicesToAdded"class="dropdown-menu my-1">
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId"
                       data-bs-device="Переездной светофор" data-count = '2' data-amperageClosed = '1.3'
-                      data-amperageOpened = '0.1' data-alwaysConnected='true' data-role='create'>
+                      data-amperageOpened = '0.1' data-alwaysConnected='' data-role='create'>
                       Переездной светофор</a>
                     <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId"
                       data-bs-device="Заградительный светофор" data-count = '1' data-amperageClosed = '2.08'
@@ -166,7 +166,7 @@
                       Заградительный светофор</a>
                      <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId"
                      data-bs-device="Акустический извещатель" data-count = '2' data-amperageClosed = '0.2'
-                     data-amperageOpened = '0' data-alwaysConnected='' data-role='create'>
+                     data-amperageOpened = '0.2' data-alwaysConnected='true' data-role='create'>
                      Акустический извещатель</a>
                      <a href="#" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalId"
                      data-bs-device="Щиток ЩПС" data-count = '1' data-amperageClosed = '0.2'
@@ -394,11 +394,11 @@
       <div class="canEdit rounded-2" id="NameDeviceDiv" contenteditable="false">
         <ul class="list-group list-group-flush ps-0">
           <li class="list-group-item text-dark d-flex justify-content-between align-items-center ps-0 py-0">
-            Переезд открыт :
+            Переезд закрыт :
             <span class="badge rounded-3 bg-secondary fs-6 mb-1"><span id="amperageClosed" class="canEdit rounded-2">1.25</span> А</span>
           </li>
           <li class="list-group-item text-dark d-flex justify-content-between align-items-center ps-0 pt-0 mt-1">
-            Переезд закрыт :         
+            Переезд открыт :         
             <span class="badge rounded-3 bg-secondary fs-6"><span id="amperageOpened" class="canEdit rounded-2">0.1</span> А</span>
           </li>
         </ul>

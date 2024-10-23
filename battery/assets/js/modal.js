@@ -98,11 +98,17 @@ settingForm.addEventListener('submit', function (event) {
         outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(amperage * 8 / 0.42 / 0.8 * 100) /100), 'А/ч'))
         outputResult.appendChild(makeOutputRow('Коэффициент 1,25', (Math.round(amperage * 8 / 0.42 / 0.8 * 1.25* 100) /100), 'А/ч'))
         const capacity = (Math.round(amperage * 8 / 0.42 / 0.8 * 1.25* 100) /100)
-        outputResult.appendChild(makeOutputRow('Аккумулятор', (findAcc(capacity)),''))
-        // checkMaxCapacity(list, 100)
-
+        const ampAlwaysConnected = getSumAmperageAlwaysConnected(list)
+        const selectAcc = findAcc(capacity)
+        outputResult.appendChild(makeOutputRow('Аккумулятор', `${selectAcc.name} - ${selectAcc.capacity}`,'А/ч'))
+        outputResult.appendChild(makeOutputRow('Ток при наличии внешнего питания', `${ampAlwaysConnected} А - 
+                    ${checkMaxAmperage(ampAlwaysConnected)?'в норме': 'превышен'}`,''))
         
-
+        outputResult.appendChild(makeOutputRow('Допустимая емкость акк.', `${Math.round(getMaxCapacity(ampAlwaysConnected)*100)/100} А/ч -
+                    ${checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity)?'в норме': 'превышен'}`,''))
+        const message = (checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity) & checkMaxAmperage(ampAlwaysConnected))? 'выполняются':'не выполняются'
+        outputResult.appendChild(makeOutputRow('Требования расчета ', message ,''))
+        
       }, false)
 
 document.getElementById('typeAcc').addEventListener('change', function() {
@@ -142,15 +148,23 @@ function loadTable(path) {
 function findAcc(capacity) {
   const table = document.getElementById('typeAcc').table
   const searchValue =  table.filter((item) => item.capacity >= capacity)[0]
-  return `${searchValue.name} - ${searchValue.capacity}А/ч ` 
+  return searchValue 
 }
-function checkMaxCapacity(list, capacity) {
-
-  const table = document.getElementById('typeAcc').table
-  const searchValue =  table.filter((item) => item.capacity >= capacity)[0]
-  console.log(Math.round(list.filter((item) => item.data.alwaysConnected ===true)
-                  .reduce((acc, item) =>  acc + item.data.amperageOpened, 0) * 36 * 1000) / 1000)
-
+function getSumAmperageAlwaysConnected(list){
+  return (Math.round(list
+    .filter((item) => item.data.alwaysConnected ===true)
+    .reduce((acc, item) =>  acc + item.data.amperageOpened * item.data.count , 0)* 1000) / 1000)
+}
+function getMaxCapacity(amp) {
+  const boostAmp = parseFloat(document.getElementById('chargerBoost').value)
+  return (boostAmp-amp) * 36
+}
+function checkMaxCapacity(amp, capacity) {
+  return getMaxCapacity(amp) > capacity
+}
+function checkMaxAmperage(amp) {
+  const chargerAmp = parseFloat(document.getElementById('chargerNorm').value)
+  return amp < chargerAmp
 }
 
 
@@ -210,50 +224,50 @@ document.getElementById('saveEditBtn').addEventListener('click', function(event)
 
 function fillDevice() {
   const deviceList = document.getElementById('device-list')
-          const nameDevice = document.getElementById('NameDevice').textContent
-          const count = parseInt(document.getElementById('numCount').textContent);
-          const amperageClosed = parseFloat(document.getElementById('amperageClosed').textContent);;
-          const amperageOpened = parseFloat(document.getElementById('amperageOpened').textContent);;
-          const groupNumber = parseInt(document.getElementById('groupBtn').value)
-          const alwaysConnected = document.getElementById('alwaysConnected').checked
-          const li1 = document.createElement('li')
-          const span = document.createElement('span')
-          const group = document.createElement('i')
-          const groupBtn = document.createElement('button')
-          const edit = document.createElement('i')
-          const editBtn = document.createElement('button')
-          const remove = document.createElement('i')
-          const removeBtn = document.createElement('button')
-          li1.classList.add('list-group-item', 'd-flex', 'align-items-center', 'py-2')
-          li1.textContent = `${nameDevice}`
-          span.classList.add('badge', 'rounded-3', 'bg-secondary', 'ms-auto', 'me-2')
-          span.textContent= `${amperageClosed} А х ${count} шт.`
-          group.classList.add('bi', `bi-${groupNumber}-square`, 'fs-4', 'opacity-80')
-          edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-80', 'edit')
-          remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80', 'remove')
+  const nameDevice = document.getElementById('NameDevice').textContent
+  const count = parseInt(document.getElementById('numCount').textContent);
+  const amperageClosed = parseFloat(document.getElementById('amperageClosed').textContent);;
+  const amperageOpened = parseFloat(document.getElementById('amperageOpened').textContent);;
+  const groupNumber = parseInt(document.getElementById('groupBtn').value)
+  const alwaysConnected = document.getElementById('alwaysConnected').checked
+  const li1 = document.createElement('li')
+  const span = document.createElement('span')
+  const group = document.createElement('i')
+  const groupBtn = document.createElement('button')
+  const edit = document.createElement('i')
+  const editBtn = document.createElement('button')
+  const remove = document.createElement('i')
+  const removeBtn = document.createElement('button')
+  li1.classList.add('list-group-item', 'd-flex', 'align-items-center', 'py-2')
+  li1.textContent = `${nameDevice}`
+  span.classList.add('badge', 'rounded-3', 'bg-secondary', 'ms-auto', 'me-2')
+  span.textContent= `${amperageClosed} А х ${count} шт.`
+  group.classList.add('bi', `bi-${groupNumber}-square`, 'fs-4', 'opacity-80')
+  edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-80', 'edit')
+  remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80', 'remove')
 
-          groupBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
-          groupBtn.append(group)
-          editBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
-          editBtn.append(edit)
-          removeBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
-          removeBtn.append(remove)
+  groupBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
+  groupBtn.append(group)
+  editBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
+  editBtn.append(edit)
+  removeBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
+  removeBtn.append(remove)
 
-          editBtn.setAttribute('data-bs-toggle','modal')
-          editBtn.setAttribute('data-bs-target','#modalId')
-          editBtn.setAttribute('data-role','edit')
+  editBtn.setAttribute('data-bs-toggle','modal')
+  editBtn.setAttribute('data-bs-target','#modalId')
+  editBtn.setAttribute('data-role','edit')
 
-          li1.appendChild(span)
-          li1.appendChild(groupBtn)
-          li1.appendChild(editBtn)
-          li1.appendChild(removeBtn)
-          
-        li1.data = {name: nameDevice,
-                    count: count,
-                    amperageClosed: amperageClosed,
-                    amperageOpened: amperageOpened,
-                    groupNumber: groupNumber,
-                    alwaysConnected: alwaysConnected   
-      }
+  li1.appendChild(span)
+  li1.appendChild(groupBtn)
+  li1.appendChild(editBtn)
+  li1.appendChild(removeBtn)
+  
+  li1.data = {name: nameDevice,
+              count: count,
+              amperageClosed: amperageClosed,
+              amperageOpened: amperageOpened,
+              groupNumber: groupNumber,
+              alwaysConnected: alwaysConnected   
+}
   return li1
 }
