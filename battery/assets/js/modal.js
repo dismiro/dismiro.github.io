@@ -79,35 +79,10 @@ settingForm.addEventListener('submit', function (event) {
           console.log('unvalidate')
           return
       }
-        const outputResult = document.getElementById('outputResult')
-        outputResult.innerHTML= ''
-        const list = Array.from(document.getElementById('device-list').children)
-        let amperage = 0
-        if (sumAmperage(list, 'Closed') >= sumAmperage(list, 'Opened')) {
-          outputResult.appendChild(makeOutputRow('Состояние переезда', 'Закрыт',''))
-          amperage = sumAmperage(list, 'Closed') 
-        } else {
-          outputResult.appendChild(makeOutputRow('Состояние переезда', 'Открыт',''))
-          amperage = sumAmperage(list, 'Opened') 
-        }
-        outputResult.appendChild(makeOutputRow('Количество устройств', countDevices(list)))
- 
-        outputResult.appendChild(makeOutputRow('Потребляемый ток', Math.round(amperage*100)/100, 'А'))
-        outputResult.appendChild(makeOutputRow('Расч. емкость(8ч.)', Math.round(amperage * 8 * 100)/100, 'А/ч'))
-        outputResult.appendChild(makeOutputRow('Коэффициент 0,42', Math.round(amperage * 8 / 0.42 * 100) /100, 'А/ч'))
-        outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(amperage * 8 / 0.42 / 0.8 * 100) /100), 'А/ч'))
-        outputResult.appendChild(makeOutputRow('Коэффициент 1,25', (Math.round(amperage * 8 / 0.42 / 0.8 * 1.25* 100) /100), 'А/ч'))
-        const capacity = (Math.round(amperage * 8 / 0.42 / 0.8 * 1.25* 100) /100)
-        const ampAlwaysConnected = getSumAmperageAlwaysConnected(list)
-        const selectAcc = findAcc(capacity)
-        outputResult.appendChild(makeOutputRow('Аккумулятор', `${selectAcc.name} - ${selectAcc.capacity}`,'А/ч'))
-        outputResult.appendChild(makeOutputRow('Ток при наличии внешнего питания', `${ampAlwaysConnected} А - 
-                    ${checkMaxAmperage(ampAlwaysConnected)?'в норме': 'превышен'}`,''))
-        
-        outputResult.appendChild(makeOutputRow('Допустимая емкость акк.', `${Math.round(getMaxCapacity(ampAlwaysConnected)*100)/100} А/ч -
-                    ${checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity)?'в норме': 'превышен'}`,''))
-        const message = (checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity) & checkMaxAmperage(ampAlwaysConnected))? 'выполняются':'не выполняются'
-        outputResult.appendChild(makeOutputRow('Требования расчета ', message ,''))
+ fillResult(1)
+ fillResult(2)
+ fillResult(3)
+ fillResult(4)
         
       }, false)
 
@@ -270,4 +245,34 @@ function fillDevice() {
               alwaysConnected: alwaysConnected   
 }
   return li1
+}
+function fillResult(acc) {
+  const outputResult = document.getElementById('acc' + acc)
+  outputResult.innerHTML= ''
+  const list = Array.from(document.getElementById('device-list').children).filter((item) => item.data.groupNumber === acc)
+  // console.log(list)
+  let amperage = 0
+  if (sumAmperage(list, 'Closed') >= sumAmperage(list, 'Opened')) {
+    outputResult.appendChild(makeOutputRow('Состояние переезда', 'Закрыт',''))
+    amperage = sumAmperage(list, 'Closed') 
+  } else {
+    outputResult.appendChild(makeOutputRow('Состояние переезда', 'Открыт',''))
+    amperage = sumAmperage(list, 'Opened') 
+  }
+  outputResult.appendChild(makeOutputRow('Количество устройств', countDevices(list)))
+  outputResult.appendChild(makeOutputRow('Потребляемый ток', Math.round(amperage*100)/100, 'А'))
+  outputResult.appendChild(makeOutputRow('Расч. емкость(8ч.)', Math.round(amperage * 8 * 100)/100, 'А/ч'))
+  outputResult.appendChild(makeOutputRow('Коэффициент 0,42', Math.round(amperage * 8 / 0.42 * 100) /100, 'А/ч'))
+  outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(amperage * 8 / 0.42 / 0.8 * 100) /100), 'А/ч'))
+  outputResult.appendChild(makeOutputRow('Коэффициент 1,25', (Math.round(amperage * 8 / 0.42 / 0.8 * 1.25* 100) /100), 'А/ч'))
+  const capacity = (Math.round(amperage * 8 / 0.42 / 0.8 * 1.25* 100) /100)
+  const ampAlwaysConnected = getSumAmperageAlwaysConnected(list)
+  const selectAcc = findAcc(capacity)
+  outputResult.appendChild(makeOutputRow('Аккумулятор', `${selectAcc.name} - ${selectAcc.capacity}`,'А/ч'))
+  outputResult.appendChild(makeOutputRow('Ток при наличии внешнего питания', `${ampAlwaysConnected} А - 
+              ${checkMaxAmperage(ampAlwaysConnected)?'в норме': 'превышен'}`,''))
+  outputResult.appendChild(makeOutputRow('Допустимая емкость акк.', `${Math.round(getMaxCapacity(ampAlwaysConnected)*100)/100} А/ч -
+              ${checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity)?'в норме': 'превышен'}`,''))
+  const message = (checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity) & checkMaxAmperage(ampAlwaysConnected))? 'выполняются':'не выполняются'
+  outputResult.appendChild(makeOutputRow('Требования расчета ', message ,''))
 }
