@@ -5,7 +5,6 @@ document.addEventListener("DOMContentLoaded", (event) => {
 
 var exampleModal = document.getElementById('modalId')
 exampleModal.addEventListener('show.bs.modal', function (event) {
-  // console.log(event.relatedTarget.parentNode.data)
   const target = event.relatedTarget
   const title = exampleModal.querySelector('#NameDevice')
   const count = exampleModal.querySelector('#numCount')
@@ -15,7 +14,6 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
   const groupBtn = document.getElementById('groupBtn') 
   const saveEditBtn = document.getElementById('saveEditBtn')
   const addBtn = document.getElementById('submitModal')
-  
   
   if (target.dataset.role==="create"){
   title.textContent = target.getAttribute('data-bs-device')
@@ -38,7 +36,6 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
     saveEditBtn.classList.remove('d-none')
     saveEditBtn.editedElement = event.relatedTarget.parentNode
     addBtn.classList.add('d-none')
-    // console.log(saveEditBtn.editedElement )
   }
 })
 
@@ -169,14 +166,20 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
 document.getElementById('countGroups').addEventListener('change', function() {
   const listGroups = document.getElementById('listGroups')
   const selectGroup = document.getElementById('selectGroup')
-
-  selectGroup
   listGroups.innerHTML=''
   const countGroups = parseInt(this.value)
+
+  const triggerFirstTab = document.querySelector('#navTabs li:first-child a')
+  bootstrap.Tab.getInstance(triggerFirstTab).show() 
+  clearAllTabs()
+  disableAllTabs()
+  
   if(countGroups == 1){
     selectGroup.classList.add('d-none')
+    document.getElementById('navTabs').classList.add('d-none')
   } else {
     selectGroup.classList.remove('d-none')
+    document.getElementById('navTabs').classList.remove('d-none')
   }
   for (let i = 1; i <= countGroups; i++){
     const a = document.createElement('a')
@@ -184,6 +187,7 @@ document.getElementById('countGroups').addEventListener('change', function() {
     a.textContent = 'Батарея №'+ i
     a.value = i
     listGroups.appendChild(a)
+    document.getElementById('tabAcc'+ i).classList.remove('d-none')
   }
 })
 document.getElementById('listGroups').addEventListener('click', function(event) {
@@ -276,3 +280,15 @@ function fillResult(acc) {
   const message = (checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity) & checkMaxAmperage(ampAlwaysConnected))? 'выполняются':'не выполняются'
   outputResult.appendChild(makeOutputRow('Требования расчета ', message ,''))
 }
+ function clearAllTabs() {
+  document.getElementById('acc1').textContent = ''
+  document.getElementById('acc2').textContent = ''
+  document.getElementById('acc3').textContent = ''
+  document.getElementById('acc4').textContent = ''
+ }
+ function disableAllTabs() {
+  document.getElementById('tabAcc1').classList.add('d-none')
+  document.getElementById('tabAcc2').classList.add('d-none')
+  document.getElementById('tabAcc3').classList.add('d-none')
+  document.getElementById('tabAcc4').classList.add('d-none')
+ }
