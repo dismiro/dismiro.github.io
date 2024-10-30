@@ -63,10 +63,26 @@ deviceList.addEventListener('mouseout', function(event) {
   if (classList.includes('remove')) event.target.classList.remove('text-danger')
 })
 deviceList.addEventListener('click', function(event) {
+  
   const classList = event.target.classList.value;
   if (classList.includes('remove')) event.target.parentNode.parentNode.remove()
+  if (classList.includes('changeGroup')) {
+    const target = event.target
+    const currentGroup = parseInt(target.parentNode.parentNode.data.groupNumber)
+    const newGroup = getNewGroup(currentGroup, event.ctrlKey)
+    target.parentNode.parentNode.data.groupNumber = newGroup
+    target.classList.remove(`bi-${currentGroup}-square`)
+    target.classList.add(`bi-${newGroup}-square`)
+  }
+  
 })
-
+function getNewGroup(currentGroup, ctrlKey) {
+  const countGroups = parseInt(document.getElementById('countGroups').value)
+  if (ctrlKey) {
+    return currentGroup <= 1 ?  countGroups : currentGroup - 1
+  }
+  return currentGroup >= countGroups ?  1 : currentGroup + 1
+}
 
 var settingForm = document.getElementById('settingForm')
 settingForm.addEventListener('submit', function (event) {
@@ -151,9 +167,9 @@ minusBtn.addEventListener('click', function() {
   if (num > 0)  numCount.textContent = num - 1;
 })
 
-document.getElementById('devicesToAdded').addEventListener('click', function(event) {
-document.getElementById('NameDevice').textContent = event.target.textContent
-})
+// document.getElementById('devicesToAdded').addEventListener('click', function(event) {
+// document.getElementById('NameDevice').textContent = event.target.textContent
+// })
 
 document.getElementById('canEdit').addEventListener('click', function(event) {
   this.classList.toggle('active')
@@ -221,7 +237,7 @@ function fillDevice() {
   li1.textContent = `${nameDevice}`
   span.classList.add('badge', 'rounded-3', 'bg-secondary', 'ms-auto', 'me-2')
   span.textContent= `${amperageClosed} А х ${count} шт.`
-  group.classList.add('bi', `bi-${groupNumber}-square`, 'fs-4', 'opacity-80')
+  group.classList.add('bi', `bi-${groupNumber}-square`, 'fs-4', 'opacity-80','changeGroup')
   edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-80', 'edit')
   remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80', 'remove')
 
