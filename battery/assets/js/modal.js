@@ -1,7 +1,10 @@
-
 document.addEventListener("DOMContentLoaded", (event) => {
   loadTable(`./assets/tabs/${document.getElementById('typeAcc').value}.json`)
 });
+
+document.getElementById('typeAcc').addEventListener('change', function() {
+  loadTable(`./assets/tabs/${this.value}.json`)
+})
 
 var exampleModal = document.getElementById('modalId')
 exampleModal.addEventListener('show.bs.modal', function (event) {
@@ -39,17 +42,15 @@ exampleModal.addEventListener('show.bs.modal', function (event) {
   }
 })
 
-exampleModal.addEventListener('hidden.bs.modal', function (event) {
-  document.getElementById('numCount').textContent = 1
-})
+// exampleModal.addEventListener('hidden.bs.modal', function (event) {
+//   document.getElementById('numCount').textContent = 1
+// })
 
 var modalForm = document.getElementById('modalForm')
-document.getElementById('submitModal').addEventListener('click', function (event) {
-  // event.preventDefault()    
-        const deviceList = document.getElementById('device-list')
-        deviceList.appendChild(fillDevice())
-        // $('#modalId').modal('hide');
-      }, false)
+document.getElementById('submitModal').addEventListener('click', function (event) { 
+  const deviceList = document.getElementById('device-list')
+  deviceList.appendChild(fillDevice())
+  }, false)
 
 const deviceList = document.getElementById('device-list')
 deviceList.addEventListener('mouseover', function(event) {
@@ -57,11 +58,13 @@ deviceList.addEventListener('mouseover', function(event) {
   if (classList.includes('edit')) event.target.classList.add('text-success-emphasis')
   if (classList.includes('remove')) event.target.classList.add('text-danger')
 })
+
 deviceList.addEventListener('mouseout', function(event) {
   const classList = event.target.classList.value;
   if (classList.includes('edit')) event.target.classList.remove('text-success-emphasis')
   if (classList.includes('remove')) event.target.classList.remove('text-danger')
 })
+
 deviceList.addEventListener('click', function(event) {
   
   const classList = event.target.classList.value;
@@ -78,9 +81,7 @@ deviceList.addEventListener('click', function(event) {
 })
 function getNewGroup(currentGroup, ctrlKey) {
   const countGroups = parseInt(document.getElementById('countGroups').value)
-  if (ctrlKey) {
-    return currentGroup <= 1 ?  countGroups : currentGroup - 1
-  }
+  if (ctrlKey) return currentGroup <= 1 ?  countGroups : currentGroup - 1
   return currentGroup >= countGroups ?  1 : currentGroup + 1
 }
 
@@ -99,9 +100,6 @@ settingForm.addEventListener('submit', function (event) {
         
       }, false)
 
-document.getElementById('typeAcc').addEventListener('change', function() {
-  loadTable(`./assets/tabs/${this.value}.json`)
-})
 
 function makeOutputRow(text, num, dim='шт.') {
   const li = document.createElement('li')
@@ -115,12 +113,15 @@ function makeOutputRow(text, num, dim='шт.') {
   li.appendChild(result)
   return li
 }
+
 function countDevices(list) {
 return list.reduce((acc,item) => acc + Number(item.data.count), 0);
 }
+
 function sumAmperage(list, state='Closed') {
   return list.reduce((acc,item) => acc + (item.data['amperage' + state] * item.data.count), 0);
 }
+
 function loadTable(path) {
   fetch(path)
   .then(response => {
@@ -138,23 +139,26 @@ function findAcc(capacity) {
   const searchValue =  table.filter((item) => item.capacity >= capacity)[0]
   return searchValue 
 }
+
 function getSumAmperageAlwaysConnected(list){
   return (Math.round(list
     .filter((item) => item.data.alwaysConnected ===true)
     .reduce((acc, item) =>  acc + item.data.amperageOpened * item.data.count , 0)* 1000) / 1000)
 }
+
 function getMaxCapacity(amp) {
   const boostAmp = parseFloat(document.getElementById('chargerBoost').value)
   return (boostAmp-amp) * 36
 }
+
 function checkMaxCapacity(amp, capacity) {
   return getMaxCapacity(amp) > capacity
 }
+
 function checkMaxAmperage(amp) {
   const chargerAmp = parseFloat(document.getElementById('chargerNorm').value)
   return amp < chargerAmp
 }
-
 
 const numCount = document.getElementById('numCount');
 const plusBtn = document.getElementById('buttonPlus');
@@ -184,9 +188,7 @@ document.getElementById('countGroups').addEventListener('change', function() {
   const selectGroup = document.getElementById('selectGroup')
   listGroups.innerHTML=''
   const countGroups = parseInt(this.value)
-
-  const triggerFirstTab = document.querySelector('#navTabs li:first-child a')
-  bootstrap.Tab.getInstance(triggerFirstTab).show() 
+  showFirstTab()
   clearAllTabs()
   disableAllTabs()
   
@@ -206,6 +208,7 @@ document.getElementById('countGroups').addEventListener('change', function() {
     document.getElementById('tabAcc'+ i).classList.remove('d-none')
   }
 })
+
 document.getElementById('listGroups').addEventListener('click', function(event) {
   const groupBtn = document.getElementById('groupBtn') 
   groupBtn.textContent =  event.target.textContent
@@ -218,7 +221,6 @@ document.getElementById('saveEditBtn').addEventListener('click', function(event)
 })
 
 function fillDevice() {
-  const deviceList = document.getElementById('device-list')
   const nameDevice = document.getElementById('NameDevice').textContent
   const count = parseInt(document.getElementById('numCount').textContent);
   const amperageClosed = parseFloat(document.getElementById('amperageClosed').textContent);;
@@ -240,7 +242,6 @@ function fillDevice() {
   group.classList.add('bi', `bi-${groupNumber}-square`, 'fs-4', 'opacity-80','changeGroup')
   edit.classList.add('bx', 'bx-edit-alt', 'fs-4', 'opacity-80', 'edit')
   remove.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80', 'remove')
-
   groupBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
   groupBtn.append(group)
   editBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm' ,'border-0', 'bg-transparent')
@@ -263,39 +264,65 @@ function fillDevice() {
               amperageOpened: amperageOpened,
               groupNumber: groupNumber,
               alwaysConnected: alwaysConnected   
-}
+  }
   return li1
 }
+
 function fillResult(acc) {
   const outputResult = document.getElementById('acc' + acc)
   outputResult.innerHTML= ''
   const list = Array.from(document.getElementById('device-list').children).filter((item) => item.data.groupNumber === acc)
-  // console.log(list)
-  let amperage = 0
-  if (sumAmperage(list, 'Closed') >= sumAmperage(list, 'Opened')) {
-    outputResult.appendChild(makeOutputRow('Состояние переезда', 'Закрыт',''))
-    amperage = sumAmperage(list, 'Closed') 
-  } else {
-    outputResult.appendChild(makeOutputRow('Состояние переезда', 'Открыт',''))
-    amperage = sumAmperage(list, 'Opened') 
-  }
+  const amperage = getMaxAmperage(list)
+  const hours = getCountHours(isOnlyZagrad(list))
+  const ampAlwaysConnected = getSumAmperageAlwaysConnected(list)
+  const capacity = (Math.round(amperage * hours / 0.42 / 0.8 * 1.25 * 100) /100)
+  const selectAcc = findAcc(capacity)
+
+  outputResult.appendChild(makeOutputRow('Состояние переезда', getWorstState(list),''))
   outputResult.appendChild(makeOutputRow('Количество устройств', countDevices(list)))
   outputResult.appendChild(makeOutputRow('Потребляемый ток', Math.round(amperage*100)/100, 'А'))
-  outputResult.appendChild(makeOutputRow('Расч. емкость(8ч.)', Math.round(amperage * 8 * 100)/100, 'А/ч'))
-  outputResult.appendChild(makeOutputRow('Коэффициент 0,42', Math.round(amperage * 8 / 0.42 * 100) /100, 'А/ч'))
-  outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(amperage * 8 / 0.42 / 0.8 * 100) /100), 'А/ч'))
-  outputResult.appendChild(makeOutputRow('Коэффициент 1,25', (Math.round(amperage * 8 / 0.42 / 0.8 * 1.25* 100) /100), 'А/ч'))
-  const capacity = (Math.round(amperage * 8 / 0.42 / 0.8 * 1.25* 100) /100)
-  const ampAlwaysConnected = getSumAmperageAlwaysConnected(list)
-  const selectAcc = findAcc(capacity)
+  outputResult.appendChild(makeOutputRow(`Расч. емкость(${hours}ч.)`, Math.round(amperage * hours * 100)/100, 'А/ч'))
+  outputResult.appendChild(makeOutputRow('Коэффициент 0,42', Math.round(amperage * hours / 0.42 * 100) /100, 'А/ч'))
+  outputResult.appendChild(makeOutputRow('Коэффициент 0,8', (Math.round(amperage * hours / 0.42 / 0.8 * 100) /100), 'А/ч'))
+  outputResult.appendChild(makeOutputRow('Коэффициент 1,25', capacity, 'А/ч'))
   outputResult.appendChild(makeOutputRow('Аккумулятор', `${selectAcc.name} - ${selectAcc.capacity}`,'А/ч'))
-  outputResult.appendChild(makeOutputRow('Ток при наличии внешнего питания', `${ampAlwaysConnected} А - 
+  outputResult.appendChild(makeOutputRow('Ток при наличии внешнего питания', `${ampAlwaysConnected}А - 
               ${checkMaxAmperage(ampAlwaysConnected)?'в норме': 'превышен'}`,''))
   outputResult.appendChild(makeOutputRow('Допустимая емкость акк.', `${Math.round(getMaxCapacity(ampAlwaysConnected)*100)/100} А/ч -
               ${checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity)?'в норме': 'превышен'}`,''))
-  const message = (checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity) & checkMaxAmperage(ampAlwaysConnected))? 'выполняются':'не выполняются'
-  outputResult.appendChild(makeOutputRow('Требования расчета ', message ,''))
+  // const message = (checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity) 
+  //                 & checkMaxAmperage(ampAlwaysConnected))? 'выполняются':'не выполняются'
+  outputResult.appendChild(makeOutputRow('Требования расчета ',(checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity) 
+                                                              & checkMaxAmperage(ampAlwaysConnected))? 'выполняются':'не выполняются' ,''))
 }
+
+function getCountHours(isOnlyZG){
+  return isOnlyZG ? 2 : 8
+}
+
+function getMaxAmperage(list) {
+  const closedAmp = sumAmperage(list, 'Closed')
+  const openedAmp = sumAmperage(list, 'Opened')
+  return (closedAmp >= openedAmp) ? closedAmp : openedAmp 
+}
+
+function getWorstState(list) {
+  const closedAmp = sumAmperage(list, 'Closed')
+  const openedAmp = sumAmperage(list, 'Opened')
+  return (closedAmp >= openedAmp) ? 'Закрыт' : "Открыт" 
+}
+function isOnlyZagrad(list){
+  const fullLength = list.length
+  if (fullLength === 0) return false
+  const filteredLength = list.filter((item) => item.data.name.includes('Заград')).length
+  return (fullLength === filteredLength)
+}
+
+function showFirstTab() {
+  const triggerFirstTab = document.querySelector('#navTabs li:first-child a')
+  bootstrap.Tab.getInstance(triggerFirstTab).show() 
+ }
+
  function clearAllTabs() {
   document.getElementById('acc1').textContent = ''
   document.getElementById('acc2').textContent = ''
