@@ -270,14 +270,13 @@ function fillDevice() {
 
 function fillResult(acc) {
   const outputResult = document.getElementById('acc' + acc)
-  outputResult.innerHTML= ''
   const list = Array.from(document.getElementById('device-list').children).filter((item) => item.data.groupNumber === acc)
   const amperage = getMaxAmperage(list)
   const hours = getCountHours(isOnlyZagrad(list))
   const ampAlwaysConnected = getSumAmperageAlwaysConnected(list)
   const capacity = (Math.round(amperage * hours / 0.42 / 0.8 * 1.25 * 100) /100)
   const selectAcc = findAcc(capacity)
-
+  outputResult.innerHTML= ''
   outputResult.appendChild(makeOutputRow('Состояние переезда', getWorstState(list),''))
   outputResult.appendChild(makeOutputRow('Количество устройств', countDevices(list)))
   outputResult.appendChild(makeOutputRow('Потребляемый ток', Math.round(amperage*100)/100, 'А'))
@@ -288,11 +287,11 @@ function fillResult(acc) {
   outputResult.appendChild(makeOutputRow('Аккумулятор', `${selectAcc.name} - ${selectAcc.capacity}`,'А/ч'))
   outputResult.appendChild(makeOutputRow('Ток при наличии внешнего питания', `${ampAlwaysConnected}А - 
               ${checkMaxAmperage(ampAlwaysConnected)?'в норме': 'превышен'}`,''))
-  outputResult.appendChild(makeOutputRow('Допустимая емкость акк.', `${Math.round(getMaxCapacity(ampAlwaysConnected)*100)/100} А/ч -
+  outputResult.appendChild(makeOutputRow('Макс. допустимая емкость', `${Math.round(getMaxCapacity(ampAlwaysConnected)*100)/100} А/ч -
               ${checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity)?'в норме': 'превышен'}`,''))
   // const message = (checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity) 
   //                 & checkMaxAmperage(ampAlwaysConnected))? 'выполняются':'не выполняются'
-  outputResult.appendChild(makeOutputRow('Требования расчета ',(checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity) 
+  outputResult.appendChild(makeOutputRow('Требования к батарее',(checkMaxCapacity(ampAlwaysConnected, selectAcc.capacity) 
                                                               & checkMaxAmperage(ampAlwaysConnected))? 'выполняются':'не выполняются' ,''))
 }
 
