@@ -757,7 +757,7 @@
         let dx = SWITCH_DX
         let height = this.height
         let width = this.width
-        this.alfa = this.alfa + 1
+        // this.alfa = this.alfa + 1
         let alfa = this.alfa
         ctx.save()
         ctx.translate(this.x * scale + x0,this.y*scale + y0);
