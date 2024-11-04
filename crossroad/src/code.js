@@ -757,24 +757,25 @@
         let dx = SWITCH_DX
         let height = this.height
         let width = this.width
-        // this.alfa = this.alfa + 1
+        this.alfa = this.alfa + 1
         let alfa = this.alfa
         ctx.save()
         ctx.translate(this.x * scale + x0,this.y*scale + y0);
         ctx.rotate(alfa*Math.PI/180);
         console.log(this.x)
-        ctx.moveTo(x0, (-height / 2) * scale + y0)
-        ctx.lineTo((height) * scale + x0, (- height / 2) * scale + y0)
-        ctx.lineTo((height- dx) * scale + x0, 0 * scale + y0)
-        ctx.lineTo(width / 2 * scale + x0, y0)
-        ctx.lineTo(width / 2 * scale + x0, height / 2 * scale + y0)
-        ctx.lineTo(-width / 2  * scale + x0, (height/2) * scale + y0)
-        ctx.lineTo(-width / 2  * scale + x0, y0)
-        ctx.lineTo((- dx)  * scale + x0,  y0)
+        ctx.moveTo(0, (-height / 2) * scale)
+        ctx.lineTo((height) * scale , (- height / 2) * scale)
+        ctx.lineTo((height- dx) * scale , 0 * scale)
+        ctx.lineTo(width / 2 * scale , 0)
+        ctx.lineTo(width / 2 * scale, height / 2 * scale)
+        ctx.lineTo(-width / 2  * scale, (height/2) * scale)
+        ctx.lineTo(-width / 2  * scale, 0)
+        ctx.lineTo((- dx)  * scale,  0)
         ctx.closePath()
         ctx.stroke()
         ctx.fill()
         ctx.restore()
+
     }
     Block.prototype.DrawSwitchLeftTop = function(ctx, x0, y0, scale) {
         ctx.beginPath()
