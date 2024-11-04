@@ -757,12 +757,11 @@
         let dx = SWITCH_DX
         let height = this.height
         let width = this.width
-        this.alfa = this.alfa + 1
+        // this.alfa = this.alfa + 1
         let alfa = this.alfa
         ctx.save()
         ctx.translate(this.x * scale + x0,this.y*scale + y0);
         ctx.rotate(alfa*Math.PI/180);
-        console.log(this.x)
         ctx.moveTo(0, (-height / 2) * scale)
         ctx.lineTo((height) * scale , (- height / 2) * scale)
         ctx.lineTo((height- dx) * scale , 0 * scale)
@@ -1282,6 +1281,10 @@
         } else if (this.type == FOR_LOOP_END_TYPE) {
             this.type = ctrlKey ? FOR_LOOP_BEGIN_TYPE : FOR_LOOP_TYPE
         }
+    }
+    Block.prototype.rotate = function(ctrlKey){
+        this.alfa -= 15
+        if (this.alfa > 90 || this.alfa < -90) this.alfa = 0       
     }
     Block.prototype.GetCursorPositionByPoint = function(x, y, ctx) {
         ctx.font = this.GetFormatting() + (this.fontSize) + 'px ' + BLOCK_FONT
@@ -2117,7 +2120,7 @@
         // let leftAlignIcons = this.GetIcons('left-align')
         // let centerAlignIcons = this.GetIcons('center-align')
         // let changeIcons = this.GetIcons('change')
-        this.rightItems = ['edit', 'left-align', 'center-align', 'bold', 'italic', 'increase-font', 'decrease-font', 'change']
+        this.rightItems = ['edit', 'left-align', 'center-align', 'bold', 'italic', 'increase-font', 'decrease-font', 'change', 'rotate']
         this.rightIcons = this.GetIconsForItems(this.rightItems)
         this.rightHints = ['Редактирование', 'Выравнивание по левому краю', 'Выравнивание по центру', 'Жирность', 'Курсив', 'Увеличение размера шрифта', 'Уменьшение размера шрифта', 'Смените метки']
     }
@@ -2780,6 +2783,8 @@
             this.ChangeFormatting(CENTER_TEXT_ALIGN)
         } else if (item == 'change') {
             this.activeBlock.SwapLabelsOfText(false)
+        } else if (item == 'rotate') {
+            this.activeBlock.rotate(false)
         }
         return true
     }
