@@ -1,6 +1,14 @@
-Переездной светофор - 1,25 / 0,05 А
-Извещатель  0,2 / 0 А
-Релейный шкаф 0,25 А
-Шлагбаум 0 / 2 А
-Щиток ЩПС 0,02 А
-Заградительный светофор 2,08 / 0,036
+        ctx.save()
+        ctx.translate(this.x * scale + x0,this.y*scale + y0);
+        ctx.rotate(this.alfa*Math.PI/180);
+        let x = (point.x) * scale 
+        let y = (point.y) * scale 
+        let radius = scale == 1 ? CONNECTION_RADIUS : Math.floor(CONNECTION_RADIUS * scale / 1.5)
+        ctx.lineWidth = BLOCK_LINE_WIDTH
+        ctx.strokeStyle = BLOCK_POINT_COLOR[DARK_THEME]
+        ctx.fillStyle = BLOCK_POINT_BACKGROUND_COLOR[DARK_THEME]
+        ctx.beginPath()
+        ctx.rect(x - radius, y - radius, 2 * radius, 2 * radius)
+        ctx.fill()
+        ctx.stroke()
+        ctx.restore()
