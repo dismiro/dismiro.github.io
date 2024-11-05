@@ -1046,8 +1046,11 @@
         }
     }
     Block.prototype.DrawResizePoint = function(ctx, x0, y0, scale, point) {
-        let x = (this.x + point.x) * scale + x0
-        let y = (this.y + point.y) * scale + y0
+        ctx.save()
+        ctx.translate(this.x * scale + x0,this.y*scale + y0);
+        ctx.rotate(this.alfa*Math.PI/180);
+        let x = point.x * scale 
+        let y = point.y * scale 
         let radius = scale == 1 ? CONNECTION_RADIUS : Math.floor(CONNECTION_RADIUS * scale / 1.5)
         ctx.lineWidth = BLOCK_LINE_WIDTH
         ctx.strokeStyle = BLOCK_POINT_COLOR[DARK_THEME]
@@ -1056,6 +1059,7 @@
         ctx.rect(x - radius, y - radius, 2 * radius, 2 * radius)
         ctx.fill()
         ctx.stroke()
+        ctx.restore()
     }
     Block.prototype.DrawConnectors = function(ctx, x0, y0, scale) {
         for (let i = 0; i < this.connectors.length; i++) this.connectors[i].Draw(ctx, x0, y0, scale, false)
