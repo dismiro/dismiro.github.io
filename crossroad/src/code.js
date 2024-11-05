@@ -315,7 +315,7 @@
     const CLEAR_FORMAT = 'clear'
     const BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, BEGIN_END_TYPE, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, LABEL_TYPE, TEXT_TYPE]
     const ALL_BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, BEGIN_END_TYPE, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, FOR_LOOP_BEGIN_TYPE, FOR_LOOP_END_TYPE, LABEL_TYPE, TEXT_TYPE, SWITCH_LEFT_TOP, SWITCH_LEFT_DOWN, SWITCH_RIGTH_DOWN]
-    const BLOCK_WIDTHS = [100, 100, 100, 100, 120, 120, 100, 30, 80]
+    const BLOCK_WIDTHS = [100, 120, 100, 100, 120, 120, 100, 30, 80]
     const BLOCK_HEIGHTS = [40, 80, 30, 40, 40, 40, 40, 30, 20]
     const MENU_ITEMS = ['Сохранить схему (json)', 'Загрузить схему (json)', 'Сохранить схему (png)', 'Сохранить области (zip)', 'Сменить цветовую тему', 'Инструкция к редактору']
     const KEYBOARD_CHARACTERS = ['∀', '∃', '∄', '←', '→', '⇔', '≠', '≡', '≤', '≥', '∈', '∉', '∅', 'ℤ', 'ℕ', '∩', '∪', '⊂', '⊃', '⊆', '⊇', '∧', '∨', '²', '³', '⋅', 'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ', 'σ', 'τ', 'υ', 'χ', 'φ', 'ψ', 'ω']
@@ -755,6 +755,7 @@
             return
         } 
         let dx = SWITCH_DX
+        const shift = 20
         let height = this.height
         let width = this.width
         // this.alfa = this.alfa + 1
@@ -762,14 +763,14 @@
         ctx.save()
         ctx.translate(this.x * scale + x0,this.y*scale + y0);
         ctx.rotate(alfa*Math.PI/180);
-        ctx.moveTo(0, (-height / 2) * scale)
-        ctx.lineTo((height) * scale , (- height / 2) * scale)
-        ctx.lineTo((height- dx) * scale , 0 * scale)
+        ctx.moveTo(-shift * scale, (-height / 2) * scale)
+        ctx.lineTo((height - shift) * scale , (- height / 2) * scale)
+        ctx.lineTo((height- dx - shift) * scale , 0 * scale)
         ctx.lineTo(width / 2 * scale , 0)
         ctx.lineTo(width / 2 * scale, height / 2 * scale)
         ctx.lineTo(-width / 2  * scale, (height/2) * scale)
         ctx.lineTo(-width / 2  * scale, 0)
-        ctx.lineTo((- dx)  * scale,  0)
+        ctx.lineTo((- dx - shift)  * scale,  0)
         ctx.closePath()
         ctx.stroke()
         ctx.fill()
@@ -1286,8 +1287,8 @@
             this.type = ctrlKey ? FOR_LOOP_BEGIN_TYPE : FOR_LOOP_TYPE
         }
     }
-    Block.prototype.rotate = function(ctrlKey){
-        this.alfa -= 15
+    Block.prototype.rotate = function(rotateToLeft){
+        rotateToLeft ? this.alfa -= 15 : this.alfa+=15
         if (this.alfa > 90 || this.alfa < -90) this.alfa = 0       
     }
     Block.prototype.GetCursorPositionByPoint = function(x, y, ctx) {
@@ -2124,9 +2125,9 @@
         // let leftAlignIcons = this.GetIcons('left-align')
         // let centerAlignIcons = this.GetIcons('center-align')
         // let changeIcons = this.GetIcons('change')
-        this.rightItems = ['edit', 'left-align', 'center-align', 'bold', 'italic', 'increase-font', 'decrease-font', 'change', 'rotate']
+        this.rightItems = ['edit', 'left-align', 'center-align', 'bold', 'italic', 'increase-font', 'decrease-font', 'left-rotate', 'right-rotate', 'change']
         this.rightIcons = this.GetIconsForItems(this.rightItems)
-        this.rightHints = ['Редактирование', 'Выравнивание по левому краю', 'Выравнивание по центру', 'Жирность', 'Курсив', 'Увеличение размера шрифта', 'Уменьшение размера шрифта', 'Смените метки']
+        this.rightHints = ['Редактирование', 'Выравнивание по левому краю', 'Выравнивание по центру', 'Жирность', 'Курсив', 'Увеличение размера шрифта', 'Уменьшение размера шрифта', 'Повернуть против часовой стрелки','Повернуть по часовой стрелке', 'Изменить']
     }
     Diagram.prototype.InitEvents = function() {
         let diagram = this
@@ -2787,7 +2788,9 @@
             this.ChangeFormatting(CENTER_TEXT_ALIGN)
         } else if (item == 'change') {
             this.activeBlock.SwapLabelsOfText(false)
-        } else if (item == 'rotate') {
+        } else if (item == 'left-rotate') {
+            this.activeBlock.rotate(true)
+        } else if (item == 'right-rotate') {
             this.activeBlock.rotate(false)
         }
         return true
