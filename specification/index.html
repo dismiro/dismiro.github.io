@@ -130,14 +130,56 @@
     
 <div class="container main-container">
   <main>
-    <section id="landings" class="container text-center pt-5 mt-5 mt-md-4 mt-lg-5">
+    <!-- <section id="landings" class="container text-center pt-5 mt-5 mt-md-4 mt-lg-5"> -->
+    <!-- <div class="input-group mb-3"> -->
+      <!-- <label class="input-group-text" for="input">Excel</label> -->
+      <!-- <input type="file" class="form-control" id="input"> -->
+    <!-- </div> -->
+    <!-- <div id='table'> </div> -->
+    <!-- <button id='export' type="button" class="btn btn-primary">Выгрузить файл</button> -->
+  <!-- </section> -->
+  <section id="landings" class="container text-center pt-5 mt-2 mt-md-4 mt-lg-5">
+    <h2 class="h1 pt-2 pt-lg-0">Модуль спецификаций напольного кабеля</h2>
     <div class="input-group mb-3">
       <label class="input-group-text" for="input">Excel</label>
       <input type="file" class="form-control" id="input">
     </div>
-    <div id='table'> </div>
-    <button id='export' type="button" class="btn btn-primary">Выгрузить файл</button>
-  </section>
+  <div class="row row-cols-1 row-cols-md-3 mb-3 text-center">
+    <div class="col">
+      <div class="card mb-4 rounded-3 shadow-sm">
+        <div class="card-header py-2">
+          <h4 class="my-1 fw-normal">Исходные данные</h4>
+        </div>
+        <div id='table' class="card-body">
+
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card mb-4 rounded-3 shadow-sm">
+        <div class="card-header py-2">
+          <h4 class="my-1 fw-normal">Обработанные данные</h4>
+        </div>
+        <div class="card-body">
+          <div id="processedData"></div>
+  
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card mb-4 rounded-3 shadow-sm">
+        <div class="card-header py-2">
+          <h4 class="my-1 fw-normal">Сумма кабеля</h4>
+        </div>
+        <div class="card-body">
+          <div id="outputResult">
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
   </main>
 </div>
 
