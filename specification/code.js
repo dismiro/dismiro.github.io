@@ -41,6 +41,10 @@ async function handleFileAsync(e) {
     cell.textContent = text;
  });
 });
+var outData = dataJS.reduce((item, acc)=> {
+    return acc.push(item['value'])
+}, [])
+    console.log(outData)
 table.classList.add('table')
 table.classList.add('table-sm')
 const processedData = document.getElementById('processedData') 
