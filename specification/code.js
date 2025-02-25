@@ -23,6 +23,7 @@ async function handleFileAsync(e) {
         const value = item['Значение']
         .replace(/\(.\)/g,'')
         .replace(/\(..\)/g,'')
+        .replace('x','х')
         .replace(' ','')
 
         const length = value.substring(0,value.indexOf('-'))
@@ -42,7 +43,7 @@ async function handleFileAsync(e) {
  });
 });
 var outData = dataJS.reduce((acc,item)=> {
-    const currentType = item['type']
+    const currentType = item['type'].replace(' ','')
     const currentLength = item['length'] * item['count']
     if (acc[currentType]){
         acc[currentType] = acc[currentType] + currentLength
@@ -56,7 +57,10 @@ table.classList.add('table')
 table.classList.add('table-sm')
 const processedData = document.getElementById('processedData') 
 processedData.appendChild(table);
-    
+    const out = document.getElementById('outputResult') 
+    var listTypes = Object.entries(outData) 
+    out.innerHTML = listTypes.map((item) => `<li>${item[0]} ---- ${item[1]} </li>`).join(' ');    
+
     // var  jsa  =  XLSX.utils.sheet_to_json ( worksheet , opts ) ;​​​​ 
     // console.log(workbook)
   
