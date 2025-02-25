@@ -15,9 +15,9 @@ async function handleFileAsync(e) {
     var  wsnames  =  workbook.SheetNames ;
     // console.log(wsnames)
     var  jsa  =  XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-    var  html  =  XLSX.utils.sheet_to_html (workbook.Sheets[wsnames],{editable:true}).replace("<table",'<table id="data-table" class="table table-sm"') ;
-    var  container  =  document.getElementById ("table")
-    container.innerHTML = html
+    // var  html  =  XLSX.utils.sheet_to_html (workbook.Sheets[wsnames],{editable:true}).replace("<table",'<table id="data-table" class="table table-sm"') ;
+    // var  container  =  document.getElementById ("table")
+    // container.innerHTML = html
     // const dataJS = jsa
     const dataJS = jsa.map((item) => {
         const value = item['Значение']
@@ -28,7 +28,7 @@ async function handleFileAsync(e) {
         const length = value.substring(0,value.indexOf('-'))
         const type = value.substring(value.indexOf('-') + 1, value.length)
         const count = item['Количество']
-        return {'row' : item['__rowNum__'],'type':type, 'length':length, 'count':count}
+        return {'row' : item['__rowNum__'],'value':value,'type':type, 'length':length, 'count':count}
 })
     console.log(dataJS)
     const table = document.createElement('table');
