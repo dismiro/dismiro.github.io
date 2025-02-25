@@ -41,10 +41,17 @@ async function handleFileAsync(e) {
     cell.textContent = text;
  });
 });
-var outData = dataJS.reduce((item, acc)=> {
-    return acc.push(item['value'])
-}, [])
-    console.log(outData)
+var outData = dataJS.reduce((acc,item)=> {
+    const currentType = item['type']
+    const currentLength = item['length'] * item['count']
+    if (acc[currentType]){
+        acc[currentType] = acc[currentType] + currentLength
+        return acc
+    }
+    acc[currentType] = currentLength
+    return acc
+}, {})
+console.log(outData)
 table.classList.add('table')
 table.classList.add('table-sm')
 const processedData = document.getElementById('processedData') 
