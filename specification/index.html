@@ -140,11 +140,13 @@
   <!-- </section> -->
   <section id="landings" class="container text-center pt-5 mt-2 mt-md-4 mt-lg-5">
     <h2 class="h1 pt-2 pt-lg-0">Модуль спецификаций напольного кабеля</h2>
-    <button id='export' type="button" class="btn btn-primary">Выгрузить файл</button>
-    <button id='calculate' type="button" class="btn btn-primary">Вжух!</button>
+ 
+    
     <div class="input-group mb-3">
-      <label class="input-group-text" for="input">Excel</label>
+      <!-- <label class="input-group-text" for="input">Выберите</label> -->
       <input type="file" class="form-control" id="input" multiple>
+      <button id='calculate' type="button" class="btn btn-outline-secondary">Выполнить расчет</button>
+      <button id='export' type="button" class="btn btn-outline-secondary">Выгрузить файл</button>
     </div>
   <div class="row row-cols-1 row-cols-md-3 mb-3 text-center">
 <!--     <div class="col">
@@ -160,7 +162,7 @@
     <div class="col-md-8">
       <div class="card mb-4 rounded-3 shadow-sm">
         <div class="card-header py-2">
-          <h4 class="my-1 fw-normal">Обработанные данные</h4>
+          <h4 class="my-1 fw-normal">Исходные данные:</h4>
         </div>
         <div class="card-body">
           <!-- <div id="processedData"></div> -->
@@ -172,10 +174,11 @@
     <div class="col-md-4">
       <div class="card mb-4 rounded-3 shadow-sm">
         <div class="card-header py-2">
-          <h4 class="my-1 fw-normal">Сумма кабеля</h4>
+          <h4 class="my-1 fw-normal">Сумма кабеля:</h4>
         </div>
         <div class="card-body">
-          <div id="outputResult">
+
+          <div class="accordion" id="result">
           </div>
         </div>
       </div>

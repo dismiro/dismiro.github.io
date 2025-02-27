@@ -30,79 +30,19 @@ async function handleFileAsync(e) {
             const length = fixValue.substring(0,fixValue.indexOf('-'))
             const type = fixValue.substring(fixValue.indexOf('-') + 1, fixValue.length)
             const count = item['Количество']
-            return {'row' : item['__rowNum__'],'value':value,'type':type, 'length':length, 'count':count}
+            return {'№' : item['__rowNum__'],'Значение':value,'Тип кабеля':type, 'Длина':length, 'Количество':count}
 })
-dataJS.push(dataFromOneFile)
+// dataJS.push(dataFromOneFile)
 // console.log(file.lastModified)
 
-const newDiv = document.createElement("div");
-const title = document.createElement("h3");
-const button = document.createElement("button");
-const titleText = file.name.replace('.xlsx', '').replace('.xls', '')
-const div2 = document.createElement("div");
-const accBody = document.createElement("div");
 const id= `${sheetName}-${file.lastModified}`.replace(' ','')
-
-
-button.innerHTML= `${titleText} : ${sheetName}`
-
-button.setAttribute('type',"button")
-button.setAttribute('data-bs-toggle',"collapse")
-button.setAttribute('data-bs-target',`#${id}`)
-button.setAttribute('aria-expanded',"false")
-button.setAttribute('aria-controls',id)
-button.classList.add("accordion-button")
-button.classList.add("collapsed")
-
-title.id = `head${id}`
-title.classList.add("accordion-header")
-
-
-newDiv.classList.add('accordion-item')
-
-div2.classList.add('accordion-collapse')
-div2.classList.add('collapse')
-// div2.classList.add('show')
-div2.id = id
-div2.setAttribute('aria-labelledby',`head${id}`)
-div2.setAttribute('data-bs-parent',"accordionDefault")
-
-accBody.classList.add('accordion-body')
-// accBody.innerHTML = 'Здесь будет таблица!'
-
-// const table = document.createElement('table');
-// // Заполнение таблицы данными
-// table.innerHTML=`<tr><th>№</th><th>Значение</th><th>Тип кабеля</th><th>Длина</th><th>Количество</th></tr>`
-// dataFromOneFile.forEach(item => {
-//     const row = table.insertRow();
-//      Object.values(item).forEach(text => {
-//     const cell = row.insertCell();
-//     cell.textContent = text;
-//  });
-// });
+const titleText = file.name.replace('.xlsx', '').replace('.xls', '')
+const btnText = `${titleText} : ${sheetName}`
 const table = createTable(dataFromOneFile)
 
-accBody.appendChild(table)
-// console.log(tableToJson(table))
-
-
-
-
-
-
-
-
-
-// console.log(dataFromOneFile)
-title.appendChild(button)
-newDiv.appendChild(title)
-newDiv.appendChild(div2)
-div2.appendChild(accBody)
-document.getElementById('processedData').appendChild(newDiv)
+document.getElementById('processedData')
+        .appendChild(createAccordion(id,btnText,table))
 }
-   
-    
-    ;
     // var  html  =  XLSX.utils.sheet_to_html (workbook.Sheets[wsnames],{editable:true}).replace("<table",'<table id="data-table" class="table table-sm"') ;
     // var  container  =  document.getElementById ("table")
     // container.innerHTML = html
@@ -205,8 +145,16 @@ XLSX.writeFile(wb,"ExportData.xlsx")
 
 function createTable(data){
   table = document.createElement('table')
-  table.innerHTML=`<tr><th>№</th><th>Значение</th><th>Тип кабеля</th><th>Длина</th><th>Количество</th></tr>`
-data.forEach(item => {
+  // table.innerHTML=`<tr><th>№</th><th>Значение</th><th>Тип кабеля</th><th>Длина</th><th>Количество</th></tr>`
+console.log(data)
+  const row = table.insertRow();
+  Object.keys(data[0]).forEach(text => {
+  const th = document.createElement('th')
+  th.textContent = text
+  row.appendChild(th)
+  })
+
+  data.forEach(item => {
     const row = table.insertRow();
      Object.values(item).forEach(text => {
     const cell = row.insertCell();
@@ -220,27 +168,41 @@ return table
 }
 
 
+function createOutputTable(obj){
+  table = document.createElement('table')
+  table.innerHTML=`<tr><th>Тип кабеля</th><th>Сумма</th></tr>`
+  var listTypes = Object.entries(obj)
+  listTypes.forEach(item => {
+    const row = table.insertRow();
+     item.forEach(text => {
+    const cell = row.insertCell();
+    cell.textContent = text;
+ });
+});
+table.classList.add('table')
+table.classList.add('table-sm')
+return table
+}
+
+
 const calculate = document.getElementById("calculate");
 calculate.addEventListener("click", calculateCable, false);
 function calculateCable() {
+  const out = document.getElementById('result')
+  out.innerHTML = ''
   const collOfTables = document.getElementById('processedData').getElementsByTagName('table')
- const arrOfTables = Array.from(collOfTables)
+  const arrOfTables = Array.from(collOfTables)
   const dataJS = arrOfTables.map(tab=> tableToJson(tab))
-  const sumByTabels = dataJS.map((item) => {
-    return sumByTypes(item)
-  })
-  console.log(sumByTabels)
-    const out = document.getElementById('outputResult')
+  const sumByTabels = dataJS.map((item) => sumByTypes(item))
+
+    const names = document.getElementById('processedData').getElementsByTagName('button')
     for (let list of sumByTabels){
-    const ul = document.createElement('ul') 
-    ul.classList.add('list-group')
-    ul.classList.add('pb-2')
-    
-    var listTypes = Object.entries(list) 
-    ul.innerHTML += listTypes.map((item) => `<li class="list-group-item pt-1 pb-1">${item[0]} ---- ${item[1]} </li>`).join(' ');    
-    out.appendChild(ul)
+      const tableFromOneList = createOutputTable(list)
+      const title = names[sumByTabels.indexOf(list)].textContent
+      out.appendChild(createAccordion('acc'+ sumByTabels.indexOf(list)+ Date.now(),title , tableFromOneList))
+
     }
-  
+
 
     
  }
@@ -257,3 +219,42 @@ function calculateCable() {
     return acc
 }, {})
  }
+
+function createAccordion(id, text, table) {
+  const newDiv = document.createElement("div");
+  const title = document.createElement("h3");
+  const button = document.createElement("button");
+
+  const div2 = document.createElement("div");
+  const accBody = document.createElement("div");
+
+  button.innerHTML= text
+
+  button.setAttribute('type',"button")
+  button.setAttribute('data-bs-toggle',"collapse")
+  button.setAttribute('data-bs-target',`#${id}`)
+  button.setAttribute('aria-expanded',"false")
+  button.setAttribute('aria-controls',id)
+  button.classList.add("accordion-button")
+  button.classList.add("collapsed")
+
+  title.id = `head${id}`
+  title.classList.add("accordion-header")
+
+  newDiv.classList.add('accordion-item')
+
+  div2.classList.add('accordion-collapse')
+  div2.classList.add('collapse')
+  // div2.classList.add('show')
+  div2.id = id
+  div2.setAttribute('aria-labelledby',`head${id}`)
+  div2.setAttribute('data-bs-parent',"accordionDefault")
+
+  accBody.classList.add('accordion-body')
+  accBody.appendChild(table)
+  title.appendChild(button)
+  newDiv.appendChild(title)
+  newDiv.appendChild(div2)
+  div2.appendChild(accBody)
+  return newDiv
+}
