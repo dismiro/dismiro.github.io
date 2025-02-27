@@ -83,7 +83,7 @@ accBody.classList.add('accordion-body')
 const table = createTable(dataFromOneFile)
 
 accBody.appendChild(table)
-console.log(tableToJson(table))
+// console.log(tableToJson(table))
 
 
 
@@ -98,7 +98,7 @@ title.appendChild(button)
 newDiv.appendChild(title)
 newDiv.appendChild(div2)
 div2.appendChild(accBody)
-document.getElementById('accordionExample').appendChild(newDiv)
+document.getElementById('processedData').appendChild(newDiv)
 }
    
     
@@ -223,7 +223,37 @@ return table
 const calculate = document.getElementById("calculate");
 calculate.addEventListener("click", calculateCable, false);
 function calculateCable() {
-  console.log(document.getElementById('processedData').getElementsByTagName('table'))
-  console.log(tableToJson(document.getElementsByTagName('table')[0]))
+  const collOfTables = document.getElementById('processedData').getElementsByTagName('table')
+ const arrOfTables = Array.from(collOfTables)
+  const dataJS = arrOfTables.map(tab=> tableToJson(tab))
+  const sumByTabels = dataJS.map((item) => {
+    return sumByTypes(item)
+  })
+  console.log(sumByTabels)
+    const out = document.getElementById('outputResult')
+    for (let list of sumByTabels){
+    const ul = document.createElement('ul') 
+    ul.classList.add('list-group')
+    ul.classList.add('pb-2')
     
+    var listTypes = Object.entries(list) 
+    ul.innerHTML += listTypes.map((item) => `<li class="list-group-item pt-1 pb-1">${item[0]} ---- ${item[1]} </li>`).join(' ');    
+    out.appendChild(ul)
+    }
+  
+
+    
+ }
+
+ function sumByTypes(obj) {
+  return obj.reduce((acc,item)=> {
+    const currentType = item['Тип кабеля'].replace(' ','')
+    const currentLength = item['Длина'] * item['Количество']
+    if (acc[currentType]){
+        acc[currentType] = acc[currentType] + currentLength
+        return acc
+    }
+    acc[currentType] = currentLength
+    return acc
+}, {})
  }
