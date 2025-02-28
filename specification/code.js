@@ -169,27 +169,41 @@ return table
 
 const countOccurences = (text, search) => (text.split(search)).length - 1
 function compareFn(a,b) {
-  // console.log(a)
-  if (countOccurences(a[0], '*') < countOccurences(b[0], '*')) {
-    return -1 
-  } else if (countOccurences(a[0], '*') > countOccurences(b[0], '*')){
-    return 1
-  }
-  return 0
+  let aPoint = 0
+  let bPoint = 0
+  const itemA = a[0]
+  const itemB = b[0]
+  const lastElFromItemA = itemA[itemA.length-1]
+  const lastElFromItemB = itemB[itemB.length-1]
+  const countSimbA = countOccurences(itemA, '*')
+  const countSimbB = countOccurences(itemB,'*')
+
+  const compareText =  itemA.localeCompare(itemB,undefined, {numeric:true, sensitivity:"base"})
+  const compareLastEl =  lastElFromItemA.localeCompare(lastElFromItemB,undefined, {numeric:true, sensitivity:"base"})
+   const compareCount = countSimbA-countSimbB
+
+  if (compareText<0) bPoint += 1;
+  else if (compareText>0) aPoint +=1
+
+  if (compareCount<0) bPoint += 10;
+  else if (compareCount>0) aPoint +=10
+
+  if (compareLastEl<0) bPoint += 100;
+  else if (compareLastEl>0) aPoint +=100
+
+  return aPoint-bPoint
 }
 
 function createOutputTable(obj){
   table = document.createElement('table')
   table.innerHTML=`<tr><th>Тип кабеля</th><th>Сумма</th></tr>`
-
   var listTypes = Object.entries(obj).sort(compareFn)
-  console.log()
-
   listTypes.forEach(item => {
     const row = table.insertRow();
-     item.forEach(text => {
+    item.forEach(text => {
     const cell = row.insertCell();
-    cell.textContent = text;
+
+    cell.innerHTML = text;
  });
 });
 table.classList.add('table')
@@ -208,13 +222,12 @@ function calculateCable() {
   const dataJS = arrOfTables.map(tab=> tableToJson(tab))
   const sumByTabels = dataJS.map((item) => sumByTypes(item))
 
-    const names = document.getElementById('processedData').getElementsByTagName('button')
-    for (let list of sumByTabels){
-      const tableFromOneList = createOutputTable(list)
-      const title = names[sumByTabels.indexOf(list)].textContent
-      out.appendChild(createAccordion('acc'+ sumByTabels.indexOf(list)+ Date.now(),title , tableFromOneList))
-
-    }
+  const names = document.getElementById('processedData').getElementsByTagName('button')
+  for (let list of sumByTabels){
+    const tableFromOneList = createOutputTable(list)
+    const title = names[sumByTabels.indexOf(list)].textContent
+    out.appendChild(createAccordion('acc'+ sumByTabels.indexOf(list)+ Date.now(),title , tableFromOneList))
+  }
 
 
     
