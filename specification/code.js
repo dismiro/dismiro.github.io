@@ -146,7 +146,7 @@ XLSX.writeFile(wb,"ExportData.xlsx")
 function createTable(data){
   table = document.createElement('table')
   // table.innerHTML=`<tr><th>№</th><th>Значение</th><th>Тип кабеля</th><th>Длина</th><th>Количество</th></tr>`
-console.log(data)
+// console.log(data)
   const row = table.insertRow();
   Object.keys(data[0]).forEach(text => {
   const th = document.createElement('th')
@@ -167,11 +167,24 @@ table.classList.add('table-sm')
 return table
 }
 
+const countOccurences = (text, search) => (text.split(search)).length - 1
+function compareFn(a,b) {
+  // console.log(a)
+  if (countOccurences(a[0], '*') < countOccurences(b[0], '*')) {
+    return -1 
+  } else if (countOccurences(a[0], '*') > countOccurences(b[0], '*')){
+    return 1
+  }
+  return 0
+}
 
 function createOutputTable(obj){
   table = document.createElement('table')
   table.innerHTML=`<tr><th>Тип кабеля</th><th>Сумма</th></tr>`
-  var listTypes = Object.entries(obj)
+
+  var listTypes = Object.entries(obj).sort(compareFn)
+  console.log()
+
   listTypes.forEach(item => {
     const row = table.insertRow();
      item.forEach(text => {
