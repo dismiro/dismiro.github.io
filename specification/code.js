@@ -20,7 +20,9 @@ async function handleFileAsync(e) {
 })
 const lstMod = String(file.lastModified)
 const shtName = String(sheetName).replaceAll(' ','')
-const id= `${shtName}-${lstMod}-${Date.now()}`
+                                 .replaceAll('(','')
+                                 .replaceAll(')','')
+const id= `${shtName}${lstMod}${Date.now()}`
 const fileName = file.name.replace('.xlsx', '').replace('.xls', '')
 const caption = `${fileName} - ${sheetName}`
 const btnText = (countOccurences(caption, '-') > 1) ? caption.slice(caption.indexOf('-') + 1): caption  
