@@ -1,12 +1,3 @@
-// const inputElement = document.getElementById("input");
-// inputElement.addEventListener("change", handleFiles, false);
-// function handleFiles() {
-//   const fileList = this.files;
-//   console.log(fileList) /* now you can work with the file list */
-// //   var  workbook  =  XLSX.readFile (fileList[0])
-// //   console.log(workbook)
-// }
-
 async function handleFileAsync(e) {
     // console.log(e.target.files)
     var dataJS = []
@@ -25,109 +16,45 @@ async function handleFileAsync(e) {
             .replace(/\(.\)/g,'')
             .replace(/\(..\)/g,'')
             .replace('x','х')
-            .replace(' ','')
+            .replaceAll(' ','')
 
             const length = fixValue.substring(0,fixValue.indexOf('-'))
             const type = fixValue.substring(fixValue.indexOf('-') + 1, fixValue.length)
             const count = item['Количество']
             return {'№' : item['__rowNum__'],'Значение':value,'Тип кабеля':type, 'Длина':length, 'Количество':count}
 })
-// dataJS.push(dataFromOneFile)
-// console.log(file.lastModified)
+const lstMod = String(file.lastModified)
+const shtName = String(sheetName).replaceAll(' ','')
+const id= `${shtName}-${lstMod}-${Date.now()}`
+const fileName = file.name.replace('.xlsx', '').replace('.xls', '')
+const caption = `${fileName} - ${sheetName}`
+const btnText = (countOccurences(caption, '-') > 1) ? caption.slice(caption.indexOf('-') + 1): caption  
 
-const id= `${sheetName}-${file.lastModified}`.replace(' ','')
-const titleText = file.name.replace('.xlsx', '').replace('.xls', '')
-const btnText = `${titleText} : ${sheetName}`
-const table = createTable(dataFromOneFile)
+const table = createTable(dataFromOneFile, btnText)
 
 document.getElementById('processedData')
         .appendChild(createAccordion(id,btnText,table))
 }
-    // var  html  =  XLSX.utils.sheet_to_html (workbook.Sheets[wsnames],{editable:true}).replace("<table",'<table id="data-table" class="table table-sm"') ;
-    // var  container  =  document.getElementById ("table")
-    // container.innerHTML = html
-    // const dataJS = jsa
     }
-    // console.log(dataJS)
-//     const dataJS = jsa.map((item) => {
-//         const fixValue = item['Значение']
-//         .replace(/\(.\)/g,'')
-//         .replace(/\(..\)/g,'')
-//         .replace('x','х')
-//         .replace(' ','')
-
-//         const length = fixValue.substring(0,fixValue.indexOf('-'))
-//         const type = fixValue.substring(fixValue.indexOf('-') + 1, fixValue.length)
-//         const count = item['Количество']
-//         return {'row' : item['__rowNum__'],'fixValue':fixValue,'type':type, 'length':length, 'count':count}
-// })
-    // console.log(dataJS)
-    // const table = document.createElement('table');
-
-// Заполнение таблицы данными
-//     dataJS.forEach(item => {
-//     const row = table.insertRow();
-//      Object.values(item).forEach(text => {
-//     const cell = row.insertCell();
-//     cell.textContent = text;
-//  });
-// });
-// var outData = dataJS.reduce((acc,item)=> {
-//     const currentType = item['type'].replace(' ','')
-//     const currentLength = item['length'] * item['count']
-//     if (acc[currentType]){
-//         acc[currentType] = acc[currentType] + currentLength
-//         return acc
-//     }
-//     acc[currentType] = currentLength
-//     return acc
-// }, {})
-// console.log(outData)
-// table.classList.add('table')
-// table.classList.add('table-sm')
-// const processedData = document.getElementById('processedData') 
-// processedData.appendChild(table);
-    // const out = document.getElementById('outputResult') 
-    // var listTypes = Object.entries(outData) 
-    // out.innerHTML = listTypes.map((item) => `<li>${item[0]} ---- ${item[1]} </li>`).join(' ');    
-
-    // var  jsa  =  XLSX.utils.sheet_to_json ( worksheet , opts ) ;​​​​ 
-    // console.log(workbook)
-  
-    /* DO SOMETHING WITH workbook HERE */
   }
   const input_dom_element = document.getElementById("input");
   input_dom_element.addEventListener("change", handleFileAsync, false);
 
-const inputElement = document.getElementById("export");
-inputElement.addEventListener("click", exportFile, false);
+const exportBtn = document.getElementById("export");
+exportBtn.addEventListener("click", exportFile, false);
+
 function exportFile() {
-//     const aoo = [
-//         {Name: "Dmitrii1", Age: 1},
-//         {Name: "Dmitrii2", Age: 2},
-//         {Name: "Dmitrii3", Age: 3},
-//         {Name: "Dmitrii4", Age: 4},
-//         {Name: "Dmitrii5", Age: 5},
-//     ]
-//     //var ws = XLSX.utils.json_to_sheet(aoo)
-//     //var wb = XLSX.utils.book_new()
-//     //XLSX.utils.book_append_sheet(wb,ws,"Sheet1")
-//     //XLSX.writeFile(wb,"ExportData.xlsx")
+  const tables = document.getElementById('processedData').getElementsByTagName('table')
+  var wb = XLSX.utils.book_new();
+  for (let table of tables){
+    const sheetName = table.getAttribute('sheet')
+    var ws = XLSX.utils.table_to_sheet(table)
+    XLSX.utils.book_append_sheet(wb, ws, sheetName)
+  }
+  XLSX.writeFile(wb,"Спецификация кабеля (название).xlsx")
+}
 
-
-var elt = document.getElementById('table')
-var wb = XLSX.utils.table_to_book(elt, {sheet: "Sheet JS"})
-
-XLSX.writeFile(wb,"ExportData.xlsx")
-    
-
-    
-//  console.log("Hello") /* now you can work with the file list */
-// //   var  workbook  =  XLSX.readFile (fileList[0])
-// // //   console.log(workbook)
- }
-
- function tableToJson(table) { 
+function tableToJson(table) { 
   var data = [];
   var headRow = table.rows[0]
   for (var i = 1; i < table.rows.length; i++) { 
@@ -135,7 +62,6 @@ XLSX.writeFile(wb,"ExportData.xlsx")
       var tableRow = table.rows[i]; 
       var rowData = {}; 
       for (var j = 0; j < tableRow.cells.length; j++) { 
-          // rowData.push(tableRow.cells[j].innerHTML);
           rowData[headRow.cells[j].innerHTML]= tableRow.cells[j].innerHTML
       } 
       data.push(rowData); 
@@ -143,10 +69,9 @@ XLSX.writeFile(wb,"ExportData.xlsx")
   return data; 
 }
 
-function createTable(data){
+function createTable(data, text=''){
   table = document.createElement('table')
   // table.innerHTML=`<tr><th>№</th><th>Значение</th><th>Тип кабеля</th><th>Длина</th><th>Количество</th></tr>`
-// console.log(data)
   const row = table.insertRow();
   Object.keys(data[0]).forEach(text => {
   const th = document.createElement('th')
@@ -163,6 +88,7 @@ function createTable(data){
 });
 table.classList.add('table')
 table.classList.add('table-sm')
+table.setAttribute('sheet',text)
 // table.contentEditable = true
 return table
 }
@@ -180,7 +106,7 @@ function compareFn(a,b) {
 
   const compareText =  itemA.localeCompare(itemB,undefined, {numeric:true, sensitivity:"base"})
   const compareLastEl =  lastElFromItemA.localeCompare(lastElFromItemB,undefined, {numeric:true, sensitivity:"base"})
-   const compareCount = countSimbA-countSimbB
+  const compareCount = countSimbA-countSimbB
 
   if (compareText<0) bPoint += 1;
   else if (compareText>0) aPoint +=1
@@ -202,7 +128,6 @@ function createOutputTable(obj){
     const row = table.insertRow();
     item.forEach(text => {
     const cell = row.insertCell();
-
     cell.innerHTML = text;
  });
 });
@@ -227,10 +152,7 @@ function calculateCable() {
     const tableFromOneList = createOutputTable(list)
     const title = names[sumByTabels.indexOf(list)].textContent
     out.appendChild(createAccordion('acc'+ sumByTabels.indexOf(list)+ Date.now(),title , tableFromOneList))
-  }
-
-
-    
+  }    
  }
 
  function sumByTypes(obj) {
@@ -250,7 +172,6 @@ function createAccordion(id, text, table) {
   const newDiv = document.createElement("div");
   const title = document.createElement("h3");
   const button = document.createElement("button");
-
   const div2 = document.createElement("div");
   const accBody = document.createElement("div");
 
