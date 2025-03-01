@@ -1,11 +1,6 @@
 async function handleFileAsync(e) {
-    // console.log(e.target.files)
-    var dataJS = []
     for (let file of e.target.files){
-
-    // const file = e.target.files[0];
     const data = await file.arrayBuffer();
-    /* data is an ArrayBuffer */
     const workbook = XLSX.read(data);
     var  wsnames  =  workbook.SheetNames ;
     for (let sheetName of wsnames){
@@ -94,6 +89,7 @@ return table
 }
 
 const countOccurences = (text, search) => (text.split(search)).length - 1
+
 function compareFn(a,b) {
   let aPoint = 0
   let bPoint = 0
@@ -135,7 +131,6 @@ table.classList.add('table')
 table.classList.add('table-sm')
 return table
 }
-
 
 const calculate = document.getElementById("calculate");
 calculate.addEventListener("click", calculateCable, false);
