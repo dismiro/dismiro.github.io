@@ -143,12 +143,12 @@ function calculateCable() {
   const arrOfTables = Array.from(collOfTables)
   const dataJS = arrOfTables.map(tab=> tableToJson(tab))
   const sumByTabels = dataJS.map((item) => sumByTypes(item))
-
-  const names = document.getElementById('processedData').getElementsByTagName('button')
+  // const names = document.getElementById('processedData').getElementsByTagName('button')
   for (let list of sumByTabels){
+    const num = sumByTabels.indexOf(list)
     const tableFromOneList = createOutputTable(list)
-    const title = names[sumByTabels.indexOf(list)].textContent
-    out.appendChild(createAccordion('acc'+ sumByTabels.indexOf(list)+ Date.now(),title , tableFromOneList))
+    const title = arrOfTables[num].getAttribute('sheet') //names[sumByTabels.indexOf(list)].textContent
+    out.appendChild(createAccordion('acc'+ num + Date.now(),title , tableFromOneList))
   }    
  }
 
