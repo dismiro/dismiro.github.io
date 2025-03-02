@@ -75,14 +75,26 @@ function createTable(data, text=''){
   th.textContent = text
   row.appendChild(th)
   })
-
-  data.forEach(item => {
+  const isFirtsTable = (row.children[1].textContent) === 'Значение' ? true : false
+  // console.log(isFirtsTable)
+//   data.forEach(item => {
+//     const row = table.insertRow();
+//      Object.values(item).forEach(text => {
+//     const cell = row.insertCell();
+//     cell.textContent = text;
+//  });
+// });
+data.forEach(item=> {
+  // const row = document.createElement('tr')
     const row = table.insertRow();
-     Object.values(item).forEach(text => {
-    const cell = row.insertCell();
+    Object.values(item).forEach(text => {
+    const cell = document.createElement('td')
     cell.textContent = text;
- });
-});
+    if (isFirtsTable & Object.values(item).indexOf(text) === 1) cell.setAttribute('contentEditable',true)
+    row.appendChild(cell)
+    })
+  // table.appendChild(row)
+})
 table.classList.add('table')
 table.classList.add('table-sm')
 table.setAttribute('sheet',text)
