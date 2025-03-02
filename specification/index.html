@@ -61,7 +61,7 @@
       --si-btn-active-border-color: #0b0f19e0;
   }
   .canEdit[contenteditable="true"] {
-    padding: 1px;
+    /* padding: 1px; */
     outline: 1px dashed #CCC;
 }
   .canEdit[contenteditable="true"]:focus, .canEdit[contenteditable="true"]:hover{
@@ -146,7 +146,7 @@
       <!-- <label class="input-group-text" for="input">Выберите</label> -->
       <input type="file" class="form-control" id="input" multiple>
       <button id='calculate' type="button" class="btn btn-outline-secondary">Выполнить расчет</button>
-      <button id='export' type="button" class="btn btn-outline-secondary">Выгрузить файл</button>
+      <!-- <button id='export' type="button" class="btn btn-outline-secondary">Выгрузить файл</button> -->
     </div>
   <div class="row row-cols-1 row-cols-md-3 mb-3 text-center">
 <!--     <div class="col">
@@ -162,7 +162,28 @@
     <div class="col-md-8">
       <div class="card mb-4 rounded-3 shadow-sm">
         <div class="card-header py-2">
-          <h4 class="my-1 fw-normal">Исходные данные:</h4>
+          <!-- <h4 class="my-1 fw-normal">Исходные данные:</h4> -->
+
+          <div class="row">
+            <div class="col-9">
+                  <h4 class="my-1 fw-normal">Исходные данные:</h4>
+            </div>
+                <div class="col-3">
+                   <div class="btn-group me-2" role="group" aria-label="Settings group">
+            
+            <button id='canEdit' class="btn btn-outline-secondary btn-icon " type="button">
+              <i class="bx bx-edit-alt fs-4"></i>
+            </button>
+            <button class="btn btn-outline-secondary btn-icon" type="button">
+              <i class="bx bx-refresh fs-4"></i>
+            </button>
+            
+          <button id='export' class="btn btn-outline-secondary btn-icon" type="button">
+              <i class="bx bx-save fs-4"></i>
+            </button></div>
+            </div>
+            </div>
+
         </div>
         <div class="card-body">
           <!-- <div id="processedData"></div> -->

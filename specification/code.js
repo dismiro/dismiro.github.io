@@ -90,7 +90,9 @@ data.forEach(item=> {
     Object.values(item).forEach(text => {
     const cell = document.createElement('td')
     cell.textContent = text;
-    if (isFirtsTable & Object.values(item).indexOf(text) === 1) cell.setAttribute('contentEditable',true)
+    if (isFirtsTable & Object.values(item).indexOf(text) === 1) {
+      cell.classList.add('canEdit')
+    }
     row.appendChild(cell)
     })
   // table.appendChild(row)
@@ -218,3 +220,24 @@ function createAccordion(id, text, table) {
   div2.appendChild(accBody)
   return newDiv
 }
+
+
+document.getElementById('canEdit').addEventListener('click', function(event) {
+  this.classList.toggle('active')
+  const elements = document.getElementsByClassName('canEdit')
+  for (let el of elements){
+    el.contentEditable = el.contentEditable !== 'true'? 'true':'false'
+  }
+  })
+  
+  // const elem = document.getElementById('processedData')
+  // let observer = new MutationObserver(mutationRecords => {
+  //   console.log(mutationRecords); // console.log(изменения)
+  // });
+  
+  // // наблюдать за всем, кроме атрибутов
+  // observer.observe(elem, {
+  //   childList: true, // наблюдать за непосредственными детьми
+  //   subtree: true, // и более глубокими потомками
+  //   characterDataOldValue: true // передавать старое значение в колбэк
+  // });
