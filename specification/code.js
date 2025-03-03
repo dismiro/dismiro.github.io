@@ -7,14 +7,17 @@ async function handleFileAsync(e) {
         const  dataFromOneFile  =  XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]).
         map((item) => {
           const value = item['Значение']
-            const fixValue = value
-            .replace(/\(.\)/g,'')
-            .replace(/\(..\)/g,'')
-            .replace('x','х')
-            .replaceAll(' ','')
+            const fixValue = getFixValue(value)
+            //  value
+            // .replace(/\(.\)/g,'')
+            // .replace(/\(..\)/g,'')
+            // .replace('x','х')
+            // .replaceAll(' ','')
 
-            const length = fixValue.substring(0,fixValue.indexOf('-'))
-            const type = fixValue.substring(fixValue.indexOf('-') + 1, fixValue.length)
+            const length = getLength(fixValue)
+            // fixValue.substring(0,fixValue.indexOf('-'))
+            const type = getType(fixValue)
+            // fixValue.substring(fixValue.indexOf('-') + 1, fixValue.length)
             const count = item['Количество']
             return {'№' : item['__rowNum__'],'Значение':value,'Тип кабеля':type, 'Длина':length, 'Количество':count}
 })
@@ -230,14 +233,33 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
   }
   })
   
-  // const elem = document.getElementById('processedData')
-  // let observer = new MutationObserver(mutationRecords => {
-  //   console.log(mutationRecords); // console.log(изменения)
-  // });
-  
-  // // наблюдать за всем, кроме атрибутов
-  // observer.observe(elem, {
-  //   childList: true, // наблюдать за непосредственными детьми
-  //   subtree: true, // и более глубокими потомками
-  //   characterDataOldValue: true // передавать старое значение в колбэк
-  // });
+  const elem = document.getElementById('processedData')
+  let observer = new MutationObserver(mutationRecords => {
+    const modifiedEl = mutationRecords[0].target
+    const cl = modifiedEl.parentElement.classList.value
+    if (cl === 'canEdit') {
+      const value = modifiedEl.textContent
+      const parent = modifiedEl.parentElement
+      parent.nextElementSibling.innerHTML = getType(getFixValue(value))
+      parent.nextElementSibling.nextElementSibling.innerHTML = getLength(getFixValue(value))
+    }
+  });
+
+  observer.observe(elem, {
+    childList: true, // наблюдать за непосредственными детьми
+    subtree: true, // и более глубокими потомками
+    characterDataOldValue: true // передавать старое значение в колбэк
+  });
+
+function getFixValue(value){
+  return value.replace(/\(.\)/g,'')
+       .replace(/\(..\)/g,'')
+       .replace('x','х')
+       .replaceAll(' ','')
+}
+function getLength(value){
+  return value.substring(0,value.indexOf('-'))
+}
+function getType(value){
+  return value.substring(value.indexOf('-') + 1, value.length)
+}
