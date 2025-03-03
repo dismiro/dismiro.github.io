@@ -19,7 +19,7 @@ async function handleFileAsync(e) {
             const type = getType(fixValue)
             // fixValue.substring(fixValue.indexOf('-') + 1, fixValue.length)
             const count = item['Количество']
-            return {'№' : item['__rowNum__'],'Значение':value,'Тип кабеля':type, 'Длина':length, 'Количество':count}
+            return {'№' : item['__rowNum__'],'Значение':value, 'Количество':count,'Тип кабеля':type, 'Длина':length}
 })
 const lstMod = String(file.lastModified)
 const shtName = String(sheetName).replaceAll(' ','')
@@ -95,15 +95,27 @@ data.forEach(item=> {
     cell.textContent = text;
     if (isFirtsTable & Object.values(item).indexOf(text) === 1) {
       cell.classList.add('canEdit')
+      cell.setAttribute('canEdit', true)
+      cell.setAttribute('edit', 'value')
     }
+    // if (isFirtsTable & Object.values(item).indexOf(text) === 2) {
+    //   cell.classList.add('canEdit')
+    //   cell.setAttribute('canEdit', true)
+    //   cell.setAttribute('edit', 'count')
+    // }
     row.appendChild(cell)
     })
+    removeBtn = document.createElement('button')
+    iBtn = document.createElement('i')
+    removeBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm', 'border-0', 'bg-transparent', 'removeBtn','d-none')
+    iBtn.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80')
+    removeBtn.appendChild(iBtn)
+    row.appendChild(removeBtn)
   // table.appendChild(row)
 })
 table.classList.add('table')
 table.classList.add('table-sm')
 table.setAttribute('sheet',text)
-// table.contentEditable = true
 return table
 }
 
@@ -231,25 +243,40 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
   for (let el of elements){
     el.contentEditable = el.contentEditable !== 'true'? 'true':'false'
   }
+  const removeBtns = document.getElementById('processedData').getElementsByClassName('removeBtn')
+  for (let btn of removeBtns){
+    btn.classList.toggle('d-none')  
+
+  }
   })
   
-  const elem = document.getElementById('processedData')
+  const processedData = document.getElementById('processedData')
   let observer = new MutationObserver(mutationRecords => {
     const modifiedEl = mutationRecords[0].target
-    const cl = modifiedEl.parentElement.classList.value
-    if (cl === 'canEdit') {
+    // console.log(modifiedEl.parentElement.parentElement)
+    // console.log(modifiedEl.parentElement.parentElement)
+    // const cl = modifiedEl.parentElement.classList.value
+    const canEdit = modifiedEl.parentElement.getAttribute('canEdit')
+    const edit =  modifiedEl.parentElement.getAttribute('edit')
+    if ((canEdit === 'true') & (edit=== 'value' ) ) {
       const value = modifiedEl.textContent
       const parent = modifiedEl.parentElement
-      parent.nextElementSibling.innerHTML = getType(getFixValue(value))
-      parent.nextElementSibling.nextElementSibling.innerHTML = getLength(getFixValue(value))
+      parent.nextElementSibling.nextElementSibling.innerHTML = getType(getFixValue(value))
+      parent.nextElementSibling.nextElementSibling.nextElementSibling.innerHTML = getLength(getFixValue(value))
     }
   });
 
-  observer.observe(elem, {
+  observer.observe(processedData, {
     childList: true, // наблюдать за непосредственными детьми
     subtree: true, // и более глубокими потомками
     characterDataOldValue: true // передавать старое значение в колбэк
   });
+
+  processedData.addEventListener("click", processedDataClick, false);
+  function processedDataClick(event){
+    const classList = event.target.classList.value;
+    if (classList.includes('bx-trash')) event.target.parentNode.parentNode.remove()
+  }
 
 function getFixValue(value){
   return value.replace(/\(.\)/g,'')
