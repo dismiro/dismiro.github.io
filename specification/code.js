@@ -20,7 +20,7 @@ const shtName = String(sheetName).replaceAll(' ','')
 const id= `${shtName}${lstMod}${Date.now()}`
 const fileName = file.name.replace('.xlsx', '').replace('.xls', '')
 const caption = `${fileName} -> ${sheetName}`
-const btnText = (countOccurences(caption, '->') > 1) ? caption.slice(caption.indexOf('->') + 1): caption  
+const btnText = (countOccurences(caption, '->') > 1) ? caption.slice(caption.indexOf('->') + 2): caption  
 
 const table = createTable(dataFromOneFile, btnText)
 
@@ -160,6 +160,7 @@ return table
 const calculate = document.getElementById("calculate");
 calculate.addEventListener("click", calculateCable, false);
 function calculateCable() {
+  console.log('0123f5ff'.indexOf('ff'))
   const out = document.getElementById('result')
   out.innerHTML = ''
   const collOfTables = document.getElementById('processedData').getElementsByTagName('table')
