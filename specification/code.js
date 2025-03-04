@@ -88,21 +88,22 @@ function createTable(data, text=''){
 //  });
 // });
 data.forEach(item=> {
-  // const row = document.createElement('tr')
     const row = table.insertRow();
+    let i = 0
     Object.values(item).forEach(text => {
     const cell = document.createElement('td')
     cell.textContent = text;
-    if (isFirtsTable & Object.values(item).indexOf(text) === 1) {
+    if (isFirtsTable & i === 1) {
       cell.classList.add('canEdit')
       cell.setAttribute('canEdit', true)
       cell.setAttribute('edit', 'value')
     }
-    // if (isFirtsTable & Object.values(item).indexOf(text) === 2) {
-    //   cell.classList.add('canEdit')
-    //   cell.setAttribute('canEdit', true)
-    //   cell.setAttribute('edit', 'count')
-    // }
+    if (isFirtsTable & i === 2) {
+      cell.classList.add('canEdit')
+      cell.setAttribute('canEdit', true)
+      cell.setAttribute('edit', 'count')
+    }
+    i += 1
     row.appendChild(cell)
     })
     removeBtn = document.createElement('button')
@@ -111,7 +112,6 @@ data.forEach(item=> {
     iBtn.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80')
     removeBtn.appendChild(iBtn)
     row.appendChild(removeBtn)
-  // table.appendChild(row)
 })
 table.classList.add('table')
 table.classList.add('table-sm')
@@ -253,12 +253,9 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
   const processedData = document.getElementById('processedData')
   let observer = new MutationObserver(mutationRecords => {
     const modifiedEl = mutationRecords[0].target
-    // console.log(modifiedEl.parentElement.parentElement)
-    // console.log(modifiedEl.parentElement.parentElement)
-    // const cl = modifiedEl.parentElement.classList.value
     const canEdit = modifiedEl.parentElement.getAttribute('canEdit')
     const edit =  modifiedEl.parentElement.getAttribute('edit')
-    if ((canEdit === 'true') & (edit=== 'value' ) ) {
+    if ((canEdit === 'true') & (edit=== 'value') ) {
       const value = modifiedEl.textContent
       const parent = modifiedEl.parentElement
       parent.nextElementSibling.nextElementSibling.innerHTML = getType(getFixValue(value))
