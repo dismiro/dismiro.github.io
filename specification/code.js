@@ -1,34 +1,26 @@
 async function handleFileAsync(e) {
-    for (let file of e.target.files){
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
-    var  wsnames  =  workbook.SheetNames ;
-    for (let sheetName of wsnames){
-        const  dataFromOneFile  =  XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]).
-        map((item) => {
-          const value = item['Значение']
-            const fixValue = getFixValue(value)
-            //  value
-            // .replace(/\(.\)/g,'')
-            // .replace(/\(..\)/g,'')
-            // .replace('x','х')
-            // .replaceAll(' ','')
-
-            const length = getLength(fixValue)
-            // fixValue.substring(0,fixValue.indexOf('-'))
-            const type = getType(fixValue)
-            // fixValue.substring(fixValue.indexOf('-') + 1, fixValue.length)
-            const count = item['Количество']
-            return {'№' : item['__rowNum__'],'Значение':value, 'Количество':count,'Тип кабеля':type, 'Длина':length}
-})
+  for (let file of e.target.files){
+  const data = await file.arrayBuffer();
+  const workbook = XLSX.read(data);
+  var  wsnames  =  workbook.SheetNames ;
+  for (let sheetName of wsnames){
+      const  dataFromOneFile  =  XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]).
+      map((item) => {
+        const value = item['Значение']
+        const fixValue = getFixValue(value)
+        const length = getLength(fixValue)
+        const type = getType(fixValue)
+        const count = item['Количество']
+        return {'№' : item['__rowNum__'],'Значение':value, 'Количество':count,'Тип кабеля':type, 'Длина':length}
+      })
 const lstMod = String(file.lastModified)
 const shtName = String(sheetName).replaceAll(' ','')
                                  .replaceAll('(','')
                                  .replaceAll(')','')
 const id= `${shtName}${lstMod}${Date.now()}`
 const fileName = file.name.replace('.xlsx', '').replace('.xls', '')
-const caption = `${fileName} - ${sheetName}`
-const btnText = (countOccurences(caption, '-') > 1) ? caption.slice(caption.indexOf('-') + 1): caption  
+const caption = `${fileName} -> ${sheetName}`
+const btnText = (countOccurences(caption, '->') > 1) ? caption.slice(caption.indexOf('->') + 1): caption  
 
 const table = createTable(dataFromOneFile, btnText)
 
@@ -36,9 +28,9 @@ document.getElementById('processedData')
         .appendChild(createAccordion(id,btnText,table))
 }
     }
-  }
-  const input_dom_element = document.getElementById("input");
-  input_dom_element.addEventListener("change", handleFileAsync, false);
+}
+const input_dom_element = document.getElementById("input");
+input_dom_element.addEventListener("change", handleFileAsync, false);
 
 const exportBtn = document.getElementById("export");
 exportBtn.addEventListener("click", exportFile, false);
@@ -58,7 +50,6 @@ function tableToJson(table) {
   var data = [];
   var headRow = table.rows[0]
   for (var i = 1; i < table.rows.length; i++) { 
-
       var tableRow = table.rows[i]; 
       var rowData = {}; 
       for (var j = 0; j < tableRow.cells.length; j++) { 
@@ -78,45 +69,48 @@ function createTable(data, text=''){
   th.textContent = text
   row.appendChild(th)
   })
-  const isFirtsTable = (row.children[1].textContent) === 'Значение' ? true : false
-  // console.log(isFirtsTable)
-//   data.forEach(item => {
-//     const row = table.insertRow();
-//      Object.values(item).forEach(text => {
-//     const cell = row.insertCell();
-//     cell.textContent = text;
-//  });
-// });
-data.forEach(item=> {
-    const row = table.insertRow();
-    let i = 0
-    Object.values(item).forEach(text => {
-    const cell = document.createElement('td')
-    cell.textContent = text;
-    if (isFirtsTable & i === 1) {
-      cell.classList.add('canEdit')
-      cell.setAttribute('canEdit', true)
-      cell.setAttribute('edit', 'value')
-    }
-    if (isFirtsTable & i === 2) {
-      cell.classList.add('canEdit')
-      cell.setAttribute('canEdit', true)
-      cell.setAttribute('edit', 'count')
-    }
-    i += 1
-    row.appendChild(cell)
-    })
-    removeBtn = document.createElement('button')
-    iBtn = document.createElement('i')
-    removeBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm', 'border-0', 'bg-transparent', 'removeBtn','d-none')
-    iBtn.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80')
-    removeBtn.appendChild(iBtn)
-    row.appendChild(removeBtn)
-})
-table.classList.add('table')
-table.classList.add('table-sm')
+  // const isFirtsTable = (row.children[1].textContent) === 'Значение' ? true : false
+data.forEach(item=> fillRow(item, table))
+table.classList.add('table','table-sm', 'my-1')
+// table.classList.add('table-sm')
 table.setAttribute('sheet',text)
 return table
+}
+
+function fillRow(item, table, editableNow=false){
+  const row = table.insertRow();
+  let i = 0
+  Object.values(item).forEach(text => {
+  const cell = document.createElement('td')
+  cell.textContent = text;
+  
+  if (i === 1) {
+    cell.classList.add('canEdit')
+    cell.setAttribute('contentEditable', editableNow)
+    cell.setAttribute('canEdit', true)
+    cell.setAttribute('edit', 'value')
+  }
+  if (i === 2) {
+    cell.classList.add('canEdit')
+    cell.setAttribute('contentEditable', editableNow)
+    cell.setAttribute('canEdit', true)
+    cell.setAttribute('edit', 'count')
+  }
+  i += 1
+  row.appendChild(cell)
+    }
+  )
+  row.appendChild(createRemoveBtn(editableNow))
+}
+
+function createRemoveBtn(editableNow) {
+  const removeBtn = document.createElement('button')
+  const iBtn = document.createElement('i')
+  removeBtn.classList.add('btn', 'btn-secondary', 'btn-icon', 'btn-sm', 'border-0', 'bg-transparent', 'removeBtn')
+  if (!editableNow) removeBtn.classList.add('d-none')
+  iBtn.classList.add('bx', 'bx-trash', 'fs-4', 'opacity-80')
+  removeBtn.appendChild(iBtn)
+  return removeBtn
 }
 
 const countOccurences = (text, search) => (text.split(search)).length - 1
@@ -227,8 +221,14 @@ function createAccordion(id, text, table) {
   div2.setAttribute('aria-labelledby',`head${id}`)
   div2.setAttribute('data-bs-parent',"accordionDefault")
 
+  const addRowBtn = document.createElement('btn')
+  addRowBtn.classList.add('btn', 'btn-outline-secondary', 'd-none', 'addRowBtn', 'w-100')
+  addRowBtn.textContent = 'Добавить строку'
+
   accBody.classList.add('accordion-body')
   accBody.appendChild(table)
+  accBody.appendChild(addRowBtn)
+  
   title.appendChild(button)
   newDiv.appendChild(title)
   newDiv.appendChild(div2)
@@ -246,7 +246,10 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
   const removeBtns = document.getElementById('processedData').getElementsByClassName('removeBtn')
   for (let btn of removeBtns){
     btn.classList.toggle('d-none')  
-
+  }
+  const addRowBtns = document.getElementById('processedData').getElementsByClassName('addRowBtn')
+  for (let btn of addRowBtns){
+    btn.classList.toggle('d-none')  
   }
   })
   
@@ -273,6 +276,13 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
   function processedDataClick(event){
     const classList = event.target.classList.value;
     if (classList.includes('bx-trash')) event.target.parentNode.parentNode.remove()
+    if (classList.includes('addRowBtn')) {
+      const parentDiv = event.target.parentElement
+      const num = parentDiv.querySelectorAll('tr').length
+      // const num = parentDiv.getElementsByTagName('table')[0].querySelectorAll('tr').length
+      const newRow = {'№' : num,'Значение':'Длина-Кабель', 'Количество': 1 ,'Тип кабеля':'Кабель', 'Длина':'Длина'}
+      fillRow(newRow, parentDiv.getElementsByTagName('table')[0],true)
+}
   }
 
 function getFixValue(value){
