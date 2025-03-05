@@ -10,8 +10,8 @@ async function handleFileAsync(e) {
         const fixValue = getFixValue(value)
         const length = getLength(fixValue)
         const type = getType(fixValue)
-        const count = item['Количество']
-        return {'№' : item['__rowNum__'],'Значение':value, 'Количество':count,'Тип кабеля':type, 'Длина':length}
+        const count = (typeof item['Количество'] !== 'undefined')? item['Количество']:item['Кол-во']  
+        return {'№' : item['__rowNum__'],'Значение':value, 'Кол-во':count,'Тип кабеля':type, 'Длина':length}
       })
 const lstMod = String(file.lastModified)
 const shtName = String(sheetName).replaceAll(' ','')
@@ -19,8 +19,8 @@ const shtName = String(sheetName).replaceAll(' ','')
                                  .replaceAll(')','')
 const id= `${shtName}${lstMod}${Date.now()}`
 const fileName = file.name.replace('.xlsx', '').replace('.xls', '')
-const caption = `${fileName} -> ${sheetName}`
-const btnText = (countOccurences(caption, '->') > 1) ? caption.slice(caption.indexOf('->') + 2): caption  
+const caption = `${fileName} _ ${sheetName}`
+const btnText = (countOccurences(caption, '_') > 1) ? caption.slice(caption.indexOf('_') + 1): caption  
 
 const table = createTable(dataFromOneFile, btnText)
 
@@ -66,13 +66,13 @@ function createTable(data, text=''){
   const row = table.insertRow();
   Object.keys(data[0]).forEach(text => {
   const th = document.createElement('th')
+  th.classList.add('noWrap')
   th.textContent = text
   row.appendChild(th)
   })
   // const isFirtsTable = (row.children[1].textContent) === 'Значение' ? true : false
 data.forEach(item=> fillRow(item, table))
 table.classList.add('table','table-sm', 'my-1')
-// table.classList.add('table-sm')
 table.setAttribute('sheet',text)
 return table
 }
@@ -160,7 +160,7 @@ return table
 const calculate = document.getElementById("calculate");
 calculate.addEventListener("click", calculateCable, false);
 function calculateCable() {
-  console.log('0123f5ff'.indexOf('ff'))
+  // console.log('0123f5ff'.indexOf('ff'))
   const out = document.getElementById('result')
   out.innerHTML = ''
   const collOfTables = document.getElementById('processedData').getElementsByTagName('table')
@@ -183,7 +183,7 @@ function calculateCable() {
  function sumByTypes(obj) {
   return obj.reduce((acc,item)=> {
     const currentType = item['Тип кабеля'].replace(' ','')
-    const currentLength = item['Длина'] * item['Количество']
+    const currentLength = item['Длина'] * item['Кол-во']
     if (acc[currentType]){
         acc[currentType] = acc[currentType] + currentLength
         return acc
@@ -281,7 +281,7 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
       const parentDiv = event.target.parentElement
       const num = parentDiv.querySelectorAll('tr').length
       // const num = parentDiv.getElementsByTagName('table')[0].querySelectorAll('tr').length
-      const newRow = {'№' : num,'Значение':'Длина-Кабель', 'Количество': 1 ,'Тип кабеля':'Кабель', 'Длина':'Длина'}
+      const newRow = {'№' : num,'Значение':'Длина-Кабель', 'Кол-во': 1 ,'Тип кабеля':'Кабель', 'Длина':'Длина'}
       fillRow(newRow, parentDiv.getElementsByTagName('table')[0],true)
 }
   }
