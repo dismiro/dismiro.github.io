@@ -3,7 +3,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="">
-  <title>Расчет емкости аккумуляторов</title>
+  <title>Модуль заполнения спецификаций напольного кабеля</title>
 
   <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@3"> -->
   <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
@@ -14,14 +14,18 @@
 
   <style>
   .main-container { 
-      max-width: 1200px;
+      max-width: 1700px;
+      min-width: 1050px;
   }
 
+  .card-header {
+    min-width: 220px;
+  }
   .pricing-header {
     max-width: 700px;
   } 
   .card-body{
-    min-width: 250px;
+    min-width: 255px;
   } 
   .card {
     min-width: 255px;
@@ -144,8 +148,8 @@ white-space: nowrap;
     <!-- <div id='table'> </div> -->
  
   <!-- </section> -->
-  <section id="landings" class="container text-center pt-5 mt-2 mt-md-4 mt-lg-5">
-    <h2 class="h1 pt-2 pt-lg-0">Модуль спецификаций напольного кабеля</h2>
+  <section id="landings" class="container main-container text-center pt-5 mt-2 mt-md-4 mt-lg-5">
+    <h2 class="h1 pt-2 pt-lg-0">Модуль заполнения спецификаций напольного кабеля</h2>
  
     
     <div class="input-group mb-3">
@@ -165,7 +169,7 @@ white-space: nowrap;
         </div>
       </div>
     </div> -->
-    <div class="col-md-8">
+    <div class="col-md-6">
       <div class="card mb-4 rounded-3 shadow-sm">
         <div class="card-header py-2">
           <!-- <h4 class="my-1 fw-normal">Исходные данные:</h4> -->
@@ -198,7 +202,7 @@ white-space: nowrap;
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="card mb-4 rounded-3 shadow-sm">
         <div class="card-header py-2">
           <h4 class="my-1 fw-normal">Сумма кабеля:</h4>
@@ -210,6 +214,19 @@ white-space: nowrap;
         </div>
       </div>
     </div>
+    <div class="col-md-3">
+      <div class="card mb-4 rounded-3 shadow-sm">
+        <div class="card-header py-2">
+          <h4 class="my-1 fw-normal">Подземные муфты:</h4>
+        </div>
+        <div class="card-body">
+
+          <div class="accordion" id="resultCouplings">
+          </div>
+        </div>
+      </div>
+    </div>
+    
 
   </div>
 </section>
