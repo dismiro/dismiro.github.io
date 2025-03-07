@@ -298,3 +298,22 @@ function getLength(value){
 function getType(value){
   return value.substring(value.indexOf('-') + 1, value.length)
 }
+let setting = {}
+const inputJSON = document.getElementById("inputDesignations");
+inputJSON.addEventListener("change", loadJson, false);
+
+async function loadJson(e) {
+  const file = await e.target.files[0]
+  let reader = new FileReader();
+
+  reader.readAsText(file);
+
+  reader.onload = function() {
+    // console.log(JSON.parse(reader.result))
+    setting = JSON.parse(reader.result)
+    console.log(setting['*']['Название'])
+  };
+  reader.onerror = function() {
+    console.log(reader.error);
+  };
+}

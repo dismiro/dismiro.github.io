@@ -153,45 +153,48 @@ white-space: nowrap;
  
     
     <div class="input-group mb-3">
-      <!-- <label class="input-group-text" for="input">Выберите</label> -->
-      <input type="file" class="form-control" id="input" multiple>
-      <button id='calculate' type="button" class="btn btn-outline-secondary">Выполнить расчет</button>
-      <!-- <button id='export' type="button" class="btn btn-outline-secondary">Выгрузить файл</button> -->
+      <input class='d-none' type="file" class="form-control" id="input" multiple>
+      <input class='d-none' type="file" class="form-control" id="inputDesignations">
     </div>
   <div class="row row-cols-1 row-cols-md-3 mb-3 text-center">
-<!--     <div class="col">
-      <div class="card mb-4 rounded-3 shadow-sm">
-        <div class="card-header py-2">
-          <h4 class="my-1 fw-normal">Исходные данные</h4>
-        </div>
-        <div id='table' class="card-body">
-
-        </div>
-      </div>
-    </div> -->
     <div class="col-md-6">
       <div class="card mb-4 rounded-3 shadow-sm">
         <div class="card-header py-2">
           <!-- <h4 class="my-1 fw-normal">Исходные данные:</h4> -->
 
           <div class="row">
-            <div class="col-10">
+            <div class="col-8">
                   <h4 class="my-1 fw-normal">Исходные данные:</h4>
             </div>
-                <div class="col-2">
+                <div class="col-4">
                    <div class="btn-group me-2" role="group" aria-label="Settings group">
-            
-            <button id='canEdit' class="btn btn-outline-secondary btn-icon " type="button">
-              <i class="bx bx-edit-alt fs-4"></i>
-            </button>
-            <!-- <button class="btn btn-outline-secondary btn-icon" type="button">
-              <i class="bx bx-refresh fs-4"></i>
-            </button> -->
-            
-          <button id='export' class="btn btn-outline-secondary btn-icon" type="button">
-              <i class="bx bx-save fs-4"></i>
-            </button></div>
-            </div>
+                    <button id='addFiles' class="btn btn-outline-secondary btn-icon " type="button">
+                      <label for="input">
+                        <i class='bx bx-folder-plus fs-4 mx-2 py-2'></i>  
+                      </label>
+
+                    </button>
+
+                    <button id='canEdit' class="btn btn-outline-secondary btn-icon " type="button">
+                      <i class="bx bx-edit-alt fs-4"></i>
+                    </button>
+
+                    
+                    <button id='addDesignations' class="btn btn-outline-secondary btn-icon " type="button">
+                      <label for="inputDesignations">
+                        <i class='bx bx-cog fs-4 mx-2 py-2'></i>  
+                      </label>
+                    </button>
+
+                    <button id='calculate' class="btn btn-outline-secondary btn-icon" type="button">
+                      <i class="bx bx-check fs-3"></i>
+                    </button>
+
+
+                    <button id='export' class="btn btn-outline-secondary btn-icon" type="button">
+                        <i class="bx bx-save fs-4"></i>
+                      </button></div>
+                 </div>
             </div>
 
         </div>
@@ -205,7 +208,7 @@ white-space: nowrap;
     <div class="col-md-3">
       <div class="card mb-4 rounded-3 shadow-sm">
         <div class="card-header py-2">
-          <h4 class="my-1 fw-normal">Сумма кабеля:</h4>
+          <h4 class="my-1 fw-normal">Кабель:</h4>
         </div>
         <div class="card-body">
 
