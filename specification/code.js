@@ -409,3 +409,7 @@ function createCell(text, row=0){
   cell.setAttribute('rowspan', row+1)
   return cell
 }
+window.addEventListener('beforeunload', (event) => {
+  event.preventDefault();
+  event.returnValue = '';
+});
