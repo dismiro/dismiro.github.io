@@ -143,7 +143,7 @@ function compareFn(a,b) {
 
 function createOutputTable(obj){
   table = document.createElement('table')
-  table.innerHTML=`<tr><th>Тип кабеля</th><th>Сумма</th></tr>`
+  table.innerHTML=`<tr><th>Название</th><th>Сумма</th></tr>`
   var listTypes = Object.entries(obj).sort(compareFn)
   listTypes.forEach(item => {
     const row = table.insertRow();
@@ -160,23 +160,48 @@ return table
 const calculate = document.getElementById("calculate");
 calculate.addEventListener("click", calculateCable, false);
 function calculateCable() {
-  // console.log('0123f5ff'.indexOf('ff'))
   const out = document.getElementById('result')
+  const resultCouplings = document.getElementById('resultCouplings')
+
   out.innerHTML = ''
+
+
   const collOfTables = document.getElementById('processedData').getElementsByTagName('table')
   const arrOfTables = Array.from(collOfTables)
   const dataJS = arrOfTables.map(tab=> tableToJson(tab))
+  const namesOfSheet = arrOfTables.map(tab=> tab.getAttribute('sheet'))
   const sumByTabels = dataJS.map((item) => sumByTypes(item))
   const sumAll = sumByTypes(dataJS.flat())
-  // const names = document.getElementById('processedData').getElementsByTagName('button')
-  for (let list of sumByTabels){
-    const num = sumByTabels.indexOf(list)
-    const tableFromOneList = createOutputTable(list)
-    const title = arrOfTables[num].getAttribute('sheet') //names[sumByTabels.indexOf(list)].textContent
-    out.appendChild(createAccordion('acc'+ num + Date.now(),title , tableFromOneList))
+  for (let i in sumByTabels){
+    const tableFromOneList = createOutputTable(sumByTabels[i])
+    const title = namesOfSheet[i]
+    out.appendChild(createAccordion('acc'+ i + Date.now(),title , tableFromOneList))
   } 
   const tableResult = createOutputTable(sumAll)
   out.appendChild(createAccordion('total' + Date.now(),'Итог:' , tableResult))
+
+  resultCouplings.innerHTML = '<h5>Заполните данные для указанных типов кабеля</h5>'
+  const notFoundTypes = checkAvailability(dataJS.flat())
+
+  if (notFoundTypes.length === 0){
+    const couplings = dataJS.map((item) => sumCouplings(item))
+    resultCouplings.innerHTML = ''
+    for (let i in couplings){
+      const tableFromOneList = createOutputTable(couplings[i])
+      const title = namesOfSheet[i] 
+      resultCouplings.appendChild(createAccordion('coupling'+ i + Date.now(),title , tableFromOneList))
+    }
+    const sumAllCoupling = sumCouplings(dataJS.flat())
+    const totalCouplings = createOutputTable(sumAllCoupling)
+    resultCouplings.appendChild(createAccordion('totalCouplings','Итог:' , totalCouplings))
+  } else {
+      notFoundTypes.forEach((item) => {
+      const span = document.createElement('span')
+      span.classList.add('badge','bg-danger', 'shadow-danger', 'mx-1')
+      span.textContent = item
+      resultCouplings.appendChild(span)
+    })
+  }
 
  }
 
@@ -192,6 +217,43 @@ function calculateCable() {
     return acc
 }, {})
  }
+ function sumCouplings(obj) {
+  return obj.reduce((acc,item)=> {
+    const currentType = item['Тип кабеля'].replace(' ','')
+    const symbols = getSymbols(currentType)
+    const type = getTypeWithoutSymbols(currentType)
+    const currentParam = setting[symbols] 
+    const count = div(item['Длина'], currentParam['Тип'][type]['Строительная длина']) * item['Кол-во']
+    const couplingName = currentParam['Тип'][type]['Муфта']
+    if (acc[couplingName]){
+        acc[couplingName] = acc[couplingName] + count
+        return acc
+    }
+    acc[couplingName] = count
+    return acc
+}, {})
+ }
+ function getSymbols(currentType){
+  return (countOccurences(currentType, 'х2') === 1) ?
+   currentType.slice(currentType.indexOf('х2') + 2) : 'Особый кабель'
+ }
+ function getTypeWithoutSymbols(currentType){
+  return (countOccurences(currentType, 'х2') === 1) ?
+   currentType.slice(0, currentType.indexOf('х2')+2) : currentType
+ }
+
+function checkAvailability(arr){
+  const notFoundTypes = []
+  arr.forEach(item => {
+    const currentType = getTypeWithoutSymbols(item['Тип кабеля'])
+    const symbols = getSymbols(item['Тип кабеля'])
+    const isIncludes = Object.keys(setting[symbols]['Тип']).includes(currentType)
+    if (!isIncludes) notFoundTypes.push(item['Тип кабеля'])
+  }
+)
+return notFoundTypes
+}
+
 
 function createAccordion(id, text, table) {
   const newDiv = document.createElement("div");
@@ -209,6 +271,7 @@ function createAccordion(id, text, table) {
   button.setAttribute('aria-controls',id)
   button.classList.add("accordion-button")
   button.classList.add("collapsed")
+  button.classList.add("py-1")
 
   title.id = `head${id}`
   title.classList.add("accordion-header")
@@ -298,6 +361,10 @@ function getLength(value){
 function getType(value){
   return value.substring(value.indexOf('-') + 1, value.length)
 }
+function div(val, by){
+  return (val - val % by) / by;
+}
+
 let setting = {}
 const inputJSON = document.getElementById("inputDesignations");
 inputJSON.addEventListener("change", loadJson, false);
@@ -309,11 +376,36 @@ async function loadJson(e) {
   reader.readAsText(file);
 
   reader.onload = function() {
-    // console.log(JSON.parse(reader.result))
+    const fieldSettings = document.getElementById('fieldSettings')
+    fieldSettings.innerHTML = ''
     setting = JSON.parse(reader.result)
-    console.log(setting['*']['Название'])
+    let index = 0
+    
+    Object.entries(setting).forEach(item=> {
+      const settingTable = document.createElement('table')
+      settingTable.classList.add('table','table-sm','table-bordered', 'my-1')
+      settingTable.innerHTML = '<tr><th>Название</th><th>Тип</th><th>Стр. длина</th><th>Муфта</th></tr>'
+      const row = settingTable.insertRow();
+      const dataValue = item[1]
+      const types = Object.entries(dataValue['Тип']) 
+      row.appendChild(createCell(dataValue["Название"], types.length))
+      types.forEach((line) => {
+        const row2 = settingTable.insertRow();
+        row2.appendChild(createCell(line[0]))
+        row2.appendChild(createCell(line[1]['Строительная длина']))
+        row2.appendChild(createCell(line[1]['Муфта']))
+      })
+      fieldSettings.appendChild(createAccordion('showDesignation'+ index, item[0] , settingTable))
+      index += 1 
+    })
   };
   reader.onerror = function() {
     console.log(reader.error);
   };
+}
+function createCell(text, row=0){
+  const cell = document.createElement('td')
+  cell.textContent = text
+  cell.setAttribute('rowspan', row+1)
+  return cell
 }

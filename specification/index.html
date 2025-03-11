@@ -154,7 +154,7 @@ white-space: nowrap;
     
     <div class="input-group mb-3">
       <input class='d-none' type="file" class="form-control" id="input" multiple>
-      <input class='d-none' type="file" class="form-control" id="inputDesignations">
+      <!-- <input class='d-none' type="file" class="form-control" id="inputDesignations"> -->
     </div>
   <div class="row row-cols-1 row-cols-md-3 mb-3 text-center">
     <div class="col-md-6">
@@ -180,20 +180,20 @@ white-space: nowrap;
                     </button>
 
                     
-                    <button id='addDesignations' class="btn btn-outline-secondary btn-icon " type="button">
-                      <label for="inputDesignations">
+                    <button id='addDesignations' class="btn btn-outline-secondary btn-icon " type="button" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                      <!-- <label for="inputDesignations"> -->
                         <i class='bx bx-cog fs-4 mx-2 py-2'></i>  
-                      </label>
+                      <!-- </label> -->
                     </button>
 
                     <button id='calculate' class="btn btn-outline-secondary btn-icon" type="button">
                       <i class="bx bx-check fs-3"></i>
                     </button>
 
-
                     <button id='export' class="btn btn-outline-secondary btn-icon" type="button">
                         <i class="bx bx-save fs-4"></i>
-                      </button></div>
+                      </button>
+                    </div>
                  </div>
             </div>
 
@@ -234,6 +234,43 @@ white-space: nowrap;
   </div>
 </section>
   </main>
+</div>
+
+<div class="modal fade" id="settingsModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title">Настройки:</h4>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body px-3">
+        <div class="container-fluid text-center">
+            <form class="" id="settingForm" novalidate>
+              <div class="row">
+                <div class="mb-2 text-start">
+                  <div class="input-group mb-3">
+                    <label class="input-group-text" for="inputDesignations">Загрузить обозначения:</label>
+                    <button class="btn btn-outline-secondary py-1" type="button" id="restoreSettings" disabled>
+                      <i class="bi bi-arrow-clockwise fs-4"></i>
+                    </button>
+                    <input type="file" class="form-control" id="inputDesignations">
+                  </div>
+                </div>
+              </div>
+            </form>
+            <h5>Текущие условные обозначения:</h5>
+
+            <div class="accordion" id="fieldSettings">
+              
+            </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+        <button id="saveSetting" type="button" class="btn btn-success btn-sm" data-bs-dismiss="modal" >Сохранить</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="../assets/js/jquery-1.11.0.min.js"></script>
