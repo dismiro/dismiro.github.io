@@ -43,7 +43,7 @@ function exportFile() {
     var ws = XLSX.utils.table_to_sheet(table)
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
   }
-  XLSX.writeFile(wb,"Спецификация кабеля (название).xlsx")
+  XLSX.writeFile(wb,"Спецификация кабеля.xlsx")
 }
 
 function tableToJson(table) { 
@@ -62,7 +62,6 @@ function tableToJson(table) {
 
 function createTable(data, text=''){
   table = document.createElement('table')
-  // table.innerHTML=`<tr><th>№</th><th>Значение</th><th>Тип кабеля</th><th>Длина</th><th>Количество</th></tr>`
   const row = table.insertRow();
   Object.keys(data[0]).forEach(text => {
   const th = document.createElement('th')
@@ -70,7 +69,6 @@ function createTable(data, text=''){
   th.textContent = text
   row.appendChild(th)
   })
-  // const isFirtsTable = (row.children[1].textContent) === 'Значение' ? true : false
 data.forEach(item=> fillRow(item, table))
 table.classList.add('table','table-sm', 'my-1')
 table.setAttribute('sheet',text)
@@ -161,10 +159,7 @@ const calculate = document.getElementById("calculate");
 calculate.addEventListener("click", calculateCable, false);
 function calculateCable() {
   const out = document.getElementById('result')
-  const resultCouplings = document.getElementById('resultCouplings')
-
   out.innerHTML = ''
-
 
   const collOfTables = document.getElementById('processedData').getElementsByTagName('table')
   const arrOfTables = Array.from(collOfTables)
@@ -180,6 +175,7 @@ function calculateCable() {
   const tableResult = createOutputTable(sumAll)
   out.appendChild(createAccordion('total' + Date.now(),'Итог:' , tableResult))
 
+  const resultCouplings = document.getElementById('resultCouplings')
   resultCouplings.innerHTML = '<h5>Заполните данные для указанных типов кабеля</h5>'
   const notFoundTypes = checkAvailability(dataJS.flat())
 
@@ -202,7 +198,6 @@ function calculateCable() {
       resultCouplings.appendChild(span)
     })
   }
-
  }
 
  function sumByTypes(obj) {
@@ -224,12 +219,14 @@ function calculateCable() {
     const type = getTypeWithoutSymbols(currentType)
     const currentParam = setting[symbols] 
     const count = div(item['Длина'], currentParam['Тип'][type]['Строительная длина']) * item['Кол-во']
-    const couplingName = currentParam['Тип'][type]['Муфта']
-    if (acc[couplingName]){
-        acc[couplingName] = acc[couplingName] + count
-        return acc
+    if(count !== 0) {  
+      const couplingName = currentParam['Тип'][type]['Муфта']
+      if (acc[couplingName]){
+          acc[couplingName] = acc[couplingName] + count
+          return acc
+      }
+      acc[couplingName] = count
     }
-    acc[couplingName] = count
     return acc
 }, {})
  }
@@ -247,11 +244,21 @@ function checkAvailability(arr){
   arr.forEach(item => {
     const currentType = getTypeWithoutSymbols(item['Тип кабеля'])
     const symbols = getSymbols(item['Тип кабеля'])
-    const isIncludes = Object.keys(setting[symbols]['Тип']).includes(currentType)
-    if (!isIncludes) notFoundTypes.push(item['Тип кабеля'])
+    const symbolsIncludes = Object.keys(setting).includes(symbols)
+    if (symbolsIncludes) {
+      const isIncludes = Object.keys(setting[symbols]['Тип']).includes(currentType)
+      if (!isIncludes) notFoundTypes.push(item['Тип кабеля'])
+    }
+     else notFoundTypes.push(`Условное обозначение: ${symbols}`)
   }
 )
-return notFoundTypes
+const uniqueNotFoundTypes = notFoundTypes.reduce((acc, item) => {
+  if (acc.includes(item)) {
+    return acc; 
+  }
+  return [...acc, item];
+}, []);
+return uniqueNotFoundTypes
 }
 
 
@@ -411,5 +418,5 @@ function createCell(text, row=0){
 }
 window.addEventListener('beforeunload', (event) => {
   event.preventDefault();
-  event.returnValue = '';
+  // event.returnValue = '';
 });
