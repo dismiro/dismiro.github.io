@@ -266,9 +266,11 @@ function createAccordion(id, text, table) {
   const newDiv = document.createElement("div");
   const title = document.createElement("h3");
   const button = document.createElement("button");
+  const removeTabBtn = document.createElement("button")
   const div2 = document.createElement("div");
   const accBody = document.createElement("div");
 
+  
   button.innerHTML= text
 
   button.setAttribute('type',"button")
@@ -279,6 +281,8 @@ function createAccordion(id, text, table) {
   button.classList.add("accordion-button")
   button.classList.add("collapsed")
   button.classList.add("py-1")
+  removeTabBtn.classList.add("btn", "btn-outline-secondary", "btn-sm", "border-0", "py-1", "d-none", "removeBtn","removeTable") 
+  removeTabBtn.textContent = 'Удалить лист'
 
   title.id = `head${id}`
   title.classList.add("accordion-header")
@@ -301,6 +305,8 @@ function createAccordion(id, text, table) {
   accBody.appendChild(addRowBtn)
   
   title.appendChild(button)
+  title.appendChild(removeTabBtn)
+  
   newDiv.appendChild(title)
   newDiv.appendChild(div2)
   div2.appendChild(accBody)
@@ -310,17 +316,17 @@ function createAccordion(id, text, table) {
 
 document.getElementById('canEdit').addEventListener('click', function(event) {
   this.classList.toggle('active')
+
   const elements = document.getElementsByClassName('canEdit')
-  for (let el of elements){
-    el.contentEditable = el.contentEditable !== 'true'? 'true':'false'
-  }
   const removeBtns = document.getElementById('processedData').getElementsByClassName('removeBtn')
-  for (let btn of removeBtns){
-    btn.classList.toggle('d-none')  
-  }
   const addRowBtns = document.getElementById('processedData').getElementsByClassName('addRowBtn')
-  for (let btn of addRowBtns){
-    btn.classList.toggle('d-none')  
+
+  for (let el of elements) el.contentEditable = el.contentEditable !== 'true'? 'true':'false'
+  
+  if (this.classList.value.includes('active')){
+    for (let btn of [...removeBtns,...addRowBtns]) btn.classList.remove('d-none')  
+  }else {
+    for (let btn of [...removeBtns, ...addRowBtns]) btn.classList.add('d-none')  
   }
   })
   
@@ -347,6 +353,7 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
   function processedDataClick(event){
     const classList = event.target.classList.value;
     if (classList.includes('bx-trash')) event.target.parentNode.parentNode.remove()
+    if (classList.includes('removeTable')) event.target.parentNode.parentNode.remove()
     if (classList.includes('addRowBtn')) {
       const parentDiv = event.target.parentElement
       const num = parentDiv.querySelectorAll('tr').length
