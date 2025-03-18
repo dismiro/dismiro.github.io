@@ -69,10 +69,10 @@ function createTable(data, text='',editable=false){
   th.textContent = text
   row.appendChild(th)
   })
-data.forEach(item=> fillRow(item, table, editable))
-table.classList.add('table','table-sm', 'my-1')
-table.setAttribute('sheet',text)
-return table
+  data.forEach(item=> fillRow(item, table, editable))
+  table.classList.add('table','table-sm', 'my-1')
+  table.setAttribute('sheet',text)
+  return table
 }
 
 function fillRow(item, table, editableNow=false){
@@ -230,6 +230,7 @@ function calculateCable() {
     return acc
 }, {})
  }
+
  function getSymbols(currentType){
   return (countOccurences(currentType, 'х2') === 1) ?
    currentType.slice(currentType.indexOf('х2') + 2) : 'Особый кабель'
@@ -270,7 +271,6 @@ function createAccordion(id, text, table) {
   const div2 = document.createElement("div");
   const accBody = document.createElement("div");
 
-  
   button.innerHTML= text
 
   button.setAttribute('type',"button")
@@ -278,9 +278,7 @@ function createAccordion(id, text, table) {
   button.setAttribute('data-bs-target',`#${id}`)
   button.setAttribute('aria-expanded',"false")
   button.setAttribute('aria-controls',id)
-  button.classList.add("accordion-button")
-  button.classList.add("collapsed")
-  button.classList.add("py-1")
+  button.classList.add("accordion-button","collapsed","py-1")
   removeTabBtn.classList.add("btn", "btn-outline-secondary", "btn-sm", "border-0", "py-1", "d-none", "removeBtn","removeTable") 
   removeTabBtn.textContent = 'Удалить лист'
 
@@ -289,9 +287,8 @@ function createAccordion(id, text, table) {
 
   newDiv.classList.add('accordion-item')
 
-  div2.classList.add('accordion-collapse')
-  div2.classList.add('collapse')
-  // div2.classList.add('show')
+  div2.classList.add("accordion-collapse", "collapse")
+
   div2.id = id
   div2.setAttribute('aria-labelledby',`head${id}`)
   div2.setAttribute('data-bs-parent',"accordionDefault")
