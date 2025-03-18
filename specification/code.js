@@ -53,7 +53,7 @@ function tableToJson(table) {
       var tableRow = table.rows[i]; 
       var rowData = {}; 
       for (var j = 0; j < tableRow.cells.length; j++) { 
-          rowData[headRow.cells[j].innerHTML]= tableRow.cells[j].innerHTML
+          rowData[headRow.cells[j].textContent]= tableRow.cells[j].textContent
       } 
       data.push(rowData); 
   } 
