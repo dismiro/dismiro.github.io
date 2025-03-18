@@ -43,7 +43,7 @@ function exportFile() {
     var ws = XLSX.utils.table_to_sheet(table)
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
   }
-  XLSX.writeFile(wb,"Спецификация кабеля.xlsx")
+  XLSX.writeFile(wb,"Спецификация.xlsx")
 }
 
 function tableToJson(table) { 
@@ -60,7 +60,7 @@ function tableToJson(table) {
   return data; 
 }
 
-function createTable(data, text=''){
+function createTable(data, text='',editable=false){
   table = document.createElement('table')
   const row = table.insertRow();
   Object.keys(data[0]).forEach(text => {
@@ -69,7 +69,7 @@ function createTable(data, text=''){
   th.textContent = text
   row.appendChild(th)
   })
-data.forEach(item=> fillRow(item, table))
+data.forEach(item=> fillRow(item, table, editable))
 table.classList.add('table','table-sm', 'my-1')
 table.setAttribute('sheet',text)
 return table
@@ -320,13 +320,13 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
   const elements = document.getElementsByClassName('canEdit')
   const removeBtns = document.getElementById('processedData').getElementsByClassName('removeBtn')
   const addRowBtns = document.getElementById('processedData').getElementsByClassName('addRowBtn')
-
+  const addNewTab = document.getElementsByClassName('addNewTab')
   for (let el of elements) el.contentEditable = el.contentEditable !== 'true'? 'true':'false'
   
   if (this.classList.value.includes('active')){
-    for (let btn of [...removeBtns,...addRowBtns]) btn.classList.remove('d-none')  
+    for (let btn of [...removeBtns,...addRowBtns, ...addNewTab]) btn.classList.remove('d-none')  
   }else {
-    for (let btn of [...removeBtns, ...addRowBtns]) btn.classList.add('d-none')  
+    for (let btn of [...removeBtns, ...addRowBtns,...addNewTab]) btn.classList.add('d-none')  
   }
   })
   
@@ -427,3 +427,31 @@ window.addEventListener('beforeunload', (event) => {
   event.preventDefault();
   // event.returnValue = '';
 });
+
+document.getElementById('addNewTabBtn').addEventListener('click', function(event) {
+  const titles = getNamesTabs(document.getElementById('processedData').getElementsByClassName('accordion-button'))
+  const nums = getNumbsNewTabs(titles)
+  const nextNum = findNextNum(nums)
+
+const id = `acc${nextNum}${Date.now()}`
+const text = `Новый лист ${nextNum}`
+const newRow = [{'№' : 1,'Значение':'Длина-Кабель', 'Кол-во': 1 ,'Тип кабеля':'Кабель', 'Длина':'Длина'}]
+const table = createTable(newRow,text, true)
+document.getElementById('processedData').appendChild(createAccordion(id,text,table))
+})
+function findNextNum(nums, num=1){
+  if (!nums.includes(num)) return num
+  return findNextNum(nums, num + 1)
+}
+function getNamesTabs(coll){
+  arr = Object.values(coll).map(item => item.innerText) 
+  return arr
+}
+function getNumbsNewTabs(arr){
+  const sortedArr=arr.filter((item) => item.includes('Новый лист'))
+  const nums = sortedArr.map(item => {
+   const arr =  item.split('Новый лист')
+   return parseInt(arr[arr.length-1])
+  })
+  return nums
+}
