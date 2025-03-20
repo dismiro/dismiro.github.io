@@ -1,33 +1,33 @@
+const BIG_TITLE_MSG = 'Предельная длина имени таблицы не может превышать 31 символа.'
+const BANNED_CHAR_MSG= `Наименования не должны содержать следующих символов: / \ ? * [ ] < > ( ) { } .`
+const BANNED_CHAR = ['/','\\','?','*', '[',']','<','>','(',')','{','}','.']
+   
 async function handleFileAsync(e) {
   for (let file of e.target.files){
-  const data = await file.arrayBuffer();
-  const workbook = XLSX.read(data);
-  var  wsnames  =  workbook.SheetNames ;
-  for (let sheetName of wsnames){
-      const  dataFromOneFile  =  XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]).
-      map((item) => {
-        const value = item['Значение']
-        const fixValue = getFixValue(value)
-        const length = getLength(fixValue)
-        const type = getType(fixValue)
-        const count = (typeof item['Количество'] !== 'undefined')? item['Количество']:item['Кол-во']  
-        return {'№' : item['__rowNum__'],'Значение':value, 'Кол-во':count,'Тип кабеля':type, 'Длина':length}
-      })
-const lstMod = String(file.lastModified)
-const shtName = String(sheetName).replaceAll(' ','')
-                                 .replaceAll('(','')
-                                 .replaceAll(')','')
-const id= `${shtName}${lstMod}${Date.now()}`
-const fileName = file.name.replace('.xlsx', '').replace('.xls', '')
-const caption = `${fileName} _ ${sheetName}`
-const btnText = (countOccurences(caption, '_') > 1) ? caption.slice(caption.indexOf('_') + 1): caption  
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data);
+    var  wsnames  =  workbook.SheetNames ;
+    for (let sheetName of wsnames){
+        const  dataFromOneFile  =  XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]).
+        map((item) => {
+          const value = item['Значение']
+          const fixValue = getFixValue(value)
+          const length = getLength(fixValue)
+          const type = getType(fixValue)
+          const count = (typeof item['Количество'] !== 'undefined')? item['Количество']:item['Кол-во']  
+          return {'№' : item['__rowNum__'],'Значение':value, 'Кол-во':count,'Тип кабеля':type, 'Длина':length}
+        })
+      const lstMod = String(file.lastModified)
+      const shtName = fixName(String(sheetName).replaceAll(' ',''))
+      const id= `${shtName}${lstMod}${Date.now()}`
+      const fileName = fixName(file.name.replace('.xlsx', '').replace('.xls', ''))
+      const caption = `${fileName} _ ${sheetName}`
+      const btnText = (countOccurences(caption, '_') > 1) ? caption.slice(caption.indexOf('_') + 1): caption  
+      const table = createTable(dataFromOneFile, btnText)
 
-const table = createTable(dataFromOneFile, btnText)
-
-document.getElementById('processedData')
-        .appendChild(createAccordion(id,btnText,table))
-}
+      document.getElementById('processedData').appendChild(createAccordion(id,btnText,table))
     }
+  }
 }
 const input_dom_element = document.getElementById("input");
 input_dom_element.addEventListener("change", handleFileAsync, false);
@@ -40,6 +40,10 @@ function exportFile() {
   var wb = XLSX.utils.book_new();
   for (let table of tables){
     const sheetName = table.getAttribute('sheet')
+    if (!checkTitleLength(sheetName)){
+      fillToast(BIG_TITLE_MSG).show()
+      return 
+    } 
     var ws = XLSX.utils.table_to_sheet(table)
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
   }
@@ -196,8 +200,8 @@ function calculateCable() {
       span.classList.add('badge','bg-danger', 'shadow-danger', 'mx-1')
       span.textContent = item
       resultCouplings.appendChild(span)
-    })
-  }
+      })
+    }
  }
 
  function sumByTypes(obj) {
@@ -278,7 +282,10 @@ function createAccordion(id, text, table) {
   button.setAttribute('data-bs-target',`#${id}`)
   button.setAttribute('aria-expanded',"false")
   button.setAttribute('aria-controls',id)
-  button.classList.add("accordion-button","collapsed","py-1")
+  button.setAttribute('canEdit' ,'true')
+  button.setAttribute('edit' ,'title')
+  button.classList.add("accordion-button","collapsed","py-1","canEdit")
+
   removeTabBtn.classList.add("btn", "btn-outline-secondary", "btn-sm", "border-0", "py-1", "d-none", "removeBtn","removeTable") 
   removeTabBtn.textContent = 'Удалить лист'
 
@@ -318,8 +325,8 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
   const removeBtns = document.getElementById('processedData').getElementsByClassName('removeBtn')
   const addRowBtns = document.getElementById('processedData').getElementsByClassName('addRowBtn')
   const addNewTab = document.getElementsByClassName('addNewTab')
-  for (let el of elements) el.contentEditable = el.contentEditable !== 'true'? 'true':'false'
-  
+  for (let el of elements) el.contentEditable = this.classList.value.includes('active') ? 'true':'false'
+
   if (this.classList.value.includes('active')){
     for (let btn of [...removeBtns,...addRowBtns, ...addNewTab]) btn.classList.remove('d-none')  
   }else {
@@ -337,28 +344,56 @@ document.getElementById('canEdit').addEventListener('click', function(event) {
       const parent = modifiedEl.parentElement
       parent.nextElementSibling.nextElementSibling.innerHTML = getType(getFixValue(value))
       parent.nextElementSibling.nextElementSibling.nextElementSibling.innerHTML = getLength(getFixValue(value))
+    } 
+    if ((canEdit === 'true') & (edit=== 'title') ) {
+      const newSheetName = modifiedEl.textContent
+      modifiedEl.parentNode.parentNode.nextSibling.getElementsByTagName('table')[0].setAttribute('sheet',newSheetName)
+      if (!checkTitle(newSheetName)) {
+        modifiedEl.textContent = mutationRecords[0].oldValue
+        fillToast(BANNED_CHAR_MSG).show()
+      }    
+      if (!checkTitleLength(newSheetName)) {
+        fillToast(BIG_TITLE_MSG).show()
+      }  
     }
   });
-
-  observer.observe(processedData, {
-    childList: true, // наблюдать за непосредственными детьми
-    subtree: true, // и более глубокими потомками
-    characterDataOldValue: true // передавать старое значение в колбэк
-  });
-
-  processedData.addEventListener("click", processedDataClick, false);
-  function processedDataClick(event){
-    const classList = event.target.classList.value;
-    if (classList.includes('bx-trash')) event.target.parentNode.parentNode.remove()
-    if (classList.includes('removeTable')) event.target.parentNode.parentNode.remove()
-    if (classList.includes('addRowBtn')) {
-      const parentDiv = event.target.parentElement
-      const num = parentDiv.querySelectorAll('tr').length
-      // const num = parentDiv.getElementsByTagName('table')[0].querySelectorAll('tr').length
-      const newRow = {'№' : num,'Значение':'Длина-Кабель', 'Кол-во': 1 ,'Тип кабеля':'Кабель', 'Длина':'Длина'}
-      fillRow(newRow, parentDiv.getElementsByTagName('table')[0],true)
+  
+function fillToast(text){
+  document.getElementById('toastText').textContent = text 
+  return new bootstrap.Toast(document.getElementById('liveToast'))
 }
+
+observer.observe(processedData, {
+  childList: true, // наблюдать за непосредственными детьми
+  subtree: true, // и более глубокими потомками
+  characterDataOldValue: true // передавать старое значение в колбэк
+});
+function fixName(text){
+  let fixedName = text
+  for (const char of BANNED_CHAR) fixedName = fixedName.replaceAll(char,'')
+  return fixedName
+}
+function checkTitle(sheetName){
+  for (const char of BANNED_CHAR) if (sheetName.includes(char)) return false
+  return true
+}
+function checkTitleLength(sheetName){
+  return sheetName.length < 32 ? true : false
+}
+
+processedData.addEventListener("click", processedDataClick, false);
+function processedDataClick(event){
+  const classList = event.target.classList.value;
+  if (classList.includes('bx-trash')) event.target.parentNode.parentNode.remove()
+  if (classList.includes('removeTable')) event.target.parentNode.parentNode.remove()
+  if (classList.includes('addRowBtn')) {
+    const parentDiv = event.target.parentElement
+    const num = parentDiv.querySelectorAll('tr').length
+    // const num = parentDiv.getElementsByTagName('table')[0].querySelectorAll('tr').length
+    const newRow = {'№' : num,'Значение':'Длина-Кабель', 'Кол-во': 1 ,'Тип кабеля':'Кабель', 'Длина':'Длина'}
+    fillRow(newRow, parentDiv.getElementsByTagName('table')[0],true)
   }
+}
 
 function getFixValue(value){
   return value.replace(/\(.\)/g,'')
@@ -452,3 +487,4 @@ function getNumbsNewTabs(arr){
   })
   return nums
 }
+

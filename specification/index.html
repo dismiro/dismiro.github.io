@@ -239,6 +239,19 @@ white-space: nowrap;
 
   </div>
 </section>
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+  <!-- Danger toast -->
+<div id='liveToast' class="toast fade hide" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
+  <div class="toast-header bg-danger text-white">
+    <i class="bx bx-error fs-3 me-2"></i>
+    <span class="me-auto">Внимание!</span>
+    <button class="btn-close btn-close-white ms-2 mb-1" type="button" data-bs-dismiss="toast" aria-label="Close"></button>
+  </div>
+  <div id='toastText' class="toast-body">Предельная длина имени таблицы не может превышать 31 символа.<br>
+    Наименования не должны содержать следующих символов:<br>
+     / \ ? * [ ] &lt &gt { } .</div>
+</div>
+</div>
   </main>
 </div>
 
