@@ -63,7 +63,7 @@ function tableToJson(table) {
   return data; 
 }
 
-function createTable(data, text='',editable=false){
+function createTable(data, text=''){
   table = document.createElement('table')
   const row = table.insertRow();
   Object.keys(data[0]).forEach(text => {
@@ -72,13 +72,14 @@ function createTable(data, text='',editable=false){
   th.textContent = text
   row.appendChild(th)
   })
-  data.forEach(item=> fillRow(item, table, editable))
+  data.forEach(item=> fillRow(item, table))
   table.classList.add('table','table-sm', 'my-1')
   table.setAttribute('sheet',text)
   return table
 }
 
-function fillRow(item, table, editableNow=false){
+function fillRow(item, table){
+  const editableNow = isEditableNow()
   const row = table.insertRow();
   let i = 0
   Object.values(item).forEach(text => {
@@ -405,7 +406,7 @@ function processedDataClick(event){
     const num = parentDiv.querySelectorAll('tr').length
     // const num = parentDiv.getElementsByTagName('table')[0].querySelectorAll('tr').length
     const newRow = {'№' : num,'Значение':'Длина-Кабель', 'Кол-во': 1 ,'Тип кабеля':'Кабель', 'Длина':'Длина'}
-    fillRow(newRow, parentDiv.getElementsByTagName('table')[0],true)
+    fillRow(newRow, parentDiv.getElementsByTagName('table')[0])
   }
 }
 
@@ -482,7 +483,7 @@ document.getElementById('addNewTabBtn').addEventListener('click', function(event
 const id = `acc${nextNum}${Date.now()}`
 const text = `Новый лист ${nextNum}`
 const newRow = [{'№' : 1,'Значение':'Длина-Кабель', 'Кол-во': 1 ,'Тип кабеля':'Кабель', 'Длина':'Длина'}]
-const table = createTable(newRow,text, true)
+const table = createTable(newRow,text)
 document.getElementById('processedData').appendChild(createAccordion(id,text,table,true,isEditableNow()))
 })
 function findNextNum(nums, num=1){
