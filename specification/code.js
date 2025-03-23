@@ -24,8 +24,7 @@ async function handleFileAsync(e) {
       const caption = `${fileName} _ ${sheetName}`
       const btnText = (countOccurences(caption, '_') > 1) ? caption.slice(caption.indexOf('_') + 1): caption  
       const table = createTable(dataFromOneFile, btnText)
-
-      document.getElementById('processedData').appendChild(createAccordion(id,btnText,table))
+      document.getElementById('processedData').appendChild(createAccordion(id,btnText,table,true,isEditableNow()))
     }
   }
 }
@@ -267,11 +266,10 @@ return uniqueNotFoundTypes
 }
 
 
-function createAccordion(id, text, table) {
+function createAccordion(id, text, table, editable=false, editableNow=false) {
   const newDiv = document.createElement("div");
   const title = document.createElement("h3");
   const button = document.createElement("button");
-  const removeTabBtn = document.createElement("button")
   const div2 = document.createElement("div");
   const accBody = document.createElement("div");
 
@@ -282,12 +280,10 @@ function createAccordion(id, text, table) {
   button.setAttribute('data-bs-target',`#${id}`)
   button.setAttribute('aria-expanded',"false")
   button.setAttribute('aria-controls',id)
-  button.setAttribute('canEdit' ,'true')
-  button.setAttribute('edit' ,'title')
-  button.classList.add("accordion-button","collapsed","py-1","canEdit")
 
-  removeTabBtn.classList.add("btn", "btn-outline-secondary", "btn-sm", "border-0", "py-1", "d-none", "removeBtn","removeTable") 
-  removeTabBtn.textContent = 'Удалить лист'
+  button.classList.add("accordion-button","collapsed","py-1")
+
+
 
   title.id = `head${id}`
   title.classList.add("accordion-header")
@@ -300,22 +296,40 @@ function createAccordion(id, text, table) {
   div2.setAttribute('aria-labelledby',`head${id}`)
   div2.setAttribute('data-bs-parent',"accordionDefault")
 
-  const addRowBtn = document.createElement('btn')
-  addRowBtn.classList.add('btn', 'btn-outline-secondary', 'd-none', 'addRowBtn', 'w-100')
-  addRowBtn.textContent = 'Добавить строку'
-
   accBody.classList.add('accordion-body')
   accBody.appendChild(table)
-  accBody.appendChild(addRowBtn)
   
   title.appendChild(button)
-  title.appendChild(removeTabBtn)
+ 
+  if (editable) {
+    button.setAttribute('canEdit' ,'true')
+    button.setAttribute('edit' ,'title')
+    button.classList.add("canEdit")
+
+    const removeTabBtn = document.createElement("button")
+    removeTabBtn.classList.add("btn", "btn-outline-secondary", "btn-sm", "border-0", "py-1", "d-none", "removeBtn","removeTable") 
+    removeTabBtn.textContent = 'Удалить лист'
+    title.appendChild(removeTabBtn)
+    
+    const addRowBtn = document.createElement('btn')
+    addRowBtn.classList.add('btn', 'btn-outline-secondary', 'd-none', 'addRowBtn', 'w-100')
+    addRowBtn.textContent = 'Добавить строку'
+    accBody.appendChild(addRowBtn)
+    if (editableNow) {
+      removeTabBtn.classList.remove("d-none")
+      addRowBtn.classList.remove("d-none")
+      button.contentEditable = true
+    }
+  }
   
   newDiv.appendChild(title)
   newDiv.appendChild(div2)
   div2.appendChild(accBody)
   return newDiv
 }
+function isEditableNow(){
+ return document.getElementById('canEdit').classList.value.includes('active')
+} 
 
 
 document.getElementById('canEdit').addEventListener('click', function(event) {
@@ -469,7 +483,7 @@ const id = `acc${nextNum}${Date.now()}`
 const text = `Новый лист ${nextNum}`
 const newRow = [{'№' : 1,'Значение':'Длина-Кабель', 'Кол-во': 1 ,'Тип кабеля':'Кабель', 'Длина':'Длина'}]
 const table = createTable(newRow,text, true)
-document.getElementById('processedData').appendChild(createAccordion(id,text,table))
+document.getElementById('processedData').appendChild(createAccordion(id,text,table,true,isEditableNow()))
 })
 function findNextNum(nums, num=1){
   if (!nums.includes(num)) return num
