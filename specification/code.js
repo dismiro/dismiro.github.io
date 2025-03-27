@@ -222,7 +222,7 @@ function calculateCable() {
     const symbols = getSymbols(currentType)
     const type = getTypeWithoutSymbols(currentType)
     const currentParam = setting[symbols] 
-    const count = div(item['Длина'], currentParam['Тип'][type]['Строительная длина']) * item['Кол-во']
+    const count = div(item['Длина'] - 1, currentParam['Тип'][type]['Строительная длина']) * item['Кол-во']
     if(count !== 0) {  
       const couplingName = currentParam['Тип'][type]['Муфта']
       if (acc[couplingName]){
