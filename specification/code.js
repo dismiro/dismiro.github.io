@@ -3,6 +3,7 @@ const BANNED_CHAR_MSG= `Наименования не должны содерж�
 const BANNED_CHAR = ['/','\\','?','*', '[',']','<','>','(',')','{','}','.']
    
 async function handleFileAsync(e) {
+  try{
   for (let file of e.target.files){
     const data = await file.arrayBuffer();
     const workbook = XLSX.read(data);
@@ -26,6 +27,10 @@ async function handleFileAsync(e) {
       const table = createTable(dataFromOneFile, btnText)
       document.getElementById('processedData').appendChild(createAccordion(id,btnText,table,true,isEditableNow()))
     }
+  }
+  } catch (error) {
+    console.error("Ошибка обработки файла:", error);
+    fillToast("Не удалось обработать файл").show();
   }
 }
 const input_dom_element = document.getElementById("input");
@@ -54,6 +59,7 @@ const exportResultBtn = document.getElementById("exportResult");
 exportResultBtn.addEventListener("click", exportResultFile, false);
 
 function exportResultFile() {
+  try {
   calculateCable()
   const resultTotalCable = document.getElementById('resultTotalCable').getElementsByTagName('table')[0]
   const resultTotalCouplings = document.getElementById('resultTotalCouplings').getElementsByTagName('table')[0]
@@ -88,6 +94,9 @@ function exportResultFile() {
   XLSX.utils.book_append_sheet(wb, wsCouplings, 'Подземные муфты')
   XLSX.utils.book_append_sheet(wb, wsCurrentSetting, 'Условные обозначения')
   XLSX.writeFile(wb, "Результаты вычислений.xlsx")
+} catch (error) {
+    fillToast(`Ошибка экспорта: ${error.message}`).show();
+  }
 }
 
 function tableToJson(table) { 
