@@ -46,7 +46,48 @@ function exportFile() {
     var ws = XLSX.utils.table_to_sheet(table)
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
   }
-  XLSX.writeFile(wb,"Спецификация.xlsx")
+  XLSX.
+  writeFile(wb,"Спецификация.xlsx")
+}
+
+const exportResultBtn = document.getElementById("exportResult");
+exportResultBtn.addEventListener("click", exportResultFile, false);
+
+function exportResultFile() {
+  calculateCable()
+  const resultTotalCable = document.getElementById('resultTotalCable').getElementsByTagName('table')[0]
+  const resultTotalCouplings = document.getElementById('resultTotalCouplings').getElementsByTagName('table')[0]
+  var wb = XLSX.utils.book_new();
+  var wsCable = XLSX.utils.table_to_sheet(resultTotalCable)
+  var wsCouplings = XLSX.utils.table_to_sheet(resultTotalCouplings)
+
+  const data = [];
+  const shortData = [];
+  const headers = ['Тип кабеля', 'Стр.длина', 'Муфта'];
+  const shortHeaders = ['Обозначение', 'Название'];
+
+  data.push(headers);
+  shortData.push(shortHeaders);
+  // Обработка JSON и добавление строк
+  for (const [category, item] of Object.entries(setting)) {
+      shortData.push([category, item.Название])
+      for (const [cableType, details] of Object.entries(item.Тип)) {
+          const typeCable = (category !== 'Особый кабель') ? 
+                `${item.Название} - ${cableType}${category}`:`${item.Название} - ${cableType}`
+          data.push([
+              typeCable,
+              details["Строительная длина"],
+              details.Муфта
+          ]);
+      }
+  }
+  const wsCurrentSetting = XLSX.utils.aoa_to_sheet(data);
+  XLSX.utils.book_append_sheet(wb, wsCable, 'Кабель')
+  XLSX.utils.sheet_add_aoa(wsCable, shortData, { origin: "E1" })
+
+  XLSX.utils.book_append_sheet(wb, wsCouplings, 'Подземные муфты')
+  XLSX.utils.book_append_sheet(wb, wsCurrentSetting, 'Условные обозначения')
+  XLSX.writeFile(wb, "Результаты вычислений.xlsx")
 }
 
 function tableToJson(table) { 
@@ -177,7 +218,7 @@ function calculateCable() {
     out.appendChild(createAccordion('acc'+ i + Date.now(),title , tableFromOneList))
   } 
   const tableResult = createOutputTable(sumAll)
-  out.appendChild(createAccordion('total' + Date.now(),'Итог:' , tableResult))
+  out.appendChild(createAccordion('resultTotalCable','Итог:' , tableResult))
 
   const resultCouplings = document.getElementById('resultCouplings')
   resultCouplings.innerHTML = '<h5>Заполните данные для указанных типов кабеля</h5>'
@@ -193,7 +234,7 @@ function calculateCable() {
     }
     const sumAllCoupling = sumCouplings(dataJS.flat())
     const totalCouplings = createOutputTable(sumAllCoupling)
-    resultCouplings.appendChild(createAccordion('totalCouplings','Итог:' , totalCouplings))
+    resultCouplings.appendChild(createAccordion('resultTotalCouplings','Итог:' , totalCouplings))
   } else {
       notFoundTypes.forEach((item) => {
       const span = document.createElement('span')
