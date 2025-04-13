@@ -294,11 +294,12 @@
     const ACTION_CHANGE_FONT = 'change-font'
     const ACTION_CHANGE_ALIGNMENT = 'change-alignment'
     const ACTION_CHANGE_TYPE = 'change-type'
-    const BLOCK_TYPE = 'Блок'
+    const BLOCK_TYPE = 'Путь / Участок пути'
     const CONDITION_TYPE = 'Стрелка ПВ'
     const SWITCH_LEFT_TOP = 'Стрелка ЛВ'
     const SWITCH_LEFT_DOWN = 'Стрелка ЛН'
     const SWITCH_RIGTH_DOWN = 'Стрелка ПН'
+    const JOINT = 'Стык'
     const BEGIN_END_TYPE = 'Начало / конец'
     const PROCEDURE_TYPE = 'Подпрограмма'
     const IN_OUT_TYPE = 'Ввод / вывод'
@@ -313,9 +314,9 @@
     const INCREASE_FONT = 'increase-font'
     const DECREASE_FONT = 'decrease-font'
     const CLEAR_FORMAT = 'clear'
-    const BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, SWITCH_LEFT_TOP, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, LABEL_TYPE, TEXT_TYPE]
-    const ALL_BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, SWITCH_LEFT_TOP, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, FOR_LOOP_BEGIN_TYPE, FOR_LOOP_END_TYPE, LABEL_TYPE, TEXT_TYPE, BEGIN_END_TYPE, SWITCH_LEFT_DOWN, SWITCH_RIGTH_DOWN]
-    const BLOCK_WIDTHS = [100, 100, 100, 100, 120, 120, 100, 30, 80]
+    const BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, SWITCH_LEFT_TOP, JOINT, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, LABEL_TYPE, TEXT_TYPE]
+    const ALL_BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, SWITCH_LEFT_TOP, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, FOR_LOOP_BEGIN_TYPE, FOR_LOOP_END_TYPE, LABEL_TYPE, TEXT_TYPE, BEGIN_END_TYPE, SWITCH_LEFT_DOWN, SWITCH_RIGTH_DOWN, JOINT]
+    const BLOCK_WIDTHS = [100, 100, 100, 20, 120, 120, 100, 30, 80]
     const BLOCK_HEIGHTS = [40, 80, 80, 40, 40, 40, 40, 30, 20]
     const MENU_ITEMS = ['Сохранить схему (json)', 'Загрузить схему (json)', 'Сохранить схему (png)', 'Сохранить области (zip)', 'Сменить цветовую тему', 'Инструкция к редактору']
     const KEYBOARD_CHARACTERS = ['∀', '∃', '∄', '←', '→', '⇔', '≠', '≡', '≤', '≥', '∈', '∉', '∅', 'ℤ', 'ℕ', '∩', '∪', '⊂', '⊃', '⊆', '⊇', '∧', '∨', '²', '³', '⋅', 'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ', 'σ', 'τ', 'υ', 'χ', 'φ', 'ψ', 'ω']
@@ -730,10 +731,25 @@
         return info.join(", ")
     }
     Block.prototype.DrawBlock = function(ctx, x0, y0, scale) {
+        const width = this.width
+        const alfa = this.alfa
+        ctx.save()
+        ctx.translate(this.x * scale + x0,this.y*scale + y0);
+        ctx.rotate(alfa*Math.PI/180);
         ctx.beginPath()
-        ctx.rect(this.left * scale + x0, this.top * scale + y0, this.width * scale, this.height * scale)
-        ctx.stroke()
-        ctx.fill()
+        ctx.moveTo(-width/2 * scale, 0 * scale);
+        ctx.lineTo(width/2 * scale, 0* scale);
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0 , 0);
+        ctx.arc(0 , 0 , 3 , 0, Math.PI * 2);
+        ctx.fillStyle = 'red';
+        ctx.fill();
+       
+        ctx.closePath()
+        ctx.restore()
         this.speed = 50
     }
     Block.prototype.DrawCondition = function(ctx, x0, y0, scale) {
@@ -741,12 +757,10 @@
         if(this.isMenuBlock) {
             let dx = 15
             let dy = 45 
-            let dy2 = 5
             ctx.beginPath();
             ctx.moveTo(x0+dx + 13.66077, y0+dy + 14.31555);
             ctx.lineTo(x0 + dx + 3.06324, y0+dy + 14.31555);
             ctx.lineWidth = 1.5;
-            ctx.strokeStyle = '#000';
             ctx.stroke();
     
             // Линия 2 (горизонтальная, толстая)
@@ -754,7 +768,6 @@
             ctx.moveTo(x0 + dx + 7.01573, y0 + dy + 16.70961);
             ctx.lineTo(x0 +dx + 13.923, y0 + dy + 16.70961);
             ctx.lineWidth = 4;
-            ctx.strokeStyle = '#000';
             ctx.stroke();
     
             // Линия 3 (длинная горизонтальная, средняя толщина)
@@ -762,7 +775,6 @@
             ctx.moveTo(dx + -0.30075, dy + 18.88353);
             ctx.lineTo(dx + 28.82446, dy + 18.88353);
             ctx.lineWidth = 2;
-            ctx.strokeStyle = '#000';
             ctx.stroke();
     
             // Линия 4 (диагональная, средняя толщина)
@@ -770,26 +782,7 @@
             ctx.moveTo(dx + 12.68292, dy + 14.85604);
             ctx.lineTo(dx + 32.24813, dy + 3.61644);
             ctx.lineWidth = 2;
-            ctx.strokeStyle = '#000';
             ctx.stroke();
-    
-            // Опционально: рисуем точку в начале координат (dx, dy) для наглядности
-            // ctx.beginPath();
-            // ctx.arc(dx, dy, 3, 0, Math.PI * 2);
-            // ctx.fillStyle = 'red';
-            // ctx.fill();
-
-            // ctx.moveTo(this.x * scale + x0, (this.top - dy) * scale + y0)
-            // ctx.lineTo((this.x  + this.height) * scale + x0, (this.top - dy) * scale + y0)
-            // ctx.lineTo((this.x + this.height- dx) * scale + x0, (this.top + dy2) * scale + y0)
-            // ctx.lineTo(this.right * scale + x0, (this.top + dy2) * scale + y0)
-            // ctx.lineTo(this.right * scale + x0, (this.bottom + dy2) * scale + y0)
-            // ctx.lineTo(this.left * scale + x0, (this.bottom + dy2) * scale + y0)
-            // ctx.lineTo(this.left * scale + x0, (this.top + dy2) * scale + y0)
-            // ctx.lineTo((this.x - dx)  * scale + x0, (this.top + dy2) * scale + y0)
-            // ctx.closePath()
-            // ctx.stroke()
-            // ctx.fill()
             return
         } 
         let height = this.height
@@ -1009,6 +1002,36 @@
         ctx.restore()
 }
 
+Block.prototype.DrawJoint = function(ctx, x0, y0, scale) {
+    let height = this.height
+    let width = this.width
+    // this.alfa = this.alfa + 1
+    let alfa = this.alfa
+    ctx.save()
+    ctx.translate(this.x * scale + x0,this.y*scale + y0);
+    ctx.rotate(alfa*Math.PI/180);
+    // Линия 1 Горизонтальная верх
+    ctx.beginPath();
+    ctx.moveTo(-7 * scale, -10 * scale);
+    ctx.lineTo(7 * scale, -10 * scale);
+    ctx.lineWidth = 1.5 * scale;
+    ctx.stroke();
+    // Линия 2 - Вертикальная
+    ctx.beginPath();
+    ctx.moveTo(0 * scale, -10 * scale);
+    ctx.lineTo(0 * scale, 10 * scale);
+    ctx.lineWidth = 1.5 * scale;
+    ctx.stroke();
+    // Линия 3 - Горизонтальная низ
+    ctx.beginPath();
+    ctx.moveTo(-7 * scale, 10 * scale);
+    ctx.lineTo(7 * scale, 10 * scale);
+    ctx.lineWidth = 1.5 * scale;
+    ctx.stroke();
+
+    ctx.closePath()
+    ctx.restore()
+}
     Block.prototype.DrawBeginEnd = function(ctx, x0, y0, scale) {
         let radius = this.width > this.height ? this.height / 2 : 2 * GRID_SIZE
         ctx.beginPath()
@@ -1266,6 +1289,8 @@
             this.DrawSwitchLeftDown(ctx, x0, y0, scale) 
         } else if (this.type == SWITCH_RIGTH_DOWN) {
             this.DrawSwitchRigthDown(ctx, x0, y0, scale) 
+        } else if (this.type == JOINT) {
+            this.DrawJoint(ctx, x0, y0, scale)
         } else if (this.type == BEGIN_END_TYPE) {
             this.DrawBeginEnd(ctx, x0, y0, scale)
         } else if (this.type == PROCEDURE_TYPE) {
@@ -1290,7 +1315,7 @@
     Block.prototype.IsMouseHover = function(x, y) {
         if (x < this.left || x > this.right) return false
         if (y < this.top || y > this.bottom) return false
-        if (this.type == BLOCK_TYPE || this.type == PROCEDURE_TYPE || this.type == IN_OUT_TYPE || this.type == FOR_LOOP_TYPE || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE || this.type == DISPLAY_TYPE || this.type == TEXT_TYPE || this.type == SWITCH_LEFT_TOP || this.type == SWITCH_LEFT_DOWN || this.type == SWITCH_RIGTH_DOWN) return true
+        if (this.type == BLOCK_TYPE || this.type == PROCEDURE_TYPE || this.type == IN_OUT_TYPE || this.type == FOR_LOOP_TYPE || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE || this.type == DISPLAY_TYPE || this.type == TEXT_TYPE || this.type == SWITCH_LEFT_TOP || this.type == SWITCH_LEFT_DOWN || this.type == SWITCH_RIGTH_DOWN || this.type == JOINT) return true
         if (this.type == BEGIN_END_TYPE) {
             if (x >= this.left + this.height / 2 && x <= this.right - this.height / 2) return true
             let dx1 = x - (this.left + this.height / 2)
