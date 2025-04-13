@@ -313,10 +313,10 @@
     const INCREASE_FONT = 'increase-font'
     const DECREASE_FONT = 'decrease-font'
     const CLEAR_FORMAT = 'clear'
-    const BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, BEGIN_END_TYPE, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, LABEL_TYPE, TEXT_TYPE]
-    const ALL_BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, BEGIN_END_TYPE, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, FOR_LOOP_BEGIN_TYPE, FOR_LOOP_END_TYPE, LABEL_TYPE, TEXT_TYPE, SWITCH_LEFT_TOP, SWITCH_LEFT_DOWN, SWITCH_RIGTH_DOWN]
-    const BLOCK_WIDTHS = [100, 120, 100, 100, 120, 120, 100, 30, 80]
-    const BLOCK_HEIGHTS = [40, 80, 30, 40, 40, 40, 40, 30, 20]
+    const BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, SWITCH_LEFT_TOP, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, LABEL_TYPE, TEXT_TYPE]
+    const ALL_BLOCK_TYPES = [BLOCK_TYPE, CONDITION_TYPE, SWITCH_LEFT_TOP, PROCEDURE_TYPE, IN_OUT_TYPE, DISPLAY_TYPE, FOR_LOOP_TYPE, FOR_LOOP_BEGIN_TYPE, FOR_LOOP_END_TYPE, LABEL_TYPE, TEXT_TYPE, BEGIN_END_TYPE, SWITCH_LEFT_DOWN, SWITCH_RIGTH_DOWN]
+    const BLOCK_WIDTHS = [100, 100, 100, 100, 120, 120, 100, 30, 80]
+    const BLOCK_HEIGHTS = [40, 80, 80, 40, 40, 40, 40, 30, 20]
     const MENU_ITEMS = ['Сохранить схему (json)', 'Загрузить схему (json)', 'Сохранить схему (png)', 'Сохранить области (zip)', 'Сменить цветовую тему', 'Инструкция к редактору']
     const KEYBOARD_CHARACTERS = ['∀', '∃', '∄', '←', '→', '⇔', '≠', '≡', '≤', '≥', '∈', '∉', '∅', 'ℤ', 'ℕ', '∩', '∪', '⊂', '⊃', '⊆', '⊇', '∧', '∨', '²', '³', '⋅', 'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ', 'σ', 'τ', 'υ', 'χ', 'φ', 'ψ', 'ω']
     const KEYBOARD_CHARACTERS_PER_ROW = 25
@@ -438,7 +438,8 @@
     const ADD_NODE_AS_POINT = false
     const SAVE_WITH_BACKGROUND = true
     const SWITCH_DX = 20
-    const SWITCHES = [CONDITION_TYPE , SWITCH_LEFT_TOP, SWITCH_LEFT_DOWN, SWITCH_RIGTH_DOWN]
+    const RSWITCHES = [CONDITION_TYPE , SWITCH_RIGTH_DOWN]//, SWITCH_LEFT_TOP, SWITCH_LEFT_DOWN,
+    const LSWITCHES = [SWITCH_LEFT_TOP, SWITCH_LEFT_DOWN]//
     let REPLACE_MATH_RULES = [
         ["\\all", "∀ "],
         ["\\forall", "∀ "],
@@ -708,10 +709,10 @@
     }
     Block.prototype.InitConnectors = function() {
         this.connectors = []
-        // this.connectors[TOP_CONNECTOR] = new Connector(this, 0, -0.5)
-        // this.connectors[RIGHT_CONNECTOR] = new Connector(this, 0.5, 0)
-        // this.connectors[BOTTOM_CONNECTOR] = new Connector(this, 0, 0.5)
-        // this.connectors[LEFT_CONNECTOR] = new Connector(this, -0.5, 0)
+        this.connectors[TOP_CONNECTOR] = new Connector(this, 0, -0.5)
+        this.connectors[RIGHT_CONNECTOR] = new Connector(this, 0.5, 0)
+        this.connectors[BOTTOM_CONNECTOR] = new Connector(this, 0, 0.5)
+        this.connectors[LEFT_CONNECTOR] = new Connector(this, -0.5, 0)
     }
     Block.prototype.UpdateConnectors = function() {
         for (let i = 0; i < this.connectors.length; i++) this.connectors[i].Update()
@@ -736,26 +737,61 @@
         this.speed = 50
     }
     Block.prototype.DrawCondition = function(ctx, x0, y0, scale) {
-        ctx.beginPath()
+        // ctx.beginPath()
         if(this.isMenuBlock) {
-            let dx = 10
-            let dy = 8 
+            let dx = 15
+            let dy = 45 
             let dy2 = 5
-            ctx.moveTo(this.x * scale + x0, (this.top - dy) * scale + y0)
-            ctx.lineTo((this.x  + this.height) * scale + x0, (this.top - dy) * scale + y0)
-            ctx.lineTo((this.x + this.height- dx) * scale + x0, (this.top + dy2) * scale + y0)
-            ctx.lineTo(this.right * scale + x0, (this.top + dy2) * scale + y0)
-            ctx.lineTo(this.right * scale + x0, (this.bottom + dy2) * scale + y0)
-            ctx.lineTo(this.left * scale + x0, (this.bottom + dy2) * scale + y0)
-            ctx.lineTo(this.left * scale + x0, (this.top + dy2) * scale + y0)
-            ctx.lineTo((this.x - dx)  * scale + x0, (this.top + dy2) * scale + y0)
-            ctx.closePath()
-            ctx.stroke()
-            ctx.fill()
+            ctx.beginPath();
+            ctx.moveTo(x0+dx + 13.66077, y0+dy + 14.31555);
+            ctx.lineTo(x0 + dx + 3.06324, y0+dy + 14.31555);
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#000';
+            ctx.stroke();
+    
+            // Линия 2 (горизонтальная, толстая)
+            ctx.beginPath();
+            ctx.moveTo(x0 + dx + 7.01573, y0 + dy + 16.70961);
+            ctx.lineTo(x0 +dx + 13.923, y0 + dy + 16.70961);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#000';
+            ctx.stroke();
+    
+            // Линия 3 (длинная горизонтальная, средняя толщина)
+            ctx.beginPath();
+            ctx.moveTo(dx + -0.30075, dy + 18.88353);
+            ctx.lineTo(dx + 28.82446, dy + 18.88353);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#000';
+            ctx.stroke();
+    
+            // Линия 4 (диагональная, средняя толщина)
+            ctx.beginPath();
+            ctx.moveTo(dx + 12.68292, dy + 14.85604);
+            ctx.lineTo(dx + 32.24813, dy + 3.61644);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#000';
+            ctx.stroke();
+    
+            // Опционально: рисуем точку в начале координат (dx, dy) для наглядности
+            // ctx.beginPath();
+            // ctx.arc(dx, dy, 3, 0, Math.PI * 2);
+            // ctx.fillStyle = 'red';
+            // ctx.fill();
+
+            // ctx.moveTo(this.x * scale + x0, (this.top - dy) * scale + y0)
+            // ctx.lineTo((this.x  + this.height) * scale + x0, (this.top - dy) * scale + y0)
+            // ctx.lineTo((this.x + this.height- dx) * scale + x0, (this.top + dy2) * scale + y0)
+            // ctx.lineTo(this.right * scale + x0, (this.top + dy2) * scale + y0)
+            // ctx.lineTo(this.right * scale + x0, (this.bottom + dy2) * scale + y0)
+            // ctx.lineTo(this.left * scale + x0, (this.bottom + dy2) * scale + y0)
+            // ctx.lineTo(this.left * scale + x0, (this.top + dy2) * scale + y0)
+            // ctx.lineTo((this.x - dx)  * scale + x0, (this.top + dy2) * scale + y0)
+            // ctx.closePath()
+            // ctx.stroke()
+            // ctx.fill()
             return
         } 
-        let dx = SWITCH_DX
-        const shift = 20
         let height = this.height
         let width = this.width
         // this.alfa = this.alfa + 1
@@ -763,67 +799,214 @@
         ctx.save()
         ctx.translate(this.x * scale + x0,this.y*scale + y0);
         ctx.rotate(alfa*Math.PI/180);
-        ctx.moveTo(-shift * scale, (-height / 2) * scale)
-        ctx.lineTo((height - shift) * scale , (- height / 2) * scale)
-        ctx.lineTo((height- dx - shift) * scale , 0 * scale)
-        ctx.lineTo(width / 2 * scale , 0)
-        ctx.lineTo(width / 2 * scale, height / 2 * scale)
-        ctx.lineTo(-width / 2  * scale, (height/2) * scale)
-        ctx.lineTo(-width / 2  * scale, 0)
-        ctx.lineTo((- dx - shift)  * scale,  0)
+        // Линия 1
+        ctx.beginPath();
+        ctx.moveTo(-10.5 * scale, -5.25 * scale);
+        ctx.lineTo(-4.5 * scale, -5.25* scale);
+        ctx.lineWidth = 1.5 * scale;
+
+        ctx.stroke();
+
+        // Линия 2 (горизонтальная, толстая)
+        ctx.beginPath();
+        ctx.moveTo(-4.5 * scale, -3 * scale);
+        ctx.lineTo(4.5 * scale, -3 * scale);
+        ctx.lineWidth = 6* scale;
+        ctx.stroke();
+
+        // Линия 3 (длинная горизонтальная, средняя толщина)
+        ctx.beginPath();
+        ctx.moveTo(-width/2 * scale, 0 * scale);
+        ctx.lineTo(width/2 * scale, 0* scale);
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+
+        // Линия 4 (диагональная, средняя толщина)
+        ctx.beginPath();
+        ctx.moveTo(4.5 * scale, -5 * scale);
+        ctx.lineTo(40 * scale, -height/2 * scale);
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(0 , 0);
+        ctx.arc(0 , 0 , 3 , 0, Math.PI * 2);
+        ctx.fillStyle = 'red';
+        ctx.fill();
+       
         ctx.closePath()
-        ctx.stroke()
-        ctx.fill()
         ctx.restore()
 
     }
     Block.prototype.DrawSwitchLeftTop = function(ctx, x0, y0, scale) {
-        ctx.beginPath()
-        let dx = SWITCH_DX
-        let shift = this.height
-        ctx.moveTo((this.x - shift) * scale + x0, (this.top - shift) * scale + y0)
-        ctx.lineTo(this.x * scale + x0, (this.top - shift) * scale + y0)
-        ctx.lineTo((this.x + shift- dx) * scale + x0, (this.top) * scale + y0)
-        ctx.lineTo(this.right * scale + x0, (this.top) * scale + y0)
-        ctx.lineTo(this.right * scale + x0, (this.bottom) * scale + y0)
-        ctx.lineTo(this.left * scale + x0, (this.bottom) * scale + y0)
-        ctx.lineTo(this.left * scale + x0, (this.top) * scale + y0)
-        ctx.lineTo((this.x - dx)  * scale + x0, (this.top) * scale + y0)
+        if(this.isMenuBlock) {
+            let dx = 15
+            let dy = 85 
+            ctx.beginPath();
+            ctx.moveTo(x0 + dx + 22, y0+dy + 15);
+            ctx.lineTo(x0 + dx + 26, y0+dy + 15);
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+    
+            // Линия 2 (горизонтальная, толстая)
+            ctx.beginPath();
+            ctx.moveTo(x0 + dx + 15, y0 + dy + 16);
+            ctx.lineTo(x0 + dx + 22, y0 + dy + 16);
+            ctx.lineWidth = 4;
+            ctx.stroke();
+    
+            // Линия 3 (длинная горизонтальная, средняя толщина)
+            ctx.beginPath();
+            ctx.moveTo(dx , dy + 19);
+            ctx.lineTo(dx + 28, dy + 19);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+    
+            // Линия 4 (диагональная, средняя толщина)
+            ctx.beginPath();
+            ctx.moveTo(dx + 15, dy + 16);
+            ctx.lineTo(dx + 0, dy + 3.61644);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            return
+        } 
+        const height = this.height
+        const width = this.width
+        // this.alfa = this.alfa + 1
+        let alfa = this.alfa
+        ctx.save()
+        ctx.translate(this.x * scale + x0,this.y*scale + y0);
+        ctx.rotate(alfa*Math.PI/180);
+        // Линия 1
+        ctx.beginPath();
+        ctx.moveTo(10.5 * scale, -5.25 * scale);
+        ctx.lineTo(4.5 * scale, -5.25* scale);
+        ctx.lineWidth = 1.5 * scale;
+
+        ctx.stroke();
+
+        // Линия 2 (горизонтальная, толстая)
+        ctx.beginPath();
+        ctx.moveTo(4.5 * scale, -3 * scale);
+        ctx.lineTo(-4.5 * scale, -3 * scale);
+        ctx.lineWidth = 6* scale;
+        ctx.stroke();
+
+        // Линия 3 (длинная горизонтальная, средняя толщина)
+        ctx.beginPath();
+        ctx.moveTo(width/2 * scale, 0 * scale);
+        ctx.lineTo(-width/2 * scale, 0* scale);
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+
+        // Линия 4 (диагональная, средняя толщина)
+        ctx.beginPath();
+        ctx.moveTo(-4.5 * scale, -5 * scale);
+        ctx.lineTo(-40 * scale, -height/2 * scale);
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(0 , 0);
+        ctx.arc(0 , 0 , 3 , 0, Math.PI * 2);
+        ctx.fillStyle = 'red';
+        ctx.fill();
+       
         ctx.closePath()
-        ctx.stroke()
-        ctx.fill()
+        ctx.restore()
     }
     Block.prototype.DrawSwitchLeftDown = function(ctx, x0, y0, scale) {
-        ctx.beginPath()
-        let dx = SWITCH_DX
-        let shift = this.height
-        ctx.moveTo((this.x - shift) * scale + x0, (this.bottom + shift) * scale + y0)
-        ctx.lineTo(this.x * scale + x0, (this.bottom + shift) * scale + y0)
-        ctx.lineTo((this.x + shift- dx) * scale + x0, (this.bottom) * scale + y0)
-        ctx.lineTo(this.right * scale + x0, (this.bottom) * scale + y0)
-        ctx.lineTo(this.right * scale + x0, (this.top) * scale + y0)
-        ctx.lineTo(this.left * scale + x0, (this.top) * scale + y0)
-        ctx.lineTo(this.left * scale + x0, (this.bottom) * scale + y0)
-        ctx.lineTo((this.x - dx)  * scale + x0, (this.bottom) * scale + y0)
+        const height = this.height
+        let width = this.width
+        // this.alfa = this.alfa + 1
+        let alfa = this.alfa
+        ctx.save()
+        ctx.translate(this.x * scale + x0,this.y*scale + y0);
+        ctx.rotate(alfa*Math.PI/180);
+        // Линия 1
+        ctx.beginPath();
+        ctx.moveTo(10.5 * scale, 5.25 * scale);
+        ctx.lineTo(4.5 * scale, 5.25* scale);
+        ctx.lineWidth = 1.5 * scale;
+
+        ctx.stroke();
+
+        // Линия 2 (горизонтальная, толстая)
+        ctx.beginPath();
+        ctx.moveTo(4.5 * scale, 3 * scale);
+        ctx.lineTo(-4.5 * scale, 3 * scale);
+        ctx.lineWidth = 6* scale;
+        ctx.stroke();
+
+        // Линия 3 (длинная горизонтальная, средняя толщина)
+        ctx.beginPath();
+        ctx.moveTo(width/2 * scale, 0 * scale);
+        ctx.lineTo(-width/2 * scale, 0* scale);
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+
+        // Линия 4 (диагональная, средняя толщина)
+        ctx.beginPath();
+        ctx.moveTo(-4.5 * scale, 5 * scale);
+        ctx.lineTo(-40 * scale, height/2 * scale);
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(0 , 0);
+        ctx.arc(0 , 0 , 3 , 0, Math.PI * 2);
+        ctx.fillStyle = 'red';
+        ctx.fill();
+       
         ctx.closePath()
-        ctx.stroke()
-        ctx.fill()
+        ctx.restore()
+    
     }
     Block.prototype.DrawSwitchRigthDown = function(ctx, x0, y0, scale) {
-    ctx.beginPath()
-    let dx = SWITCH_DX
-    let shift = this.height
-    ctx.moveTo(this.x * scale + x0, (this.bottom + shift) * scale + y0)
-    ctx.lineTo((this.x  + shift) * scale + x0, (this.bottom + shift) * scale + y0)
-    ctx.lineTo((this.x + this.height- dx) * scale + x0, this.bottom * scale + y0)
-    ctx.lineTo(this.right * scale + x0, this.bottom * scale + y0)
-    ctx.lineTo(this.right * scale + x0, this.top * scale + y0)
-    ctx.lineTo(this.left * scale + x0, this.top * scale + y0)
-    ctx.lineTo(this.left * scale + x0, this.bottom * scale + y0)
-    ctx.lineTo((this.x - dx)  * scale + x0, this.bottom * scale + y0)
-    ctx.closePath()
-    ctx.stroke()
-    ctx.fill()
+        let height = this.height
+        let width = this.width
+        // this.alfa = this.alfa + 1
+        let alfa = this.alfa
+        ctx.save()
+        ctx.translate(this.x * scale + x0,this.y*scale + y0);
+        ctx.rotate(alfa*Math.PI/180);
+        // Линия 1
+        ctx.beginPath();
+        ctx.moveTo(-10.5 * scale, 5.25 * scale);
+        ctx.lineTo(-4.5 * scale, 5.25* scale);
+        ctx.lineWidth = 1.5 * scale;
+
+        ctx.stroke();
+
+        // Линия 2 (горизонтальная, толстая)
+        ctx.beginPath();
+        ctx.moveTo(-4.5 * scale, 3 * scale);
+        ctx.lineTo(4.5 * scale, 3 * scale);
+        ctx.lineWidth = 6* scale;
+        ctx.stroke();
+
+        // Линия 3 (длинная горизонтальная, средняя толщина)
+        ctx.beginPath();
+        ctx.moveTo(-width/2 * scale, 0 * scale);
+        ctx.lineTo(width/2 * scale, 0* scale);
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+
+        // Линия 4 (диагональная, средняя толщина)
+        ctx.beginPath();
+        ctx.moveTo(4.5 * scale, 5 * scale);
+        ctx.lineTo(40 * scale, height/2 * scale);
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(0 , 0);
+        ctx.arc(0 , 0 , 3 , 0, Math.PI * 2);
+        ctx.fillStyle = 'red';
+        ctx.fill();
+       
+        ctx.closePath()
+        ctx.restore()
 }
 
     Block.prototype.DrawBeginEnd = function(ctx, x0, y0, scale) {
@@ -1265,9 +1448,12 @@
         return this.type == CONDITION_TYPE || this.type == SWITCH_LEFT_TOP || this.type == SWITCH_LEFT_DOWN || this.type == SWITCH_RIGTH_DOWN  || this.type == BEGIN_END_TYPE || this.type == IN_OUT_TYPE || this.type == LABEL_TYPE || this.type == FOR_LOOP_TYPE || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE
     }
     Block.prototype.SwapLabelsOfText = function(ctrlKey) {
-        if (SWITCHES.includes(this.type)) {
-            let index = SWITCHES.indexOf(this.type)
-            this.type = SWITCHES[(index + (ctrlKey ? -1 : 1)) % SWITCHES.length]
+        if (LSWITCHES.includes(this.type)) {
+            let index = LSWITCHES.indexOf(this.type)
+            this.type = LSWITCHES[(index + (ctrlKey ? -1 : 1)) % LSWITCHES.length]
+        }else if (RSWITCHES.includes(this.type)) {
+            let index = RSWITCHES.indexOf(this.type)
+            this.type = RSWITCHES[(index + (ctrlKey ? -1 : 1)) % RSWITCHES.length]
         
         // if (this.type == CONDITION_TYPE) {
             // this.labelsPosition = (this.labelsPosition + (ctrlKey ? -1 : 1) + 5) % 5
@@ -2722,13 +2908,13 @@
             DARK_THEME = 1 - DARK_THEME
             return
         }
-        if (y < SAVE_LOAD_MENU_Y0 + SAVE_LOAD_MENU_ITEM_HEIGHT * 6) {
-            let link = document.createElement("a")
-            link.target = "_blank"
-            link.href = "https://programforyou.ru/poleznoe/how-to-use-our-block-diagram-redactor"
-            link.click()
-            return
-        }
+        // if (y < SAVE_LOAD_MENU_Y0 + SAVE_LOAD_MENU_ITEM_HEIGHT * 6) {
+        //     let link = document.createElement("a")
+        //     link.target = "_blank"
+        //     link.href = "https://programforyou.ru/poleznoe/how-to-use-our-block-diagram-redactor"
+        //     link.click()
+        //     return
+        // }
     }
     Diagram.prototype.BottomMenuMouseDown = function() {
         let x0 = BOTTOM_MENU_X0 < 0 ? this.width + BOTTOM_MENU_X0 : BOTTOM_MENU_X0
