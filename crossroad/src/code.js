@@ -441,6 +441,8 @@
     const SWITCH_DX = 20
     const RSWITCHES = [CONDITION_TYPE , SWITCH_RIGTH_DOWN]//, SWITCH_LEFT_TOP, SWITCH_LEFT_DOWN,
     const LSWITCHES = [SWITCH_LEFT_TOP, SWITCH_LEFT_DOWN]//
+    const JOINTWIDTH = 5
+    const JOINTHEIGTH = 7
     let REPLACE_MATH_RULES = [
         ["\\all", "∀ "],
         ["\\forall", "∀ "],
@@ -1003,8 +1005,8 @@
 }
 
 Block.prototype.DrawJoint = function(ctx, x0, y0, scale) {
-    let height = this.height
-    let width = this.width
+    let height = JOINTHEIGTH
+    let width = JOINTWIDTH
     // this.alfa = this.alfa + 1
     let alfa = this.alfa
     ctx.save()
@@ -1012,20 +1014,20 @@ Block.prototype.DrawJoint = function(ctx, x0, y0, scale) {
     ctx.rotate(alfa*Math.PI/180);
     // Линия 1 Горизонтальная верх
     ctx.beginPath();
-    ctx.moveTo(-7 * scale, -10 * scale);
-    ctx.lineTo(7 * scale, -10 * scale);
+    ctx.moveTo(-width * scale, -height * scale);
+    ctx.lineTo(width * scale, -height * scale);
     ctx.lineWidth = 1.5 * scale;
     ctx.stroke();
     // Линия 2 - Вертикальная
     ctx.beginPath();
-    ctx.moveTo(0 * scale, -10 * scale);
-    ctx.lineTo(0 * scale, 10 * scale);
+    ctx.moveTo(0 * scale, -height * scale);
+    ctx.lineTo(0 * scale, height * scale);
     ctx.lineWidth = 1.5 * scale;
     ctx.stroke();
     // Линия 3 - Горизонтальная низ
     ctx.beginPath();
-    ctx.moveTo(-7 * scale, 10 * scale);
-    ctx.lineTo(7 * scale, 10 * scale);
+    ctx.moveTo(-width * scale, height * scale);
+    ctx.lineTo(width * scale, height * scale);
     ctx.lineWidth = 1.5 * scale;
     ctx.stroke();
 
@@ -1315,26 +1317,32 @@ Block.prototype.DrawJoint = function(ctx, x0, y0, scale) {
     Block.prototype.IsMouseHover = function(x, y) {
         if (x < this.left || x > this.right) return false
         if (y < this.top || y > this.bottom) return false
-        if (this.type == BLOCK_TYPE || this.type == PROCEDURE_TYPE || this.type == IN_OUT_TYPE || this.type == FOR_LOOP_TYPE || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE || this.type == DISPLAY_TYPE || this.type == TEXT_TYPE || this.type == SWITCH_LEFT_TOP || this.type == SWITCH_LEFT_DOWN || this.type == SWITCH_RIGTH_DOWN || this.type == JOINT) return true
-        if (this.type == BEGIN_END_TYPE) {
-            if (x >= this.left + this.height / 2 && x <= this.right - this.height / 2) return true
-            let dx1 = x - (this.left + this.height / 2)
-            let dx2 = x - (this.right - this.height / 2)
-            let dy = y - this.y
-            if (dx1 * dx1 + dy * dy < this.height * this.height / 4) return true
-            if (dx2 * dx2 + dy * dy < this.height * this.height / 4) return true
-            return false
-        }
-        if (this.type == CONDITION_TYPE) {
-            let k = this.height / this.width
-            let dx = x - this.x
-            let dy = this.y - y
-            if (dx > 0) {
-                return dy < -k * dx + this.height / 2 && dy > k * dx - this.height / 2
-            } else {
-                return dy < k * dx + this.height / 2 && dy > -k * dx - this.height / 2
-            }
-        }
+        if (this.type == BLOCK_TYPE || this.type == PROCEDURE_TYPE 
+            || this.type == IN_OUT_TYPE || this.type == FOR_LOOP_TYPE 
+            || this.type == FOR_LOOP_BEGIN_TYPE || this.type == FOR_LOOP_END_TYPE 
+            || this.type == DISPLAY_TYPE || this.type == TEXT_TYPE 
+            || this.type == SWITCH_LEFT_TOP || this.type == SWITCH_LEFT_DOWN 
+            || this.type == SWITCH_RIGTH_DOWN || this.type == JOINT
+            || this.type == CONDITION_TYPE) return true
+        // if (this.type == BEGIN_END_TYPE) {
+        //     if (x >= this.left + this.height / 2 && x <= this.right - this.height / 2) return true
+        //     let dx1 = x - (this.left + this.height / 2)
+        //     let dx2 = x - (this.right - this.height / 2)
+        //     let dy = y - this.y
+        //     if (dx1 * dx1 + dy * dy < this.height * this.height / 4) return true
+        //     if (dx2 * dx2 + dy * dy < this.height * this.height / 4) return true
+        //     return false
+        // }
+        // if (this.type == CONDITION_TYPE) {
+        //     let k = this.height / this.width
+        //     let dx = x - this.x
+        //     let dy = this.y - y
+        //     if (dx > 0) {
+        //         return dy < -k * dx + this.height / 2 && dy > k * dx - this.height / 2
+        //     } else {
+        //         return dy < k * dx + this.height / 2 && dy > -k * dx - this.height / 2
+        //     }
+        // }
         if (this.type == LABEL_TYPE) {
             let dx = x - this.x
             let dy = y - this.y

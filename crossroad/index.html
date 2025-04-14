@@ -12,9 +12,19 @@
 <link rel="stylesheet" href ="./style/style.css"> 
 <link rel="stylesheet" href ="./style/style2.css"> 
 
+<script src="../assets/theme-switcher.js"></script>
+<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+<link rel="stylesheet" media="screen" href="../assets/theme.min.css">
+<style>
+    .container { 
+        max-width: 1700px;
+        min-width: 1050px;
+    }
+</style>
+
 </head>
 <body oncontextmenu="return false;">
-<header>
+<!-- <header>
 <div class="menu">
 <div class="menu-logo"><a href=""><img src="./images/logo.gif" alt="logo of Programforyou"></a></div>
 <div class="menu-items">
@@ -23,7 +33,7 @@
 <li id="sub-menu-li"><a><span class="fa fa-caret-right"></span> Сервисы</a>
 <ul class="sub-menu">
 <li><a title="Вы сейчас на этой странице">Калькулятор параметров переезда</a></li>
-<!-- <li><a href="https://programforyou.ru/graph-redactor" target="_blank">Редактор графов</a></li> -->
+<li><a href="https://programforyou.ru/graph-redactor" target="_blank">Редактор графов</a></li>
 <li><a href="../MU_ui/new_design/pricing/index.html" target="_blank">МУ новый дизайн</a></li>
 </ul>
 </li>
@@ -31,8 +41,63 @@
 </ul>
 </div>
 </div>
-</header>
-<canvas id="canvas" width="1370" height="854" style="width: 1370px; height: 854px; cursor: default;" title=""></canvas>
+</header> -->
+<header class="header navbar navbar-expand-lg bg-light shadow-sm fixed-top">
+    <div class="container px-3">
+      <a href="https://dismiro.github.io" class="navbar-brand pe-3">
+        <img src="../assets/logo.svg" width="47" alt="S & I    ">
+        Signaling & Interlocking
+      </a>
+      <div id="navbarNav" class="offcanvas offcanvas-end">
+        <div class="offcanvas-header border-bottom">
+          <h5 class="offcanvas-title">Меню</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-current="page">Сервисы</a>
+              <div class="dropdown-menu p-0">
+                <div class="d-lg-flex">
+                  <div class="mega-dropdown-column d-flex justify-content-center align-items-center rounded-3 rounded-end-0 px-0" style="margin: -1px; background-color: #f3f6ff;">
+                    <img src="../assets/images/landings.jpg" alt="Landings">
+                  </div>
+                  <div class="mega-dropdown-column pt-lg-3 pb-lg-4" style="--si-mega-dropdown-column-width: 25rem;">
+                    <ul class="list-unstyled mb-0">
+                      <li><a href="../index.html" class="dropdown-item">Главная страница</a></li>
+                      <li><a href="../indicator/index.html" class="dropdown-item">Жильность кабеля к МУ <span class="badge bg-success ms-2">Готово</span></a></li>
+                      <li><a href="../crossroad/index.html" class="dropdown-item">Параметры извещения переезд <span class="badge bg-warning ms-2">В разработке</span></a></li>
+                      <li><a href="../battery_parameters/index.html" class="dropdown-item">Расчет емкости аккумуляторов<span class="badge bg-warning ms-2">В разработке</span></a></li>
+
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">Справка</a>
+              <ul class="dropdown-menu">
+                <li><a href="../help.html" class="dropdown-item">Вся платформа</a></li>
+                <li><a href="./help.html" class="dropdown-item">Этот модуль</a></li>
+              </ul>
+            </li>
+            <li class="nav-item">
+              <a href="../about.html" class="nav-link">О нас</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div class="form-check form-switch mode-switch pe-lg-1 ms-auto me-4" data-bs-toggle="mode">
+        <input type="checkbox" class="form-check-input" id="theme-mode">
+        <label class="form-check-label d-none d-sm-block" for="theme-mode">Светлая</label>
+        <label class="form-check-label d-none d-sm-block" for="theme-mode">Темная</label>
+      </div>
+      <button type="button" class="navbar-toggler" data-bs-toggle="offcanvas" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </div>
+  </header>
+<canvas id="canvas" class="pt-3" width="1370" height="854" style="width: 1370px; height: 854px; cursor: default;" title=""></canvas>
 <input id="input" type="file" accept=".json">
 <input id="source-input" type="file" accept=".cpp, .hpp, .c, .h, .pas">
 <input id="text-input" type="text">
