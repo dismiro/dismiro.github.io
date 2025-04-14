@@ -330,7 +330,7 @@
     const RIGHT_CONNECTOR = 1
     const BOTTOM_CONNECTOR = 2
     const LEFT_CONNECTOR = 3
-    var DARK_THEME = 1
+    var DARK_THEME = (localStorage.theme === 'dark') ? 0 : 1
     const CENTER_TEXT_ALIGN = 'center'
     const LEFT_TEXT_ALIGN = 'left'
     const FOR_AS_GOST_STANDART = false
@@ -2301,6 +2301,7 @@ Block.prototype.DrawJoint = function(ctx, x0, y0, scale) {
         this.antiHistory = []
         this.copyBuffer = null
         this.currSelection = null
+        
     }
     Diagram.prototype.GetIcons = function(id, iconsCount = 4) {
         let icons = []
@@ -4848,3 +4849,8 @@ Block.prototype.DrawJoint = function(ctx, x0, y0, scale) {
         window.requestAnimationFrame(Draw)
     }
     window.requestAnimationFrame(Draw) 
+
+    window.addEventListener('themeUpdated', (e) => {
+        DARK_THEME = (localStorage.theme === 'dark') ? 0 : 1
+        console.log('Новое значение темы:', e.detail); // 1, 2, 3...
+      });

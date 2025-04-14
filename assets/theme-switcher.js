@@ -62,6 +62,7 @@
           setStoredTheme(theme)
           setTheme(theme)
           showActiveTheme(theme, true)
+          window.dispatchEvent(new CustomEvent('themeUpdated', { detail: theme }));
         })
       })
   })
