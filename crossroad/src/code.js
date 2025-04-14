@@ -334,7 +334,7 @@
     const CENTER_TEXT_ALIGN = 'center'
     const LEFT_TEXT_ALIGN = 'left'
     const FOR_AS_GOST_STANDART = false
-    const BACKGROUND_COLOR = ['#2b2b2b', '#fff']
+    const BACKGROUND_COLOR = ['#11131a', '#fff'] //0b0f19 2b2b2b
     const GRID_COLOR = ['#383838', '#f0f0f0']
     const MAJOR_GRID_COLOR = ['#404040', '#e0e0e0']
     const GRID_SIZE = 10
@@ -346,11 +346,11 @@
     }
     const MENU_X0 = 10
     const MENU_BORDER_WIDTH = 1
-    const MENU_BACKGROUND_COLOR = ['#3c3f41', '#fdfdfd']
+    const MENU_BACKGROUND_COLOR = ['#0b0f19', '#fdfdfd']
     const MENU_BORDER_COLOR = ['#8b8b8b', '#aaa']
-    const MENU_BLOCK_ACTIVE_COLOR = ['#4e5254', '#2196f3']
+    const MENU_BLOCK_ACTIVE_COLOR = ['#222636', '#e2e5f1']
     const MENU_TEXT_COLOR = ['#bbb', '#000']
-    const MENU_ACTIVE_TEXT_COLOR = ['#fff', '#fff']
+    const MENU_ACTIVE_TEXT_COLOR = ['#fff', '#000']
     const BLOCKS_MENU_Y0 = 10
     const BLOCKS_MENU_BLOCK_WIDTH = 40
     const BLOCKS_MENU_BLOCK_HEIGHT = 20
