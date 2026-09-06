@@ -1,0 +1,3931 @@
+{
+  "cables": [
+    {
+      "handle": "3C4CF",
+      "cable": "80-14x2(8) #",
+      "length": 80,
+      "type": "14x2(8) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [80] }
+    },
+    {
+      "handle": "3C4B7",
+      "cable": "55-4x2(3)*",
+      "length": 55,
+      "type": "4x2(3)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [55] }
+    },
+    {
+      "handle": "3C4B3",
+      "cable": "80-19x2(6) #",
+      "length": 80,
+      "type": "19x2(6) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [80] }
+    },
+    {
+      "handle": "3C24D",
+      "cable": "470-10x2(6)**",
+      "length": 470,
+      "type": "10x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [470] }
+    },
+    {
+      "handle": "3C24C",
+      "cable": "470-7x2(6)**",
+      "length": 470,
+      "type": "7x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [470] }
+    },
+    {
+      "handle": "3C213",
+      "cable": "5-2x2(2)",
+      "length": 5,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3C1DE",
+      "cable": "440-10x2(6)**",
+      "length": 440,
+      "type": "10x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [440] }
+    },
+    {
+      "handle": "3C1DD",
+      "cable": "5-xxxxxx x3",
+      "length": 5,
+      "type": "xxxxxx x3",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3B81D",
+      "cable": "175-10x2(4)**",
+      "length": 175,
+      "type": "10x2(4)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [175] }
+    },
+    {
+      "handle": "3B81C",
+      "cable": "165-10x2(8)*",
+      "length": 165,
+      "type": "10x2(8)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [165] }
+    },
+    {
+      "handle": "3B81B",
+      "cable": "50-10x2(6) \\U+0394",
+      "length": 50,
+      "type": "10x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B81A",
+      "cable": "50-7x2(6) \\U+0394",
+      "length": 50,
+      "type": "7x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B7E4",
+      "cable": "130-10x2(8)**",
+      "length": 130,
+      "type": "10x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [130] }
+    },
+    {
+      "handle": "3B7E3",
+      "cable": "440-10x2(8)**",
+      "length": 440,
+      "type": "10x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [440] }
+    },
+    {
+      "handle": "3B7E2",
+      "cable": "50-10x2(8) \\U+0394",
+      "length": 50,
+      "type": "10x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B7E1",
+      "cable": "300-7x2(6)**",
+      "length": 300,
+      "type": "7x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [300] }
+    },
+    {
+      "handle": "3B7E0",
+      "cable": "300-7x2(6)**",
+      "length": 300,
+      "type": "7x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [300] }
+    },
+    {
+      "handle": "3B7DF",
+      "cable": "50-10x2(8) \\U+0394",
+      "length": 50,
+      "type": "10x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B7DE",
+      "cable": "590-10x2(8)**",
+      "length": 590,
+      "type": "10x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [590] }
+    },
+    {
+      "handle": "3B7DD",
+      "cable": "50-10x2(8) \\U+0394",
+      "length": 50,
+      "type": "10x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B7DC",
+      "cable": "50-7x2(6) \\U+0394",
+      "length": 50,
+      "type": "7x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B7DB",
+      "cable": "50-7x2(6) \\U+0394",
+      "length": 50,
+      "type": "7x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B7B5",
+      "cable": "5-xxxxxx x1",
+      "length": 5,
+      "type": "xxxxxx x1",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3B7B4",
+      "cable": "300-7x2(6)**",
+      "length": 300,
+      "type": "7x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [300] }
+    },
+    {
+      "handle": "3B7B3",
+      "cable": "440-7x2(6)**",
+      "length": 440,
+      "type": "7x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [440] }
+    },
+    {
+      "handle": "3B7B2",
+      "cable": "630-10x2(6)**",
+      "length": 630,
+      "type": "10x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [630] }
+    },
+    {
+      "handle": "3B7B1",
+      "cable": "440-10x2(8)**",
+      "length": 440,
+      "type": "10x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [440] }
+    },
+    {
+      "handle": "3B7B0",
+      "cable": "220-10x2(4)**",
+      "length": 220,
+      "type": "10x2(4)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [220] }
+    },
+    {
+      "handle": "3B7AF",
+      "cable": "140-19x2(6)**",
+      "length": 140,
+      "type": "19x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [140] }
+    },
+    {
+      "handle": "3B7AE",
+      "cable": "440-7x2(4)**",
+      "length": 440,
+      "type": "7x2(4)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [440] }
+    },
+    {
+      "handle": "3B7AD",
+      "cable": "5-xxxxxx x3",
+      "length": 5,
+      "type": "xxxxxx x3",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3B7AC",
+      "cable": "5-xxxxxx x4",
+      "length": 5,
+      "type": "xxxxxx x4",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3B7AB",
+      "cable": "5-xxxxxx x6",
+      "length": 5,
+      "type": "xxxxxx x6",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3B7AA",
+      "cable": "5-xxxxxx x5",
+      "length": 5,
+      "type": "xxxxxx x5",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3B7A9",
+      "cable": "5-xxxxxx x10",
+      "length": 5,
+      "type": "xxxxxx x10",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3B7A8",
+      "cable": "5-xxxxxx x12",
+      "length": 5,
+      "type": "xxxxxx x12",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3B782",
+      "cable": "175-14x2(8)**",
+      "length": 175,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [175] }
+    },
+    {
+      "handle": "3B781",
+      "cable": "20-21x2(6) \\U+0394",
+      "length": 20,
+      "type": "21x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B780",
+      "cable": "420-30x2(8)**",
+      "length": 420,
+      "type": "30x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "ГНБ": [50], "Не определен": [370] }
+    },
+    {
+      "handle": "3B77F",
+      "cable": "500-14x2(8)**",
+      "length": 500,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "ГНБ": [50], "Не определен": [450] }
+    },
+    {
+      "handle": "3B77E",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B77D",
+      "cable": "320-19x2(12)**",
+      "length": 320,
+      "type": "19x2(12)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [320] }
+    },
+    {
+      "handle": "3B77C",
+      "cable": "320-14x2(12)**",
+      "length": 320,
+      "type": "14x2(12)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [320] }
+    },
+    {
+      "handle": "3B77B",
+      "cable": "20-14x2(8) \\U+0394",
+      "length": 20,
+      "type": "14x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B77A",
+      "cable": "20-30x2(8) \\U+0394",
+      "length": 20,
+      "type": "30x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B779",
+      "cable": "420-21x2(6)**",
+      "length": 420,
+      "type": "21x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "ГНБ": [50], "Не определен": [370] }
+    },
+    {
+      "handle": "3B778",
+      "cable": "20-14x2(8) \\U+0394",
+      "length": 20,
+      "type": "14x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B777",
+      "cable": "20-19x2(12) \\U+0394",
+      "length": 20,
+      "type": "19x2(12) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B776",
+      "cable": "20-14x2(12) \\U+0394",
+      "length": 20,
+      "type": "14x2(12) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B70F",
+      "cable": "740-30x2(8)**",
+      "length": 740,
+      "type": "30x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [740] }
+    },
+    {
+      "handle": "3B70E",
+      "cable": "20-21x2(6) \\U+0394",
+      "length": 20,
+      "type": "21x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B70D",
+      "cable": "670-14x2(8)**",
+      "length": 670,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [670] }
+    },
+    {
+      "handle": "3B70C",
+      "cable": "590-30x2(8)**",
+      "length": 590,
+      "type": "30x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [590] }
+    },
+    {
+      "handle": "3B70B",
+      "cable": "20-21x2(6) \\U+0394",
+      "length": 20,
+      "type": "21x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B70A",
+      "cable": "740-14x2(8)**",
+      "length": 740,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [740] }
+    },
+    {
+      "handle": "3B709",
+      "cable": "20-30x2(8) \\U+0394",
+      "length": 20,
+      "type": "30x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B708",
+      "cable": "590-21x2(6)**",
+      "length": 590,
+      "type": "21x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [590] }
+    },
+    {
+      "handle": "3B707",
+      "cable": "20-14x2(8) \\U+0394",
+      "length": 20,
+      "type": "14x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B706",
+      "cable": "20-30x2(8) \\U+0394",
+      "length": 20,
+      "type": "30x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B705",
+      "cable": "20-14x2(8) \\U+0394",
+      "length": 20,
+      "type": "14x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B704",
+      "cable": "820-21x2(6)**",
+      "length": 820,
+      "type": "21x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [820] }
+    },
+    {
+      "handle": "3B6FF",
+      "cable": "315-14x2(8)**",
+      "length": 315,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [315] }
+    },
+    {
+      "handle": "3B6FE",
+      "cable": "160-14x2(8)**",
+      "length": 160,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [160] }
+    },
+    {
+      "handle": "3B6FD",
+      "cable": "160-12x2(7)**",
+      "length": 160,
+      "type": "12x2(7)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [160] }
+    },
+    {
+      "handle": "3B6FC",
+      "cable": "20-10x2(8) \\U+0394",
+      "length": 20,
+      "type": "10x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B6FB",
+      "cable": "20-14x2(8) \\U+0394",
+      "length": 20,
+      "type": "14x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B6FA",
+      "cable": "20-14x2(8) \\U+0394",
+      "length": 20,
+      "type": "14x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B6F8",
+      "cable": "550-10x2(8)**",
+      "length": 550,
+      "type": "10x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [550] }
+    },
+    {
+      "handle": "3B6F7",
+      "cable": "550-14x2(8)**",
+      "length": 550,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [550] }
+    },
+    {
+      "handle": "3B6F6",
+      "cable": "20-14x2(8) \\U+0394",
+      "length": 20,
+      "type": "14x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B6F5",
+      "cable": "20-12x2(7) \\U+0394",
+      "length": 20,
+      "type": "12x2(7) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B640",
+      "cable": "425-30x2(8)**",
+      "length": 425,
+      "type": "30x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [425] }
+    },
+    {
+      "handle": "3B63F",
+      "cable": "20-30x2(8) \\U+0394",
+      "length": 20,
+      "type": "30x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B63B",
+      "cable": "20-21x2(6) \\U+0394",
+      "length": 20,
+      "type": "21x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B63A",
+      "cable": "20-21x2(6) \\U+0394",
+      "length": 20,
+      "type": "21x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B639",
+      "cable": "335-14x2(8)**",
+      "length": 335,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [335] }
+    },
+    {
+      "handle": "3B638",
+      "cable": "255-16x2(6)**",
+      "length": 255,
+      "type": "16x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [255] }
+    },
+    {
+      "handle": "3B637",
+      "cable": "20-21x2(6) \\U+0394",
+      "length": 20,
+      "type": "21x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B636",
+      "cable": "425-14x2(8)**",
+      "length": 425,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [425] }
+    },
+    {
+      "handle": "3B635",
+      "cable": "150-21x2(6)**",
+      "length": 150,
+      "type": "21x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [150] }
+    },
+    {
+      "handle": "3B634",
+      "cable": "425-14x2(8)**",
+      "length": 425,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [425] }
+    },
+    {
+      "handle": "3B633",
+      "cable": "505-21x2(6)**",
+      "length": 505,
+      "type": "21x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [505] }
+    },
+    {
+      "handle": "3B632",
+      "cable": "20-16x2(6) \\U+0394",
+      "length": 20,
+      "type": "16x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B631",
+      "cable": "255-21x2(6)**",
+      "length": 255,
+      "type": "21x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [255] }
+    },
+    {
+      "handle": "3B630",
+      "cable": "20-14x2(8) \\U+0394",
+      "length": 20,
+      "type": "14x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B593",
+      "cable": "20-3x2(2)*",
+      "length": 20,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B592",
+      "cable": "75-7x2(6)*",
+      "length": 75,
+      "type": "7x2(6)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [75] }
+    },
+    {
+      "handle": "3B591",
+      "cable": "10-3x2(2)*",
+      "length": 10,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B57D",
+      "cable": "30-2x2(2)",
+      "length": 30,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3B57C",
+      "cable": "15-4x2(2)*",
+      "length": 15,
+      "type": "4x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B57A",
+      "cable": "20-4x2(3)*",
+      "length": 20,
+      "type": "4x2(3)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B579",
+      "cable": "50-4x2(3)*",
+      "length": 50,
+      "type": "4x2(3)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B578",
+      "cable": "20-3x2(2)*",
+      "length": 20,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B577",
+      "cable": "50-3x2(2)*",
+      "length": 50,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B576",
+      "cable": "5-7x2(4)",
+      "length": 5,
+      "type": "7x2(4)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3B575",
+      "cable": "50-7x2(6)*",
+      "length": 50,
+      "type": "7x2(6)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B574",
+      "cable": "20-7x2(6)*",
+      "length": 20,
+      "type": "7x2(6)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B573",
+      "cable": "20-3x2(2)*",
+      "length": 20,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B572",
+      "cable": "50-3x2(2)*",
+      "length": 50,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "3B11F",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3B11E",
+      "cable": "35-10x2 #",
+      "length": 35,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "3B11D",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3B11C",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B11B",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B11A",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B119",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B118",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B117",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B116",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3B115",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B114",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B113",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B112",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B111",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3B110",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B10F",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B10E",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B10D",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3B10C",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B10B",
+      "cable": "35-10x2 #",
+      "length": 35,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "3B10A",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B109",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3B108",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B107",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B106",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B105",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B104",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B103",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B102",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B101",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B100",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0FF",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0FE",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0FD",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0FC",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0FB",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0FA",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0F9",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3B0F8",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0F7",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0F6",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0F5",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0F4",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0F3",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0F2",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0F1",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0F0",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0EF",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0EE",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0ED",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0EC",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0EB",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0EA",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3B0E9",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3B0E8",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0E7",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0E6",
+      "cable": "35-10x2 #",
+      "length": 35,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "3B0E5",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0E4",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3B0E3",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0E2",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0E1",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0E0",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0DF",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0DE",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0DD",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0DC",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0DB",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0DA",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0D9",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0D8",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0D7",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3B0D6",
+      "cable": "35-10x2 #",
+      "length": 35,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "3B0D5",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3B0D4",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0D3",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0D2",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0D1",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0D0",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0CF",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0CE",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0CD",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0CC",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0CB",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3B0CA",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3B0C9",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0C8",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0C7",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0C6",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0C5",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0C4",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3B0C3",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3B0C1",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0C0",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0BF",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0BE",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3B0BD",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0BC",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0BB",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0BA",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0B9",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0B8",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0B7",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0B6",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0B5",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0B4",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0B3",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0B2",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0B1",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0B0",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3B0AF",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3B0AE",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3B0AD",
+      "cable": "35-10x2 #",
+      "length": 35,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "3B0AC",
+      "cable": "210-3x2(2)**",
+      "length": 210,
+      "type": "3x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [210] }
+    },
+    {
+      "handle": "3B0AB",
+      "cable": "680-2x2(2)**",
+      "length": 680,
+      "type": "2x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [680] }
+    },
+    {
+      "handle": "3B0AA",
+      "cable": "20-3x2(4)",
+      "length": 20,
+      "type": "3x2(4)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0A9",
+      "cable": "600-4x2(2)**",
+      "length": 600,
+      "type": "4x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [600] }
+    },
+    {
+      "handle": "3B0A8",
+      "cable": "20-3x2(4)",
+      "length": 20,
+      "type": "3x2(4)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0A7",
+      "cable": "210-3x2(2)**",
+      "length": 210,
+      "type": "3x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [210] }
+    },
+    {
+      "handle": "3B0A6",
+      "cable": "20-3x2(4)",
+      "length": 20,
+      "type": "3x2(4)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0A5",
+      "cable": "680-2x2(2)**",
+      "length": 680,
+      "type": "2x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [680] }
+    },
+    {
+      "handle": "3B0A4",
+      "cable": "20-3x2(2)*",
+      "length": 20,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3B0A3",
+      "cable": "40-3x2(2)*",
+      "length": 40,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [40] }
+    },
+    {
+      "handle": "3B0A2",
+      "cable": "95-3x2(2)*",
+      "length": 95,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [95] }
+    },
+    {
+      "handle": "3B0A1",
+      "cable": "95-7x2(6)*",
+      "length": 95,
+      "type": "7x2(6)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [95] }
+    },
+    {
+      "handle": "3B0A0",
+      "cable": "40-7x2(6)*",
+      "length": 40,
+      "type": "7x2(6)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [40] }
+    },
+    {
+      "handle": "3B09F",
+      "cable": "20-7x2(6)*",
+      "length": 20,
+      "type": "7x2(6)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A582",
+      "cable": "200-4x2(2)*",
+      "length": 200,
+      "type": "4x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [200] }
+    },
+    {
+      "handle": "3A581",
+      "cable": "360-4x2(2)**",
+      "length": 360,
+      "type": "4x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [360] }
+    },
+    {
+      "handle": "3A580",
+      "cable": "15-4x2(2)*",
+      "length": 15,
+      "type": "4x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A561",
+      "cable": "230-16x2(6)**",
+      "length": 230,
+      "type": "16x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [230] }
+    },
+    {
+      "handle": "3A560",
+      "cable": "150-16x2(6)**",
+      "length": 150,
+      "type": "16x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [150] }
+    },
+    {
+      "handle": "3A55F",
+      "cable": "20-16x2(6) \\U+0394",
+      "length": 20,
+      "type": "16x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A55E",
+      "cable": "20-16x2(6) \\U+0394",
+      "length": 20,
+      "type": "16x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A548",
+      "cable": "410-30x2(8)**",
+      "length": 410,
+      "type": "30x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "ГНБ": [50], "Траншея поперечно": [25], "Не определен": [335] }
+    },
+    {
+      "handle": "3A547",
+      "cable": "410-14x2(8)**",
+      "length": 410,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "ГНБ": [50], "Траншея поперечно": [25], "Не определен": [335] }
+    },
+    {
+      "handle": "3A546",
+      "cable": "490-21x2(6)**",
+      "length": 490,
+      "type": "21x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "ГНБ": [50], "Траншея поперечно": [25], "Не определен": [415] }
+    },
+    {
+      "handle": "3A545",
+      "cable": "310-14x2(8)**",
+      "length": 310,
+      "type": "14x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [310] }
+    },
+    {
+      "handle": "3A544",
+      "cable": "230-21x2(6)**",
+      "length": 230,
+      "type": "21x2(6)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [230] }
+    },
+    {
+      "handle": "3A543",
+      "cable": "20-21x2(6) \\U+0394",
+      "length": 20,
+      "type": "21x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A542",
+      "cable": "20-14x2(8) \\U+0394",
+      "length": 20,
+      "type": "14x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A541",
+      "cable": "20-30x2(8) \\U+0394",
+      "length": 20,
+      "type": "30x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A540",
+      "cable": "20-14x2(8) \\U+0394",
+      "length": 20,
+      "type": "14x2(8) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A53F",
+      "cable": "20-21x2(6) \\U+0394",
+      "length": 20,
+      "type": "21x2(6) \\U+0394",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A3DF",
+      "cable": "140-3x2(2)",
+      "length": 140,
+      "type": "3x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [140] }
+    },
+    {
+      "handle": "3A3DE",
+      "cable": "5-2x2(2)",
+      "length": 5,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3A3DC",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A3DB",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A3DA",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A3D9",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3A3D8",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A3D7",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3A3D6",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3A3D5",
+      "cable": "35-10x2 #",
+      "length": 35,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "3A3D4",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3A3D3",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3A3D2",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3A3D1",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A3D0",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A3CF",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A3CE",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A3CD",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A3CC",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A3CB",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A3CA",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3A3C9",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3A3C8",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3A3C7",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3A2D7",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A2D6",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3A2D5",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3A2D4",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3A2C6",
+      "cable": "210-3x2(2)*",
+      "length": 210,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [210] }
+    },
+    {
+      "handle": "3A2C5",
+      "cable": "155-3x2(2)*",
+      "length": 155,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [155] }
+    },
+    {
+      "handle": "3A2C4",
+      "cable": "110-3x2(2)*",
+      "length": 110,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [110] }
+    },
+    {
+      "handle": "3A2C3",
+      "cable": "70-3x2(2)*",
+      "length": 70,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "3A2C2",
+      "cable": "155-7x2(6)*",
+      "length": 155,
+      "type": "7x2(6)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [155] }
+    },
+    {
+      "handle": "3A2C1",
+      "cable": "110-7x2(6)*",
+      "length": 110,
+      "type": "7x2(6)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [110] }
+    },
+    {
+      "handle": "3A2C0",
+      "cable": "210-7x2(6)*",
+      "length": 210,
+      "type": "7x2(6)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [210] }
+    },
+    {
+      "handle": "3A2BF",
+      "cable": "70-7x2(6)*",
+      "length": 70,
+      "type": "7x2(6)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "3A2BA",
+      "cable": "890-xxx-x-xx-4/2(2,0)xx-16(2) \"8xx\"",
+      "length": 890,
+      "type": "xxx-x-xx-4/2(2,0)xx-16(2) \"8xx\"",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [890] }
+    },
+    {
+      "handle": "3A2B9",
+      "cable": "890-xxx-x-xx-4/2(2,0)xx-16(2) \"8xx\"",
+      "length": 890,
+      "type": "xxx-x-xx-4/2(2,0)xx-16(2) \"8xx\"",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [890] }
+    },
+    {
+      "handle": "3A2B8",
+      "cable": "100-xxxxxx(x)-LS 2x2,5-0,66",
+      "length": 100,
+      "type": "xxxxxx(x)-LS 2x2,5-0,66",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [100] }
+    },
+    {
+      "handle": "3A2B7",
+      "cable": "100-xxxxxx(x)-LS 2x2,5-0,66",
+      "length": 100,
+      "type": "xxxxxx(x)-LS 2x2,5-0,66",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [100] }
+    },
+    {
+      "handle": "3A2B6",
+      "cable": "100-xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "length": 100,
+      "type": "xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [100] }
+    },
+    {
+      "handle": "3A2B5",
+      "cable": "100-xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "length": 100,
+      "type": "xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [100] }
+    },
+    {
+      "handle": "3A2B4",
+      "cable": "100-xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "length": 100,
+      "type": "xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [100] }
+    },
+    {
+      "handle": "3A2B3",
+      "cable": "100-10x2 &",
+      "length": 100,
+      "type": "10x2 &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [100] }
+    },
+    {
+      "handle": "3A2B2",
+      "cable": "70-xxxxxx(x)-LS 2x2,5-0,66",
+      "length": 70,
+      "type": "xxxxxx(x)-LS 2x2,5-0,66",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "3A2B1",
+      "cable": "70-xxxxxx(x)-LS 2x2,5-0,66",
+      "length": 70,
+      "type": "xxxxxx(x)-LS 2x2,5-0,66",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "3A2B0",
+      "cable": "70-xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "length": 70,
+      "type": "xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "3A2AF",
+      "cable": "70-xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "length": 70,
+      "type": "xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "3A2AE",
+      "cable": "70-xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "length": 70,
+      "type": "xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "3A2AD",
+      "cable": "70-10x2 &",
+      "length": 70,
+      "type": "10x2 &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "3981E",
+      "cable": "40-3x2(4)",
+      "length": 40,
+      "type": "3x2(4)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [40] }
+    },
+    {
+      "handle": "3981D",
+      "cable": "75-2x2(2)",
+      "length": 75,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [75] }
+    },
+    {
+      "handle": "3981C",
+      "cable": "45-3x2(2)",
+      "length": 45,
+      "type": "3x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [45] }
+    },
+    {
+      "handle": "3981B",
+      "cable": "30-2x2(2)",
+      "length": 30,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3981A",
+      "cable": "35-2x2(2)",
+      "length": 35,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "39819",
+      "cable": "35-2x2(2)",
+      "length": 35,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "39818",
+      "cable": "5-2x2(2)",
+      "length": 5,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "39817",
+      "cable": "960-2x2(2)**",
+      "length": 960,
+      "type": "2x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [960] }
+    },
+    {
+      "handle": "39816",
+      "cable": "40-3x2(4)",
+      "length": 40,
+      "type": "3x2(4)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [40] }
+    },
+    {
+      "handle": "39815",
+      "cable": "30-2x2(2)",
+      "length": 30,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "39814",
+      "cable": "30-2x2(2)",
+      "length": 30,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "39813",
+      "cable": "510-2x2(2)**",
+      "length": 510,
+      "type": "2x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [510] }
+    },
+    {
+      "handle": "39812",
+      "cable": "40-2x2(2)",
+      "length": 40,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [40] }
+    },
+    {
+      "handle": "39811",
+      "cable": "40-2x2(2)",
+      "length": 40,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [40] }
+    },
+    {
+      "handle": "39810",
+      "cable": "30-2x2(2)",
+      "length": 30,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3980F",
+      "cable": "45-3x2(2)",
+      "length": 45,
+      "type": "3x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [45] }
+    },
+    {
+      "handle": "3980E",
+      "cable": "85-2x2(2)",
+      "length": 85,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [85] }
+    },
+    {
+      "handle": "3980D",
+      "cable": "5-2x2(2)",
+      "length": 5,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "3980C",
+      "cable": "140-3x2(2)",
+      "length": 140,
+      "type": "3x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [140] }
+    },
+    {
+      "handle": "3980B",
+      "cable": "120-3x2(2)*",
+      "length": 120,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [120] }
+    },
+    {
+      "handle": "3980A",
+      "cable": "55-3x2(2)*",
+      "length": 55,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [55] }
+    },
+    {
+      "handle": "39809",
+      "cable": "30-3x2(2)*",
+      "length": 30,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "39807",
+      "cable": "120-4x2(3)*",
+      "length": 120,
+      "type": "4x2(3)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [120] }
+    },
+    {
+      "handle": "39806",
+      "cable": "85-3x2(2)*",
+      "length": 85,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [85] }
+    },
+    {
+      "handle": "39805",
+      "cable": "30-4x2(3)*",
+      "length": 30,
+      "type": "4x2(3)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3948F",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3948E",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3948D",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3948C",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3948B",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3948A",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "39489",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "39488",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "39487",
+      "cable": "95-3x2(2)*",
+      "length": 95,
+      "type": "3x2(2)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [95] }
+    },
+    {
+      "handle": "39486",
+      "cable": "95-4x2(3)*",
+      "length": 95,
+      "type": "4x2(3)*",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [95] }
+    },
+    {
+      "handle": "39485",
+      "cable": "70-xxxxxx(x)-LS 2x2,5-0,66",
+      "length": 70,
+      "type": "xxxxxx(x)-LS 2x2,5-0,66",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "39484",
+      "cable": "70-xxxxxx(x)-LS 2x2,5-0,66",
+      "length": 70,
+      "type": "xxxxxx(x)-LS 2x2,5-0,66",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "39483",
+      "cable": "70-xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "length": 70,
+      "type": "xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "39482",
+      "cable": "70-xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "length": 70,
+      "type": "xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "39481",
+      "cable": "70-xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "length": 70,
+      "type": "xxxxxxxxxxxx(A)-HF 1x2x0,6",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "39480",
+      "cable": "70-10x2 &",
+      "length": 70,
+      "type": "10x2 &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [70] }
+    },
+    {
+      "handle": "38EA3",
+      "cable": "230-3x2(2)**",
+      "length": 230,
+      "type": "3x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [230] }
+    },
+    {
+      "handle": "38EA1",
+      "cable": "495-4x2(2)**",
+      "length": 495,
+      "type": "4x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [495] }
+    },
+    {
+      "handle": "38E9E",
+      "cable": "620-4x2(2)**",
+      "length": 620,
+      "type": "4x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [620] }
+    },
+    {
+      "handle": "38E9D",
+      "cable": "30-2x2(2)",
+      "length": 30,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "38E9B",
+      "cable": "30-2x2(2)",
+      "length": 30,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "38E9A",
+      "cable": "340-16x2(8)**",
+      "length": 340,
+      "type": "16x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [340] }
+    },
+    {
+      "handle": "38E99",
+      "cable": "30-2x2(2)",
+      "length": 30,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "38DE4",
+      "cable": "250-3x2(2)**",
+      "length": 250,
+      "type": "3x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [250] }
+    },
+    {
+      "handle": "38DE2",
+      "cable": "80-10x2(9) #",
+      "length": 80,
+      "type": "10x2(9) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [80] }
+    },
+    {
+      "handle": "38DE1",
+      "cable": "80-19x2(6) #",
+      "length": 80,
+      "type": "19x2(6) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [80] }
+    },
+    {
+      "handle": "38DE0",
+      "cable": "5-10x2(8) #",
+      "length": 5,
+      "type": "10x2(8) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38DDF",
+      "cable": "5-4x2(0) #",
+      "length": 5,
+      "type": "4x2(0) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38DDE",
+      "cable": "5-4x2(0) #",
+      "length": 5,
+      "type": "4x2(0) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38DDD",
+      "cable": "5-10x2(8) #",
+      "length": 5,
+      "type": "10x2(8) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38DDC",
+      "cable": "80-14x2(8) #",
+      "length": 80,
+      "type": "14x2(8) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [80] }
+    },
+    {
+      "handle": "38DDB",
+      "cable": "15-2x2(2)",
+      "length": 15,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "38DDA",
+      "cable": "50-3x2(2)",
+      "length": 50,
+      "type": "3x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "38DD9",
+      "cable": "30-4x2(2)",
+      "length": 30,
+      "type": "4x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "38DD8",
+      "cable": "75-3x2(2)",
+      "length": 75,
+      "type": "3x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [75] }
+    },
+    {
+      "handle": "38DD7",
+      "cable": "35-3x2(2)",
+      "length": 35,
+      "type": "3x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "38DD6",
+      "cable": "5-2x2(2)",
+      "length": 5,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38DD5",
+      "cable": "5-2x2(2)",
+      "length": 5,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38DD4",
+      "cable": "270-10x2(8)**",
+      "length": 270,
+      "type": "10x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [270] }
+    },
+    {
+      "handle": "38DD3",
+      "cable": "160-2x2(2)",
+      "length": 160,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [160] }
+    },
+    {
+      "handle": "38DD2",
+      "cable": "180-3x2(2)",
+      "length": 180,
+      "type": "3x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [180] }
+    },
+    {
+      "handle": "38DD1",
+      "cable": "15-2x2(2)",
+      "length": 15,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "38DD0",
+      "cable": "20-2x2(2)",
+      "length": 20,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "38DCF",
+      "cable": "45-2x2(2)",
+      "length": 45,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [45] }
+    },
+    {
+      "handle": "38DCE",
+      "cable": "30-2x2(2)",
+      "length": 30,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "38DCD",
+      "cable": "430-10x2(8)**",
+      "length": 430,
+      "type": "10x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [430] }
+    },
+    {
+      "handle": "38DCC",
+      "cable": "65-2x2(2)",
+      "length": 65,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [65] }
+    },
+    {
+      "handle": "38DCB",
+      "cable": "80-3x2(2)",
+      "length": 80,
+      "type": "3x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [80] }
+    },
+    {
+      "handle": "38DC8",
+      "cable": "5-4x2(2)",
+      "length": 5,
+      "type": "4x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38DC5",
+      "cable": "5-7x2(2)",
+      "length": 5,
+      "type": "7x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38DC3",
+      "cable": "5-4x2(2)",
+      "length": 5,
+      "type": "4x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38DC1",
+      "cable": "5-4x2(0)",
+      "length": 5,
+      "type": "4x2(0)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38DC0",
+      "cable": "960-xxx-x-xx-4/2(2,0)xx-16(2) \"8xx\"",
+      "length": 960,
+      "type": "xxx-x-xx-4/2(2,0)xx-16(2) \"8xx\"",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [960] }
+    },
+    {
+      "handle": "38DBF",
+      "cable": "960-xxx-x-xx-4/2(2,0)xx-16(2) \"8xx\"",
+      "length": 960,
+      "type": "xxx-x-xx-4/2(2,0)xx-16(2) \"8xx\"",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [960] }
+    },
+    {
+      "handle": "38D9C",
+      "cable": "5-4x2(0) #",
+      "length": 5,
+      "type": "4x2(0) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38D9B",
+      "cable": "5-10x2(8) #",
+      "length": 5,
+      "type": "10x2(8) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38D9A",
+      "cable": "5-4x2(0) #",
+      "length": 5,
+      "type": "4x2(0) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38D99",
+      "cable": "5-10x2(8) #",
+      "length": 5,
+      "type": "10x2(8) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38D98",
+      "cable": "5-4x2(0) #",
+      "length": 5,
+      "type": "4x2(0) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38D97",
+      "cable": "5-10x2(8) #",
+      "length": 5,
+      "type": "10x2(8) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38D6A",
+      "cable": "50-7x2(4) &",
+      "length": 50,
+      "type": "7x2(4) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "38D69",
+      "cable": "50-4x2(2) &",
+      "length": 50,
+      "type": "4x2(2) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "38D52",
+      "cable": "50-7x2(4) &",
+      "length": 50,
+      "type": "7x2(4) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "38D51",
+      "cable": "50-14x2(6) &",
+      "length": 50,
+      "type": "14x2(6) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "38D3E",
+      "cable": "5-10x2(8) #",
+      "length": 5,
+      "type": "10x2(8) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38D3D",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "38D3C",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "38D3B",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "38D3A",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "38D39",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "38D38",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "38D37",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "38D36",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "38D35",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "38D34",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "38D31",
+      "cable": "5-4x2(0) #",
+      "length": 5,
+      "type": "4x2(0) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "38D30",
+      "cable": "80-10x2(9) #",
+      "length": 80,
+      "type": "10x2(9) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [80] }
+    },
+    {
+      "handle": "38C63",
+      "cable": "20-3x2(4)",
+      "length": 20,
+      "type": "3x2(4)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "38C62",
+      "cable": "220-3x2(2)**",
+      "length": 220,
+      "type": "3x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Траншея поперечно": [25], "Не определен": [195] }
+    },
+    {
+      "handle": "38A23",
+      "cable": "600-2x2(2)**",
+      "length": 600,
+      "type": "2x2(2)**",
+      "lengthMismatch": true,
+      "routing type": { "Траншея вне пути": [311, 1000], "Не определен": [0] }
+    },
+    {
+      "handle": "38A22",
+      "cable": "600-2x2(2)**",
+      "length": 600,
+      "type": "2x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Траншея вне пути": [311, 202], "Траншея поперечно": [5], "Не определен": [82] }
+    },
+    {
+      "handle": "38A21",
+      "cable": "20-3x2(4)",
+      "length": 20,
+      "type": "3x2(4)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "37DF5",
+      "cable": "330-4x2(2)**",
+      "length": 330,
+      "type": "4x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [330] }
+    },
+    {
+      "handle": "37DF4",
+      "cable": "35-2x2(2)",
+      "length": 35,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "37DF3",
+      "cable": "75-3x2(2)",
+      "length": 75,
+      "type": "3x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [75] }
+    },
+    {
+      "handle": "37DF2",
+      "cable": "330-10x2(8)**",
+      "length": 330,
+      "type": "10x2(8)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [330] }
+    },
+    {
+      "handle": "37DF0",
+      "cable": "20-3x2(4)",
+      "length": 20,
+      "type": "3x2(4)",
+      "lengthMismatch": true,
+      "routing type": { "Траншея поперечно": [25], "Не определен": [0] }
+    },
+    {
+      "handle": "37DEF",
+      "cable": "20-3x2(4)",
+      "length": 20,
+      "type": "3x2(4)",
+      "lengthMismatch": false,
+      "routing type": { "Траншея поперечно": [7], "Не определен": [13] }
+    },
+    {
+      "handle": "37DEE",
+      "cable": "220-3x2(2)**",
+      "length": 220,
+      "type": "3x2(2)**",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [220] }
+    },
+    {
+      "handle": "376D1",
+      "cable": "1080-2x2(2)**",
+      "length": 1080,
+      "type": "2x2(2)**",
+      "lengthMismatch": true,
+      "routing type": { "Траншея вне пути": [202, 1000], "Траншея поперечно": [5], "Не определен": [0] }
+    },
+    {
+      "handle": "372A6",
+      "cable": "5-2x2(2)",
+      "length": 5,
+      "type": "2x2(2)",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "36ECE",
+      "cable": "940-2x2(2)**",
+      "length": 940,
+      "type": "2x2(2)**",
+      "lengthMismatch": true,
+      "routing type": { "Траншея вне пути": [1000], "Траншея поперечно": [25], "Не определен": [0] }
+    },
+    {
+      "handle": "36A79",
+      "cable": "5-10x2(8) #",
+      "length": 5,
+      "type": "10x2(8) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "36A78",
+      "cable": "5-4x2(0) #",
+      "length": 5,
+      "type": "4x2(0) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "369E4",
+      "cable": "5-4x2(0) #",
+      "length": 5,
+      "type": "4x2(0) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "369E3",
+      "cable": "5-10x2(8) #",
+      "length": 5,
+      "type": "10x2(8) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [5] }
+    },
+    {
+      "handle": "368D1",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "368D0",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "368CF",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "368CE",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "368CD",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "368CC",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "368CB",
+      "cable": "35-10x2 #",
+      "length": 35,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "368CA",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "368C9",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "368C8",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "368C7",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "368C6",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "368C5",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "368C4",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "368C3",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "368C2",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "367E5",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "367E4",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "367E3",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "367E2",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "367E1",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "367E0",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "367DF",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "367DE",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "367DD",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "36095",
+      "cable": "80-10x2(9) #",
+      "length": 80,
+      "type": "10x2(9) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [80] }
+    },
+    {
+      "handle": "3546D",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3546C",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "3546B",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "3536E",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3536D",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "3536C",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "35359",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "35358",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "35357",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "3529D",
+      "cable": "80-19x2(6) #",
+      "length": 80,
+      "type": "19x2(6) #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [80] }
+    },
+    {
+      "handle": "35266",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "35265",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "35264",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "35263",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "35262",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "3525B",
+      "cable": "25-10x2 #",
+      "length": 25,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [25] }
+    },
+    {
+      "handle": "35257",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "351F5",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "351F4",
+      "cable": "15-10x2 #",
+      "length": 15,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "351F2",
+      "cable": "35-10x2 #",
+      "length": 35,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [35] }
+    },
+    {
+      "handle": "351F1",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "351F0",
+      "cable": "30-10x2 #",
+      "length": 30,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [30] }
+    },
+    {
+      "handle": "351EF",
+      "cable": "10-10x2 #",
+      "length": 10,
+      "type": "10x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "1FC00",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "1FBFF",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "1FBFE",
+      "cable": "10-4x2 #",
+      "length": 10,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [10] }
+    },
+    {
+      "handle": "1FBFD",
+      "cable": "15-4x2 #",
+      "length": 15,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [15] }
+    },
+    {
+      "handle": "1FBFC",
+      "cable": "20-4x2 #",
+      "length": 20,
+      "type": "4x2 #",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [20] }
+    },
+    {
+      "handle": "1F809",
+      "cable": "50-3x2(2) &",
+      "length": 50,
+      "type": "3x2(2) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "1F808",
+      "cable": "50-7x2(6) &",
+      "length": 50,
+      "type": "7x2(6) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "1F807",
+      "cable": "xxxxxx x3-2",
+      "length": 0,
+      "type": "2",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [0] }
+    },
+    {
+      "handle": "1F806",
+      "cable": "xxxxxx x3-1",
+      "length": 0,
+      "type": "1",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [0] }
+    },
+    {
+      "handle": "1EA08",
+      "cable": "50-7x2(4) &",
+      "length": 50,
+      "type": "7x2(4) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "1EA07",
+      "cable": "50-3x2(2) &",
+      "length": 50,
+      "type": "3x2(2) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "1EA06",
+      "cable": "50-3x2(2) &",
+      "length": 50,
+      "type": "3x2(2) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "1EA05",
+      "cable": "50-3x2(2) &",
+      "length": 50,
+      "type": "3x2(2) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "1E9D1",
+      "cable": "50-3x2(2) &",
+      "length": 50,
+      "type": "3x2(2) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "1E9D0",
+      "cable": "50-4x2(2) &",
+      "length": 50,
+      "type": "4x2(2) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "1E9CF",
+      "cable": "50-3x2(2) &",
+      "length": 50,
+      "type": "3x2(2) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    },
+    {
+      "handle": "1E9CE",
+      "cable": "50-3x2(2) &",
+      "length": 50,
+      "type": "3x2(2) &",
+      "lengthMismatch": false,
+      "routing type": { "Не определен": [50] }
+    }
+  ],
+  "routingTypeBlocks": [
+    {
+      "handle": "3CED8",
+      "type": "Траншея поперечно",
+      "length": 25,
+      "cablesCount": 5,
+      "contained": ["410-30x2(8)**", "410-14x2(8)**", "490-21x2(6)**", "220-3x2(2)**", "940-2x2(2)**"]
+    },
+    {
+      "handle": "3CE2C",
+      "type": "Траншея вне пути",
+      "length": 1000,
+      "cablesCount": 1,
+      "contained": ["1080-2x2(2)**"]
+    },
+    {
+      "handle": "3CD9E",
+      "type": "Траншея вне пути",
+      "length": 1000,
+      "cablesCount": 2,
+      "contained": ["600-2x2(2)**", "940-2x2(2)**"]
+    },
+    {
+      "handle": "3CCD1",
+      "type": "ГНБ",
+      "length": 50,
+      "cablesCount": 6,
+      "contained": ["420-30x2(8)**", "500-14x2(8)**", "420-21x2(6)**", "410-30x2(8)**", "410-14x2(8)**", "490-21x2(6)**"]
+    },
+    {
+      "handle": "3CBB1",
+      "type": "Траншея поперечно",
+      "length": 25,
+      "cablesCount": 1,
+      "contained": ["20-3x2(4)"]
+    },
+    {
+      "handle": "3CB04",
+      "type": "Траншея поперечно",
+      "length": 7,
+      "cablesCount": 1,
+      "contained": ["20-3x2(4)"]
+    },
+    {
+      "handle": "3CA8E",
+      "type": "Траншея вне пути",
+      "length": 311,
+      "cablesCount": 1,
+      "contained": ["600-2x2(2)**"]
+    },
+    {
+      "handle": "3C8CC",
+      "type": "Траншея поперечно",
+      "length": 5,
+      "cablesCount": 1,
+      "contained": ["600-2x2(2)**"]
+    },
+    {
+      "handle": "3C74D",
+      "type": "Траншея поперечно",
+      "length": 5,
+      "cablesCount": 1,
+      "contained": ["1080-2x2(2)**"]
+    },
+    {
+      "handle": "3C632",
+      "type": "Траншея вне пути",
+      "length": 202,
+      "cablesCount": 2,
+      "contained": ["600-2x2(2)**", "1080-2x2(2)**"]
+    },
+    {
+      "handle": "3C518",
+      "type": "Траншея вне пути",
+      "length": 311,
+      "cablesCount": 1,
+      "contained": ["600-2x2(2)**"]
+    }
+  ]
+}
