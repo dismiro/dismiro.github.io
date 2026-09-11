@@ -399,12 +399,18 @@ function createCablesAccordion(cables, totalLength) {
       ? '<span class="d-inline-flex align-items-center justify-content-center text-danger" title="Несоответствие длины трассы" data-bs-toggle="tooltip"><i class="bx bx-error fs-4"></i></span>' 
       : '<span class="d-inline-flex align-items-center justify-content-center text-success" title="Длина соответствует" data-bs-toggle="tooltip"><i class="bx bx-check fs-4"></i></span>';
 
+    const rawType = c.type || '';
+    const normType = normalizeCableType(rawType);
+    const typeTitleAttr = (normType && normType !== rawType.trim())
+      ? ` title="Марка кабеля при расчете: ${escapeHtml(normType)}"`
+      : '';
+
     row.innerHTML = `
       <td class="text-muted small text-center">${idx + 1}</td>
       <td class="font-monospace text-muted small cell-wrap">${escapeHtml(c.handle || '')}</td>
       <td class="fw-bold canEdit cell-wrap" data-field="cable">${escapeHtml(c.cable || '')}</td>
       <td class="canEdit text-end font-monospace fw-semibold" data-field="length">${c.length ?? 0}</td>
-      <td class="canEdit cell-wrap" data-field="type">${escapeHtml(c.type || '')}</td>
+      <td class="canEdit cell-wrap" data-field="type"${typeTitleAttr}>${escapeHtml(rawType)}</td>
       <td class="cell-wrap">${routingHtml}</td>
       <td class="text-center align-middle">${mismatchIcon}</td>
       <td class="action-col d-none text-center">
@@ -762,6 +768,27 @@ function updateEditableElements() {
   });
 }
 
+/**
+ * Нормализует марку/тип кабеля для ведомости объемов работ.
+ * 
+ * Правила:
+ * 1. Кабели вида «4х2(2)» и «4х2(4)» — это один и тот же тип кабеля («4х2»),
+ *    содержащий разное количество запасных жил в скобках.
+ * 2. При определении типа кабеля отбрасывается значение в скобках с числом жил запаса
+ *    в конце строки (или непосредственно перед условными знаками чертежа: *, **, #, &, Δ и т.д.).
+ * 3. Если число или значение в скобках находится НЕ в конце (например, в середине марки:
+ *    «кабель-4/2(2)хх-16», «(2,0)» или «ВВГнг(А)-LS»), оно не является запасом жил и НЕ отбрасывается.
+ */
+function normalizeCableType(typeStr) {
+  if (!typeStr || typeof typeStr !== 'string') return typeStr || 'Без типа';
+  const str = typeStr.trim();
+  if (!str) return 'Без типа';
+
+  // Отбрасываем (число) только в конце строки или перед сносками чертежа (*, **, #, &, \U+..., Δ)
+  const cleaned = str.replace(/\s*\(\d+\)(?=(?:\s*(?:[*#&^~!Δ§†‡№]|\\U\+[0-9a-fA-F]+))*$)/g, '').trim();
+  return cleaned || str || 'Без типа';
+}
+
 // Calculate Cable Volumes & Trench/Routing Volumes
 function calculateVolumes() {
   const cableTable = document.getElementById('tableCables');
@@ -772,7 +799,7 @@ function calculateVolumes() {
     return;
   }
 
-  // 1. Calculate Cable summary
+  // 1. Calculate Cable summary with normalized cable types
   const cableSummary = {};
   let grandTotalCableLength = 0;
   let grandTotalCableCount = 0;
@@ -783,7 +810,8 @@ function calculateVolumes() {
       const typeCell = row.querySelector('[data-field="type"]');
       const lengthCell = row.querySelector('[data-field="length"]');
       if (typeCell && lengthCell) {
-        const type = typeCell.textContent.trim() || 'Без типа';
+        const rawType = typeCell.textContent.trim() || 'Без типа';
+        const type = normalizeCableType(rawType);
         const length = parseFloat(lengthCell.textContent.replace(/\s+/g, '')) || 0;
 
         if (!cableSummary[type]) {
@@ -797,7 +825,8 @@ function calculateVolumes() {
     });
   } else if (currentData && currentData.cables) {
     currentData.cables.forEach(c => {
-      const type = c.type || 'Без типа';
+      const rawType = c.type || 'Без типа';
+      const type = normalizeCableType(rawType);
       const length = Number(c.length) || 0;
       if (!cableSummary[type]) cableSummary[type] = { count: 0, length: 0 };
       cableSummary[type].count += 1;
