@@ -2,6 +2,7 @@
 let currentData = null;
 let currentFileName = '';
 let isEditable = false;
+let isRawColCollapsed = false;
 
 // Initialize tooltips and event listeners
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,6 +10,45 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   setupDragAndDrop();
 });
+
+function toggleRawColumnCollapse(forceState) {
+  const mainRow = document.getElementById('mainContentRow');
+  const expandedContent = document.getElementById('rawCardExpandedContent');
+  const collapsedContent = document.getElementById('rawCardCollapsedContent');
+  const toggleBtn = document.getElementById('toggleRawColBtn');
+
+  if (!mainRow || !expandedContent || !collapsedContent) return;
+
+  isRawColCollapsed = typeof forceState === 'boolean' ? forceState : !isRawColCollapsed;
+
+  if (isRawColCollapsed) {
+    mainRow.classList.add('row-raw-collapsed');
+    expandedContent.classList.add('d-none');
+    expandedContent.classList.remove('d-flex');
+    collapsedContent.classList.remove('d-none');
+    collapsedContent.classList.add('d-flex');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('title', 'Развернуть панель исходных данных');
+      toggleBtn.setAttribute('data-bs-original-title', 'Развернуть панель исходных данных');
+      toggleBtn.innerHTML = "<i class='bx bx-chevrons-right fs-5'></i>";
+    }
+  } else {
+    mainRow.classList.remove('row-raw-collapsed');
+    collapsedContent.classList.add('d-none');
+    collapsedContent.classList.remove('d-flex');
+    expandedContent.classList.remove('d-none');
+    expandedContent.classList.add('d-flex');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('title', 'Свернуть панель исходных данных');
+      toggleBtn.setAttribute('data-bs-original-title', 'Свернуть панель исходных данных');
+      toggleBtn.innerHTML = "<i class='bx bx-chevrons-left fs-5'></i>";
+    }
+  }
+
+  // Remove any open tooltips to prevent orphaned tooltip bubbles
+  document.querySelectorAll('.tooltip').forEach(t => t.remove());
+  initTooltips();
+}
 
 function initTooltips() {
   if (window.bootstrap && bootstrap.Tooltip) {
@@ -150,6 +190,36 @@ function setupEventListeners() {
   if (resetBtn) {
     resetBtn.addEventListener('click', resetDataToEmpty);
   }
+
+  // Toggle raw data column collapse / expand
+  const toggleRawColBtn = document.getElementById('toggleRawColBtn');
+  if (toggleRawColBtn) {
+    toggleRawColBtn.addEventListener('click', () => toggleRawColumnCollapse());
+  }
+
+  const expandRawColBtn = document.getElementById('expandRawColBtn');
+  if (expandRawColBtn) {
+    expandRawColBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleRawColumnCollapse(false);
+    });
+  }
+
+  const collapsedRawContent = document.getElementById('rawCardCollapsedContent');
+  if (collapsedRawContent) {
+    collapsedRawContent.addEventListener('click', (e) => {
+      if (e.target.closest('#collapsedCalcBtn') || e.target.closest('#expandRawColBtn')) return;
+      toggleRawColumnCollapse(false);
+    });
+  }
+
+  const collapsedCalcBtn = document.getElementById('collapsedCalcBtn');
+  if (collapsedCalcBtn) {
+    collapsedCalcBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      calculateVolumes();
+    });
+  }
 }
 
 function setupDragAndDrop() {
@@ -268,6 +338,12 @@ function renderProcessedData(data, fileName) {
     activeFileNameEl.innerHTML = `<span class="badge bg-primary-subtle text-primary border me-1"><i class='bx bx-check-circle me-1'></i>${escapeHtml(fileName)}</span>`;
   }
 
+  const collapsedFileBadge = document.getElementById('collapsedFileBadge');
+  if (collapsedFileBadge) {
+    collapsedFileBadge.setAttribute('title', fileName || 'Файл загружен');
+    collapsedFileBadge.setAttribute('data-bs-original-title', fileName || 'Файл загружен');
+  }
+
   let totalCablesCount = 0;
   let totalCableLength = 0;
   let totalRoutingCount = 0;
@@ -374,6 +450,7 @@ function createCablesAccordion(cables, totalLength) {
   cables.forEach((c, idx) => {
     const row = document.createElement('tr');
     row.dataset.index = idx;
+    row._cableData = c;
 
     // Formatting routing type: render each routing type as a multi-line badge
     let routingHtml = '<span class="text-muted">-</span>';
@@ -667,6 +744,12 @@ function resetDataToEmpty() {
   const activeFileNameEl = document.getElementById('activeFileName');
   if (activeFileNameEl) activeFileNameEl.textContent = 'Файл не выбран';
 
+  const collapsedFileBadge = document.getElementById('collapsedFileBadge');
+  if (collapsedFileBadge) {
+    collapsedFileBadge.setAttribute('title', 'Файл не выбран');
+    collapsedFileBadge.setAttribute('data-bs-original-title', 'Файл не выбран');
+  }
+
   const cableBadgeTotal = document.getElementById('cableBadgeTotal');
   if (cableBadgeTotal) cableBadgeTotal.classList.add('d-none');
 
@@ -799,8 +882,9 @@ function calculateVolumes() {
     return;
   }
 
-  // 1. Calculate Cable summary with normalized cable types
+  // 1. Calculate Cable summary with normalized cable types and routing types breakdown
   const cableSummary = {};
+  const grandRoutingSummary = {};
   let grandTotalCableLength = 0;
   let grandTotalCableCount = 0;
 
@@ -815,12 +899,33 @@ function calculateVolumes() {
         const length = parseFloat(lengthCell.textContent.replace(/\s+/g, '')) || 0;
 
         if (!cableSummary[type]) {
-          cableSummary[type] = { count: 0, length: 0 };
+          cableSummary[type] = { count: 0, length: 0, routingTypes: {} };
         }
         cableSummary[type].count += 1;
         cableSummary[type].length += length;
         grandTotalCableCount += 1;
         grandTotalCableLength += length;
+
+        // Extract routing type for this cable row
+        const cableObj = row._cableData || (currentData && currentData.cables && currentData.cables[row.dataset.index]);
+        const rtObj = (cableObj && (cableObj['routing type'] || cableObj.routingType)) || {};
+        let hasRouting = false;
+
+        for (const [rName, lengths] of Object.entries(rtObj)) {
+          const arr = Array.isArray(lengths) ? lengths : [lengths];
+          const sum = arr.reduce((acc, val) => acc + (Number(val) || 0), 0);
+          if (sum > 0 || arr.length > 0) {
+            hasRouting = true;
+            cableSummary[type].routingTypes[rName] = (cableSummary[type].routingTypes[rName] || 0) + sum;
+            grandRoutingSummary[rName] = (grandRoutingSummary[rName] || 0) + sum;
+          }
+        }
+
+        if (!hasRouting && length > 0) {
+          const fallbackName = 'Не определен';
+          cableSummary[type].routingTypes[fallbackName] = (cableSummary[type].routingTypes[fallbackName] || 0) + length;
+          grandRoutingSummary[fallbackName] = (grandRoutingSummary[fallbackName] || 0) + length;
+        }
       }
     });
   } else if (currentData && currentData.cables) {
@@ -828,15 +933,36 @@ function calculateVolumes() {
       const rawType = c.type || 'Без типа';
       const type = normalizeCableType(rawType);
       const length = Number(c.length) || 0;
-      if (!cableSummary[type]) cableSummary[type] = { count: 0, length: 0 };
+      if (!cableSummary[type]) {
+        cableSummary[type] = { count: 0, length: 0, routingTypes: {} };
+      }
       cableSummary[type].count += 1;
       cableSummary[type].length += length;
       grandTotalCableCount += 1;
       grandTotalCableLength += length;
+
+      const rtObj = c['routing type'] || c.routingType || {};
+      let hasRouting = false;
+
+      for (const [rName, lengths] of Object.entries(rtObj)) {
+        const arr = Array.isArray(lengths) ? lengths : [lengths];
+        const sum = arr.reduce((acc, val) => acc + (Number(val) || 0), 0);
+        if (sum > 0 || arr.length > 0) {
+          hasRouting = true;
+          cableSummary[type].routingTypes[rName] = (cableSummary[type].routingTypes[rName] || 0) + sum;
+          grandRoutingSummary[rName] = (grandRoutingSummary[rName] || 0) + sum;
+        }
+      }
+
+      if (!hasRouting && length > 0) {
+        const fallbackName = 'Не определен';
+        cableSummary[type].routingTypes[fallbackName] = (cableSummary[type].routingTypes[fallbackName] || 0) + length;
+        grandRoutingSummary[fallbackName] = (grandRoutingSummary[fallbackName] || 0) + length;
+      }
     });
   }
 
-  renderCableResult(cableSummary, grandTotalCableCount, grandTotalCableLength);
+  renderCableResult(cableSummary, grandTotalCableCount, grandTotalCableLength, grandRoutingSummary);
 
   // 2. Calculate Routing / Trench summary
   const routingSummary = {};
@@ -877,7 +1003,7 @@ function calculateVolumes() {
   showToast('Расчет объемов успешно выполнен', 'success', 'Расчет завершен');
 }
 
-function renderCableResult(summary, totalCount, totalLength) {
+function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary) {
   const container = document.getElementById('result');
   if (!container) return;
 
@@ -885,15 +1011,40 @@ function renderCableResult(summary, totalCount, totalLength) {
 
   let rowsHtml = '';
   entries.forEach(([type, val], idx) => {
+    const rtEntries = Object.entries(val.routingTypes || {}).sort((a, b) => b[1] - a[1]);
+    let routingHtml = '<span class="text-muted small">-</span>';
+    if (rtEntries.length > 0) {
+      routingHtml = `<div class="d-flex flex-wrap gap-1 align-items-center py-1">` +
+        rtEntries.map(([rName, len]) => {
+          return `<span class="routing-tag py-0 px-2" style="font-size: 0.75rem;">` +
+            `<span class="fw-semibold">${escapeHtml(rName)}:</span> <span class="font-monospace">${Math.round(len).toLocaleString('ru-RU')} м</span>` +
+          `</span>`;
+        }).join('') +
+      `</div>`;
+    }
+
     rowsHtml += `
       <tr>
         <td class="text-muted small text-center">${idx + 1}</td>
         <td class="fw-bold cell-wrap">${escapeHtml(type)}</td>
         <td class="text-center font-monospace">${val.count}</td>
         <td class="text-end font-monospace fw-semibold">${Math.round(val.length).toLocaleString('ru-RU')}</td>
+        <td class="cell-wrap">${routingHtml}</td>
       </tr>
     `;
   });
+
+  const grandRtEntries = Object.entries(grandRoutingSummary || {}).sort((a, b) => b[1] - a[1]);
+  let grandRoutingHtml = '<span class="text-muted small">-</span>';
+  if (grandRtEntries.length > 0) {
+    grandRoutingHtml = `<div class="d-flex flex-wrap gap-1 align-items-center py-1">` +
+      grandRtEntries.map(([rName, len]) => {
+        return `<span class="routing-tag py-0 px-2 bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.75rem;">` +
+          `<span class="fw-semibold">${escapeHtml(rName)}:</span> <span class="font-monospace">${Math.round(len).toLocaleString('ru-RU')} м</span>` +
+        `</span>`;
+      }).join('') +
+    `</div>`;
+  }
 
   container.innerHTML = `
     <div class="mb-3 d-flex flex-wrap gap-2">
@@ -911,14 +1062,15 @@ function renderCableResult(summary, totalCount, totalLength) {
       </div>
     </div>
 
-    <div class="table-responsive custom-table-scroll rounded-2 border">
+    <div class="table-responsive table-responsive-full rounded-2 border">
       <table class="table table-sm table-hover text-start align-middle mb-0">
         <thead class="table-sticky-header">
           <tr>
             <th style="width: 40px;" class="text-center">№</th>
-            <th>Марка кабеля</th>
-            <th class="text-center" style="width: 55px;">Шт</th>
-            <th class="text-end" style="width: 100px;">Длина,м</th>
+            <th style="min-width: 120px;">Марка кабеля</th>
+            <th class="text-center" style="width: 50px;">Шт</th>
+            <th class="text-end" style="width: 90px;">Длина,м</th>
+            <th style="min-width: 220px;">Способы прокладки</th>
           </tr>
         </thead>
         <tbody>
@@ -929,6 +1081,7 @@ function renderCableResult(summary, totalCount, totalLength) {
             <td colspan="2" class="ps-2">Итого:</td>
             <td class="text-center font-monospace">${totalCount}</td>
             <td class="text-end font-monospace text-primary">${Math.round(totalLength).toLocaleString('ru-RU')}</td>
+            <td class="cell-wrap">${grandRoutingHtml}</td>
           </tr>
         </tfoot>
       </table>
@@ -977,7 +1130,7 @@ function renderRoutingResult(summary, totalCount, totalLength) {
       </div>
     </div>
 
-    <div class="table-responsive custom-table-scroll rounded-2 border">
+    <div class="table-responsive table-responsive-full rounded-2 border">
       <table class="table table-sm table-hover text-start align-middle mb-0">
         <thead class="table-sticky-header">
           <tr>

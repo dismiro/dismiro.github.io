@@ -61,6 +61,15 @@
     scrollbar-width: thin;
   }
 
+  /* Ведомость кабелей и ведомость траншей отображаются на полную высоту без вертикальной прокрутки */
+  .table-responsive-full,
+  #result .custom-table-scroll,
+  #resultCouplings .custom-table-scroll {
+    max-height: none !important;
+    overflow-y: visible !important;
+    overflow-x: auto;
+  }
+
   .custom-table-scroll::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -138,6 +147,110 @@
     white-space: normal !important;
     word-break: break-word !important;
     line-height: 1.35;
+  }
+
+  /* Ensure icon dropdown-toggle in btn-icon centers cleanly without default caret displacing the icon */
+  .btn-icon.dropdown-toggle::after {
+    display: none !important;
+  }
+
+  /* Transition for collapsing/expanding columns */
+  .transition-col {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                flex 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* When raw data column is collapsed on desktop / tablet */
+  @media (min-width: 992px) {
+    .row-raw-collapsed > #rawCol {
+      flex: 0 0 64px !important;
+      max-width: 64px !important;
+      width: 64px !important;
+      padding-left: 0.25rem !important;
+      padding-right: 0.25rem !important;
+    }
+
+    .row-raw-collapsed > #cablesCol {
+      flex: 0 0 calc(58% - 37px) !important;
+      max-width: calc(58% - 37px) !important;
+      width: calc(58% - 37px) !important;
+    }
+
+    .row-raw-collapsed > #trenchesCol {
+      flex: 0 0 calc(42% - 37px) !important;
+      max-width: calc(42% - 37px) !important;
+      width: calc(42% - 37px) !important;
+    }
+  }
+
+  /* Mobile / tablet compact bar when collapsed */
+  @media (max-width: 991.98px) {
+    .row-raw-collapsed > #rawCol {
+      width: 100% !important;
+    }
+    .row-raw-collapsed #rawCardCollapsedContent {
+      flex-direction: row !important;
+      justify-content: space-between !important;
+      padding: 0.6rem 0.9rem !important;
+      height: auto !important;
+    }
+    .row-raw-collapsed #rawCardCollapsedContent .vertical-text-container {
+      display: inline-block !important;
+      padding: 0 !important;
+    }
+    .row-raw-collapsed #rawCardCollapsedContent .vertical-text {
+      writing-mode: horizontal-tb !important;
+      transform: none !important;
+      font-size: 0.85rem !important;
+    }
+    .row-raw-collapsed #rawCardCollapsedContent > div {
+      flex-direction: row !important;
+      gap: 0.5rem !important;
+    }
+    .row-raw-collapsed #rawCardCollapsedContent .border-top {
+      border-top: none !important;
+      border-left: 1px solid var(--si-border-color, #e2e8f0) !important;
+      padding-top: 0 !important;
+      padding-left: 0.5rem !important;
+      margin-top: 0 !important;
+      width: auto !important;
+    }
+  }
+
+  .vertical-text-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .vertical-text {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    letter-spacing: 0.12em;
+    user-select: none;
+  }
+
+  .collapsed-raw-card {
+    border: 1px dashed var(--si-border-color, #cbd5e1);
+    background-color: rgba(241, 245, 249, 0.6);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+
+  .collapsed-raw-card:hover {
+    background-color: rgba(226, 232, 240, 0.8);
+    border-color: #94a3b8;
+  }
+
+  [data-bs-theme="dark"] .collapsed-raw-card {
+    background-color: rgba(30, 41, 59, 0.5);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  [data-bs-theme="dark"] .collapsed-raw-card:hover {
+    background-color: rgba(30, 41, 59, 0.85);
+    border-color: rgba(255, 255, 255, 0.3);
   }
 
   [data-bs-theme="dark"] .routing-tag {
@@ -289,11 +402,13 @@
       <input class='d-none' type="file" class="form-control" id="input" accept=".json,application/json,.xlsx,.xls" multiple>
     </div>
 
-    <!-- Main Grid: 6 cols for input, 3 cols for cables, 3 cols for trenches -->
-    <div class="row g-3 g-xl-4 mb-4 text-start">
+    <!-- Main Grid: 5 cols for input, 4 cols for cables, 3 cols for trenches -->
+    <div id="mainContentRow" class="row g-3 g-xl-4 mb-4 text-start">
       <!-- Input Data Card -->
-      <div class="col-12 col-xl-6 col-lg-6">
-        <div class="card module-card h-100 mb-0">
+      <div id="rawCol" class="col-12 col-xl-5 col-lg-5 transition-col">
+        <div class="card module-card h-100 mb-0 position-relative">
+          <!-- Expanded state view -->
+          <div id="rawCardExpandedContent" class="h-100 d-flex flex-column">
           <div class="card-header py-2 py-md-3 px-3 px-md-4">
             <!-- Header Row 1: Title, File Name Badge, Reset Button, and Main Actions -->
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -310,21 +425,19 @@
                 </div>
               </div>
 
-              <!-- Action Toolbar -->
-              <div class="d-flex align-items-center gap-1 ms-auto">
-                <div class="btn-group btn-group-sm" role="group" aria-label="Toolbar">
-                  <button id='canEdit' class="btn btn-outline-secondary d-flex align-items-center gap-1" type="button" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Включить / выключить редактирование">
+              <!-- Action Toolbar: all buttons unified in compact icon-button style -->
+              <div class="d-flex align-items-center ms-auto">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Панель действий">
+                  <button id='canEdit' class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Включить / выключить редактирование">
                     <i class="bx bx-edit-alt fs-5"></i>
-                    <span class="d-none d-md-inline">Правка</span>
                   </button>
 
-                  <button id='calculate' class="btn btn-primary d-flex align-items-center gap-1 px-3" type="button" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Выполнить расчет объемов">
+                  <button id='calculate' class="btn btn-primary btn-icon" type="button" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Выполнить расчет объемов">
                     <i class="bx bx-play-circle fs-5"></i>
-                    <span class="fw-semibold">Расчет</span>
                   </button>
 
                   <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split rounded-end-1" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Экспорт">
+                    <button type="button" class="btn btn-outline-secondary btn-icon dropdown-toggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Экспорт данных">
                       <i class="bx bx-download fs-5"></i>
                     </button>
                     <div class="dropdown-menu dropdown-menu-end shadow-sm my-1">
@@ -341,6 +454,10 @@
                       </a>
                     </div>
                   </div>
+
+                  <button type="button" id="toggleRawColBtn" class="btn btn-outline-secondary btn-icon" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Свернуть панель исходных данных">
+                    <i class='bx bx-chevrons-left fs-5'></i>
+                  </button>
                 </div>
               </div>
             </div>
@@ -396,12 +513,39 @@
               </div>
             </div>
           </div>
+          </div>
+
+          <!-- Collapsed state sidebar view -->
+          <div id="rawCardCollapsedContent" class="d-none collapsed-raw-card rounded-3 h-100 flex-column align-items-center py-3 px-1 justify-content-between" style="cursor: pointer;" title="Нажмите в любом месте, чтобы развернуть панель исходных данных">
+            <div class="d-flex flex-column align-items-center gap-2 w-100">
+              <button type="button" id="expandRawColBtn" class="btn btn-sm btn-primary btn-icon shadow-sm" data-bs-toggle="tooltip" data-bs-placement="right" title="Развернуть исходные данные">
+                <i class='bx bx-chevrons-right fs-5'></i>
+              </button>
+              <div class="p-2 rounded-circle bg-primary-subtle text-primary mt-2" data-bs-toggle="tooltip" data-bs-placement="right" title="Исходные данные">
+                <i class='bx bx-data fs-5'></i>
+              </div>
+              <div class="vertical-text-container py-3">
+                <span class="vertical-text text-muted small fw-bold text-uppercase" style="font-size: 0.72rem;">
+                  Исходные данные
+                </span>
+              </div>
+            </div>
+
+            <div class="d-flex flex-column align-items-center gap-2 mt-auto w-100 pt-3 border-top border-secondary-subtle">
+              <span id="collapsedFileBadge" class="badge bg-secondary-subtle text-secondary p-2" data-bs-toggle="tooltip" data-bs-placement="right" title="Файл не выбран">
+                <i class='bx bx-file fs-6'></i>
+              </span>
+              <button type="button" id="collapsedCalcBtn" class="btn btn-sm btn-outline-primary btn-icon" data-bs-toggle="tooltip" data-bs-placement="right" title="Выполнить расчет объемов">
+                <i class='bx bx-play-circle fs-5'></i>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Result Card: Cables -->
-      <div class="col-12 col-md-6 col-xl-3 col-lg-3">
-        <div class="card module-card h-100 mb-0">
+      <div id="cablesCol" class="col-12 col-md-6 col-xl-4 col-lg-4 transition-col">
+        <div class="card module-card mb-0">
           <div class="card-header py-3 px-3">
             <div class="d-flex align-items-center justify-content-between">
               <div class="d-flex align-items-center gap-2">
@@ -424,8 +568,8 @@
       </div>
 
       <!-- Result Card: Routing / Trenches -->
-      <div class="col-12 col-md-6 col-xl-3 col-lg-3">
-        <div class="card module-card h-100 mb-0">
+      <div id="trenchesCol" class="col-12 col-md-6 col-xl-3 col-lg-3 transition-col">
+        <div class="card module-card mb-0">
           <div class="card-header py-3 px-3">
             <div class="d-flex align-items-center justify-content-between">
               <div class="d-flex align-items-center gap-2">
