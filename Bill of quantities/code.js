@@ -346,7 +346,7 @@ function lookupCableInfo(rawType, catalog) {
     for (const [sKey, sVal] of Object.entries(cat["Особый кабель"]["Тип"])) {
       if (!sVal || typeof sVal !== 'object') continue;
       const normKey = normalizeCableLookupKey(sKey);
-      if (normStr === normKey || rawNormStr === normKey || normStr.includes(normKey) || normKey.includes(normStr) || rawNormStr.includes(normKey) || normKey.includes(rawNormStr)) {
+      if (normStr === normKey || rawNormStr === normKey) {
         const itemCat = String(sVal["Категория"] || '').toLowerCase();
         const isOpt = itemCat.includes('оптич');
         return {
@@ -1005,8 +1005,10 @@ function createCablesAccordion(cables, totalLength) {
   const headerId = 'headingCables';
   const collapseId = 'collapseCables';
 
-  // Count mismatches
+  // Count mismatches and missing couplings
   const mismatchCount = cables.filter(c => Boolean(c.lengthMismatch)).length;
+  let totalCouplingsCount = 0;
+  const missingCouplingTypesSet = new Set();
 
   const tableWrapper = document.createElement('div');
   tableWrapper.className = 'table-responsive custom-table-scroll';
@@ -1015,7 +1017,7 @@ function createCablesAccordion(cables, totalLength) {
   table.className = 'table table-sm table-hover table-striped mb-0 text-start align-middle';
   table.id = 'tableCables';
 
-  // Table header - NO TRUNCATION
+  // Table header - with coupling count column
   table.innerHTML = `
     <thead class="table-sticky-header">
       <tr>
@@ -1025,6 +1027,7 @@ function createCablesAccordion(cables, totalLength) {
         <th style="width: 90px;" class="text-end">Длина,м</th>
         <th style="min-width: 110px;">Тип кабеля</th>
         <th style="min-width: 210px;">Способ прокладки</th>
+        <th style="width: 110px;" class="text-center">Муфты (шт.)</th>
         <th style="width: 90px;" class="text-center">Соответствие длин</th>
         <th class="action-col d-none" style="width: 40px;"></th>
       </tr>
@@ -1079,6 +1082,48 @@ function createCablesAccordion(cables, totalLength) {
       ? ` title="Марка кабеля при расчете: ${escapeHtml(normType)}"`
       : '';
 
+    // Coupling calculation and info lookup from catalog
+    const effectiveType = normType || rawType;
+    const info = lookupCableInfo(effectiveType);
+    const cableLen = Number(c.length) || 0;
+    const buildLen = Number(info.buildingLength) || 0;
+    const couplingCount = buildLen > 0 ? Math.floor(cableLen / buildLen) : 0;
+    totalCouplingsCount += couplingCount;
+
+    const couplingName = (info.coupling || '').trim();
+    const hasCouplingInfo = Boolean(couplingName && couplingName.toLowerCase() !== 'уточнить' && couplingName.toLowerCase() !== '-');
+
+    if (!hasCouplingInfo && effectiveType.trim()) {
+      missingCouplingTypesSet.add(effectiveType.trim());
+    }
+
+    let couplingHtml = '';
+    if (hasCouplingInfo) {
+      const countBadge = couplingCount > 0 
+        ? `<span class="badge bg-primary text-white fw-bold px-2 py-1">${couplingCount}</span>` 
+        : `<span class="text-muted small">0</span>`;
+      couplingHtml = `
+        <div class="d-flex flex-column align-items-center justify-content-center">
+          <div>${countBadge}</div>
+          <div class="text-muted text-truncate font-monospace" style="font-size: 0.72rem; max-width: 120px;" title="Тип муфты: ${escapeHtml(couplingName)} (строит. длина: ${buildLen} м)">
+            ${escapeHtml(couplingName)}
+          </div>
+        </div>
+      `;
+    } else {
+      const countBadge = couplingCount > 0 
+        ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning fw-bold px-2 py-1">${couplingCount}</span>` 
+        : `<span class="text-muted small">0</span>`;
+      couplingHtml = `
+        <div class="d-flex flex-column align-items-center justify-content-center">
+          <div>${countBadge}</div>
+          <span class="badge bg-warning-subtle text-warning border border-warning-subtle d-inline-flex align-items-center gap-1 mt-0_5 py-0 px-1" style="font-size: 0.68rem; cursor: pointer;" title="Тип муфты не указан в справочнике кабелей. Кликните, чтобы открыть справочник" onclick="openWorksRulesModal('cables')">
+            <i class='bx bx-error-circle'></i>Нет типа муфты
+          </span>
+        </div>
+      `;
+    }
+
     row.innerHTML = `
       <td class="text-muted small text-center">${idx + 1}</td>
       <td class="font-monospace text-muted small cell-wrap">${escapeHtml(c.handle || '')}</td>
@@ -1086,6 +1131,7 @@ function createCablesAccordion(cables, totalLength) {
       <td class="canEdit text-end font-monospace fw-semibold" data-field="length">${c.length ?? 0}</td>
       <td class="canEdit cell-wrap" data-field="type"${typeTitleAttr}>${escapeHtml(rawType)}</td>
       <td class="cell-wrap">${routingHtml}</td>
+      <td class="text-center align-middle">${couplingHtml}</td>
       <td class="text-center align-middle">${mismatchIcon}</td>
       <td class="action-col d-none text-center">
         <button type="button" class="btn btn-sm btn-outline-danger p-0 border-0 removeRowBtn" title="Удалить строку">
@@ -1106,13 +1152,54 @@ function createCablesAccordion(cables, totalLength) {
 
   tableWrapper.appendChild(table);
 
+  const missingCouplingsCount = missingCouplingTypesSet.size;
+
+  let missingCouplingsAlert = '';
+  if (missingCouplingsCount > 0) {
+    const missingBadges = Array.from(missingCouplingTypesSet)
+      .map(t => `<span class="badge bg-body text-body border me-1 font-monospace" style="font-size: 0.75rem;">${escapeHtml(t)}</span>`)
+      .join(' ');
+
+    missingCouplingsAlert = `
+      <div class="alert alert-warning border-warning shadow-sm mx-3 mt-3 mb-2 py-2 px-3 small d-flex align-items-start justify-content-between gap-2 flex-wrap">
+        <div class="d-flex align-items-start gap-2">
+          <i class="bx bx-error-circle fs-5 text-warning flex-shrink-0 mt-0_5"></i>
+          <div>
+            <div class="fw-bold text-dark mb-1">
+              Внимание: в справочнике кабелей не указан тип муфты для ${missingCouplingsCount} марок:
+            </div>
+            <div class="d-flex flex-wrap gap-1 align-items-center mb-1">
+              ${missingBadges}
+            </div>
+            <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
+              Для корректного подсчета и спецификации подземных муфт укажите тип муфты и строительную длину в разделе «Справочник кабелей».
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" style="font-size: 0.75rem;" onclick="openWorksRulesModal('cables')">
+          <i class="bx bx-book-open"></i> Открыть справочник кабелей
+        </button>
+      </div>
+    `;
+  }
+
   const mismatchBadgeHeader = mismatchCount > 0
     ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle d-inline-flex align-items-center">
         <i class='bx bx-error me-1'></i>Несоответствий: ${mismatchCount}
        </span>`
-    : `<span class="badge bg-success-subtle text-success border border-success-subtle d-inline-flex align-items-center">
-        <i class='bx bx-check me-1'></i>Несоответствий: 0
-       </span>`;
+    : '';
+
+  const missingCouplingHeaderBadge = missingCouplingsCount > 0
+    ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning d-inline-flex align-items-center" title="Нет информации о типе муфты для ${missingCouplingsCount} марок">
+        <i class='bx bx-error-circle me-1'></i>Муфты без типа: ${missingCouplingsCount}
+       </span>`
+    : '';
+
+  const headerBadges = [
+    missingCouplingHeaderBadge,
+    mismatchBadgeHeader,
+    `<span class="badge bg-primary-subtle text-primary border">${cables.length} шт. / ${Math.round(totalLength).toLocaleString('ru-RU')} м</span>`
+  ].filter(Boolean).join('');
 
   accItem.innerHTML = `
     <h2 class="accordion-header" id="${headerId}">
@@ -1122,15 +1209,15 @@ function createCablesAccordion(cables, totalLength) {
             <i class='bx bx-git-branch text-primary fs-4'></i>
             <span>Кабели</span>
           </div>
-          <div class="d-flex align-items-center gap-2">
-            ${mismatchBadgeHeader}
-            <span class="badge bg-primary-subtle text-primary border">${cables.length} шт. / ${Math.round(totalLength).toLocaleString('ru-RU')} м</span>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            ${headerBadges}
           </div>
         </div>
       </button>
     </h2>
     <div id="${collapseId}" class="accordion-collapse collapse show" aria-labelledby="${headerId}">
       <div class="accordion-body p-0">
+        ${missingCouplingsAlert}
         <!-- table appended here -->
       </div>
     </div>
