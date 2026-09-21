@@ -488,7 +488,7 @@
     </div>
  
     <div class="input-group mb-2">
-      <input class='d-none' type="file" class="form-control" id="input" accept=".json,application/json,.xlsx,.xls" multiple>
+      <input class='d-none' type="file" class="form-control" id="input" accept=".json,application/json" multiple>
     </div>
 
     <!-- Main Grid: 5 cols for input, 4 cols for cables, 3 cols for trenches -->
@@ -517,7 +517,7 @@
               <!-- Action Toolbar: all buttons unified in compact icon-button style -->
               <div class="d-flex align-items-center ms-auto">
                 <div class="btn-group btn-group-sm" role="group" aria-label="Панель действий">
-                  <button id="uploadDataBtn" class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Загрузить свой файл данных (.json, .xlsx)">
+                  <button id="uploadDataBtn" class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Загрузить свой файл данных (.json)">
                     <i class="bx bx-upload fs-5"></i>
                   </button>
 
@@ -575,7 +575,7 @@
                       </a>
                       <div class="dropdown-divider my-1"></div>
                       <a id='menuUploadData' href="#" class="dropdown-item d-flex align-items-center gap-2">
-                        <i class='bx bx-file text-secondary fs-5'></i> Загрузить проект (.json, .xlsx)...
+                        <i class='bx bx-file text-secondary fs-5'></i> Загрузить проект (.json)...
                       </a>
                       <a id='exportExcel' href="#" class="dropdown-item d-flex align-items-center gap-2">
                         <i class='bx bx-table text-primary fs-5'></i> Исходные таблицы (Excel)
@@ -626,11 +626,11 @@
                 </div>
                 <h4 class="mb-1 fw-bold fs-5">Загрузите файл с исходными данными проекта</h4>
                 <p class="text-muted fs-sm mb-4 mx-auto" style="max-width: 480px;">
-                  Перетащите файл <code>.json</code> или <code>.xlsx</code> сюда либо нажмите кнопку для выбора на устройстве.
+                  Перетащите файл <code>.json</code> сюда либо нажмите кнопку для выбора на устройстве.
                 </p>
                 <div class="d-flex justify-content-center gap-2 flex-wrap">
                   <label for="input" class="btn btn-primary px-3 mb-0 d-inline-flex align-items-center gap-2 shadow-sm" style="cursor: pointer;">
-                    <i class='bx bx-upload fs-5'></i>Загрузить свой файл (.json, .xlsx)
+                    <i class='bx bx-upload fs-5'></i>Загрузить свой файл (.json)
                   </label>
                   <button type="button" id="loadSampleBtn" class="btn btn-outline-secondary px-3 d-inline-flex align-items-center gap-2">
                     <i class='bx bx-file fs-5'></i>Загрузить пример
@@ -658,7 +658,7 @@
             </div>
 
             <div class="d-flex flex-column align-items-center gap-2 mt-auto w-100 pt-3 border-top border-secondary-subtle">
-              <span id="collapsedFileBadge" class="badge bg-secondary-subtle text-secondary p-2" data-bs-toggle="tooltip" data-bs-placement="right" title="Файл не выбран">
+              <span id="collapsedFileBadge" class="badge bg-secondary-subtle text-secondary-emphasis p-2" data-bs-toggle="tooltip" data-bs-placement="right" title="Файл не выбран">
                 <i class='bx bx-file fs-6'></i>
               </span>
               <button type="button" id="collapsedCalcBtn" class="btn btn-sm btn-outline-primary btn-icon" data-bs-toggle="tooltip" data-bs-placement="right" title="Выполнить расчет объемов">
@@ -673,10 +673,13 @@
       <div id="cablesCol" class="col-12 col-md-6 col-xl-4 col-lg-4 transition-col">
         <div class="card module-card mb-0">
           <div class="card-header py-3 px-3">
-            <div class="d-flex align-items-center justify-content-between">
-              <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-1">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
                 <i class='bx bx-git-branch text-primary fs-4'></i>
                 <h4 class="my-0 fw-bold fs-6">Ведомость кабелей</h4>
+                <span id="cableMissingBadge" class="badge bg-warning text-dark border border-warning-subtle d-none" style="font-size: 0.72rem; cursor: pointer;" title="В правилах отсутствуют сметные нормы для некоторых способов прокладки">
+                  <i class='bx bx-alarm-exclamation me-1'></i>Неполные правила
+                </span>
               </div>
               <span id="cableBadgeTotal" class="badge bg-primary-subtle text-primary border d-none">0 шт.</span>
             </div>
@@ -697,10 +700,13 @@
       <div id="trenchesCol" class="col-12 col-md-6 col-xl-3 col-lg-3 transition-col">
         <div class="card module-card mb-0">
           <div class="card-header py-3 px-3">
-            <div class="d-flex align-items-center justify-content-between">
-              <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-1">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
                 <i class='bx bx-layer text-info fs-4'></i>
                 <h4 class="my-0 fw-bold fs-6">Ведомость траншей</h4>
+                <span id="trenchMissingBadge" class="badge bg-warning text-dark border border-warning-subtle d-none" style="font-size: 0.72rem; cursor: pointer;" title="В правилах отсутствуют сметные нормы для некоторых способов прокладки">
+                  <i class='bx bx-alarm-exclamation me-1'></i>Неполные правила
+                </span>
               </div>
               <span id="routingBadgeTotal" class="badge bg-info-subtle text-info-emphasis border d-none">0 шт.</span>
             </div>
