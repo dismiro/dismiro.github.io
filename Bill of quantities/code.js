@@ -5,13 +5,187 @@ let isEditable = false;
 let isRawColCollapsed = false;
 
 // Helper to extract works/materials array from a rule object,
-// supporting both "Работы и материалы" and legacy "Работы" / "works"
+// supporting both "Работы и материалы" (array or object with tier keys) and legacy "Работы" / "works"
 function getRuleWorks(rule) {
   if (!rule || typeof rule !== 'object') return [];
-  if (Array.isArray(rule["Работы и материалы"])) return rule["Работы и материалы"];
-  if (Array.isArray(rule["Работы"])) return rule["Работы"];
-  if (Array.isArray(rule.works)) return rule.works;
+  const wm = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] :
+             (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
+  if (Array.isArray(wm)) return wm;
+  if (wm && typeof wm === 'object') {
+    const list = [];
+    Object.entries(wm).forEach(([tierKey, arr]) => {
+      if (Array.isArray(arr)) {
+        arr.forEach(item => {
+          if (item && typeof item === 'object') {
+            list.push({ ...item, _tierKey: tierKey });
+          }
+        });
+      } else if (arr && typeof arr === 'object') {
+        list.push({ ...arr, _tierKey: tierKey });
+      }
+    });
+    return list;
+  }
   return [];
+}
+
+// Evaluate formula (e.g. "ДЛИНА", "0.36*ДЛИНА", "1.05*ДЛИНА") with a given length value
+function evaluateWorkFormula(formula, lengthValue) {
+  const len = Number(lengthValue) || 0;
+  if (!formula || typeof formula !== 'string' || !formula.trim()) {
+    return len;
+  }
+  const clean = formula.trim();
+  if (clean.toUpperCase() === 'ДЛИНА') {
+    return len;
+  }
+  const expr = clean.replace(/,/g, '.').replace(/ДЛИНА/gi, String(len));
+  try {
+    if (/^[0-9+\-*/().\s]+$/.test(expr)) {
+      const val = Function("'use strict'; return (" + expr + ");")();
+      if (typeof val === 'number' && !isNaN(val)) {
+        return val;
+      }
+    }
+  } catch (e) {
+    // fallback
+  }
+  return len;
+}
+
+// Build display string for formula in VOR
+function buildWorkFormulaDisplay(formula, totalLength, itemsCount, unit) {
+  const clean = (formula || 'ДЛИНА').trim();
+  if (clean.toUpperCase() === 'ДЛИНА') {
+    return `${totalLength.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} м кабеля${itemsCount > 1 ? ` (${itemsCount} мар.)` : ''}`;
+  }
+  let disp = clean.replace(/,/g, '.').replace(/\*/g, ' * ');
+  disp = disp.replace(/ДЛИНА/gi, `${totalLength.toLocaleString('ru-RU')} м кабеля`);
+  return disp;
+}
+
+// Parse and normalize rule's "Работы и материалы" supporting both the new object structure:
+// "Работы и материалы": { "1": [...], "2": [...], "3": [...], "оптический": [...] }
+// and legacy flat array format: [ { ... }, ... ]
+function parseRuleWorksAndMaterials(rule) {
+  if (!rule || typeof rule !== 'object') {
+    return { optical: null, tiers: [], allItems: [], isObjectStructure: false, rawObj: {} };
+  }
+
+  const wm = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] :
+             (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
+
+  if (!wm || typeof wm !== 'object') {
+    return { optical: null, tiers: [], allItems: [], isObjectStructure: false, rawObj: {} };
+  }
+
+  const isOpticalItem = item => {
+    if (!item || typeof item !== 'object') return false;
+    const cat = String(item["Категория"] || item.category || '').toLowerCase();
+    const nm = String(item["Наименование"] || item.name || '').toLowerCase();
+    return cat.includes('оптич') || nm.includes('оптическ') || cat.includes('волс') || nm.includes('волс');
+  };
+
+  const isOpticalKey = k => {
+    const s = String(k || '').toLowerCase();
+    return s.includes('оптич') || s.includes('волс') || s.includes('optic');
+  };
+
+  // Convert legacy array to object representation if needed
+  let wmObj = {};
+  let isObjectStructure = true;
+
+  if (Array.isArray(wm)) {
+    isObjectStructure = false;
+    wm.forEach(item => {
+      if (!item || typeof item !== 'object') return;
+      if (isOpticalItem(item)) {
+        if (!wmObj["оптический"]) wmObj["оптический"] = [];
+        wmObj["оптический"].push(item);
+      } else {
+        const th = extractWeightThreshold(item);
+        const k = th !== null ? String(th) : (item["МаксВес"] !== undefined ? String(item["МаксВес"]) : "1");
+        if (!wmObj[k]) wmObj[k] = [];
+        wmObj[k].push(item);
+      }
+    });
+  } else {
+    wmObj = wm;
+  }
+
+  let optical = null;
+  const tiers = [];
+  const allItems = [];
+
+  for (const [key, itemsVal] of Object.entries(wmObj)) {
+    const items = Array.isArray(itemsVal) ? itemsVal : (itemsVal ? [itemsVal] : []);
+    items.forEach(it => allItems.push(it));
+
+    if (isOpticalKey(key) || items.some(isOpticalItem)) {
+      optical = {
+        key,
+        items,
+        isOptical: true
+      };
+    } else {
+      let threshold = null;
+      let isOver = false;
+
+      // 1. Try parsing key directly as a number or threshold
+      const cleanKey = String(key).trim().replace(',', '.');
+      const numKey = parseFloat(cleanKey);
+      if (!isNaN(numKey) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
+        threshold = numKey > 50 ? numKey / 1000 : numKey;
+      } else {
+        const matchDo = cleanKey.match(/(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
+        if (matchDo) {
+          threshold = parseFloat(matchDo[1].replace(',', '.'));
+        }
+        if (/(?:свыше|более|от|>)\s*[:;]?\s*\d+/i.test(cleanKey)) {
+          isOver = true;
+          const matchOver = cleanKey.match(/(?:свыше|более|от|>)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
+          if (matchOver) threshold = parseFloat(matchOver[1].replace(',', '.'));
+        }
+      }
+
+      // 2. If threshold not determined from key, check items inside this tier
+      if (threshold === null && items.length > 0) {
+        for (const it of items) {
+          const itTh = extractWeightThreshold(it);
+          if (itTh !== null) {
+            threshold = itTh;
+            break;
+          }
+        }
+      }
+      if (!isOver && items.some(it => isOverWeightThreshold(it))) {
+        isOver = true;
+      }
+
+      tiers.push({
+        key,
+        threshold,
+        isOver,
+        items,
+        cables: []
+      });
+    }
+  }
+
+  // Sort tiers: ascending by threshold for "до X", then "свыше X", then unthresholded
+  tiers.sort((a, b) => {
+    if (!a.isOver && !b.isOver) {
+      if (a.threshold !== null && b.threshold !== null) return a.threshold - b.threshold;
+      if (a.threshold !== null) return -1;
+      if (b.threshold !== null) return 1;
+      return 0;
+    }
+    if (a.isOver && !b.isOver) return 1;
+    if (!a.isOver && b.isOver) return -1;
+    return (a.threshold || 0) - (b.threshold || 0);
+  });
+
+  return { optical, tiers, allItems, isObjectStructure, rawObj: wmObj };
 }
 
 // Helper to extract all sections from rules object (where top-level keys are section names)
@@ -247,9 +421,100 @@ function lookupCableInfo(rawType, catalog) {
   };
 }
 
-// Weight tier categories: до 1 кг/м (1), до 2 кг/м (2), до 3 кг/м (3), свыше 3 кг/м (6)
-function getCableWeightTier(weight) {
+// Extract numeric weight threshold (kg/m) from a work item
+// Supports explicit properties (МаксВес, maxWeight, вес, масса) and parsing from Наименование
+// Handles decimal comma or dot ("1,5" -> 1.5, "1.5" -> 1.5)
+// Handles "до 1", "до: 1", "до 1,5", "до: 1,5", "до 1.5 кг", "массой 1 км, кг; до 1,5", "массой 1 км, кг; до 1000" (-> 1.0)
+function extractWeightThreshold(work) {
+  if (!work || typeof work !== 'object') return null;
+
+  // 1. Try explicit properties
+  const propVal = work["МаксВес"] !== undefined ? work["МаксВес"] :
+                  (work.maxWeight !== undefined ? work.maxWeight :
+                  (work["вес"] !== undefined ? work["вес"] : work["масса"]));
+  let numProp = null;
+  if (propVal !== undefined && propVal !== null && propVal !== '') {
+    const s = String(propVal).trim().replace(',', '.');
+    const n = parseFloat(s);
+    if (!isNaN(n)) {
+      numProp = n > 50 ? n / 1000 : n;
+    }
+  }
+
+  // 2. Try parsing from name
+  const name = String(work["Наименование"] || work.name || '').trim();
+  let numFromName = null;
+
+  // Weight thresholds only apply to cable works or works mentioning mass/weight/kg
+  // Must NOT match distance expressions like "до 5 м", "до 10 м", "до 100 м" (перемещение грунта, бурение и т.д.)
+  const hasWeightContext = /(?:кабел|масс[аое]|вес[аое]|кг(?:\/м)?)/i.test(name);
+  if (hasWeightContext) {
+    // A: Look for "массой ... до:? X"
+    const matchMassDo = name.match(/масс[а-я0-9\s,;:]*?(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
+    // B: Look for "до:? X\s*кг"
+    const matchKgDo = name.match(/(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)\s*кг/i);
+    // C: In cable work: "до: X" where unit is NOT distance (м, км, см, мм) or machine power
+    let matchCableDo = null;
+    if (!matchMassDo && !matchKgDo && /кабел/i.test(name)) {
+      const matchCandidate = name.match(/(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)(?:\s*([а-яa-z]+))?/i);
+      if (matchCandidate) {
+        const trailingUnit = (matchCandidate[2] || '').toLowerCase();
+        if (!['м', 'км', 'см', 'мм', 'т', 'квт', 'л.с.', 'шт', 'чел'].includes(trailingUnit)) {
+          matchCableDo = matchCandidate;
+        }
+      }
+    }
+
+    const matchDo = matchMassDo || matchKgDo || matchCableDo;
+    if (matchDo) {
+      const rawVal = parseFloat(matchDo[1].replace(',', '.'));
+      if (!isNaN(rawVal)) {
+        if (rawVal > 50 && /1\s*км/i.test(name)) {
+          numFromName = rawVal / 1000;
+        } else {
+          numFromName = rawVal;
+        }
+      }
+    }
+  }
+
+  // If both exist, check if one was explicitly modified by user (e.g. non-standard or changed)
+  if (numFromName !== null && numProp !== null) {
+    if (numFromName === numProp) return numFromName;
+    const isStandard = v => v === 1 || v === 2 || v === 3;
+    if (!isStandard(numFromName) && isStandard(numProp)) return numFromName;
+    if (!isStandard(numProp) && isStandard(numFromName)) return numProp;
+    return numFromName;
+  }
+
+  if (numFromName !== null) return numFromName;
+  if (numProp !== null) return numProp;
+  return null;
+}
+
+// Check if work represents an "over threshold" category ("свыше 3 кг", "более 3", etc.)
+function isOverWeightThreshold(work) {
+  const name = String(work["Наименование"] || work.name || '').toLowerCase();
+  if (!/(?:кабел|масс|вес|кг)/i.test(name)) return false;
+  return /(?:свыше|более|от)\s*[:;]?\s*\d+/i.test(name);
+}
+
+// Weight tier categories: dynamically evaluated from rule, or fallback to standard 1, 2, 3, 6
+function getCableWeightTier(weight, rule) {
   const w = Number(weight) || 0.35;
+  if (rule) {
+    const works = getRuleWorks(rule);
+    const thresholds = works
+      .map(extractWeightThreshold)
+      .filter(t => t !== null)
+      .sort((a, b) => a - b);
+    if (thresholds.length > 0) {
+      for (const t of thresholds) {
+        if (w <= t) return t;
+      }
+      return thresholds[thresholds.length - 1];
+    }
+  }
   if (w <= 1.0) return 1;
   if (w <= 2.0) return 2;
   if (w <= 3.0) return 3;
@@ -1427,7 +1692,7 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
   entries.forEach(([type, val], idx) => {
     const cMeta = lookupCableInfo(type, catalog);
     const opticalBadge = cMeta.isOptical
-      ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 500;" title="Оптический кабель (ВОЛС). Прокладывается по нормам оптических кабелей независимо от веса"><i class="bx bx-broadcast me-0_5"></i>оптический</span>`
+      ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 500;" title="Оптический кабель (ВОЛС). Прокладывается по нормам оптических кабелей независимо от веса">оптический</span>`
       : '';
     const notInCatalogBadge = !cMeta.foundInCatalog
       ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" style="font-size: 0.68rem; font-weight: normal;" title="Марка не найдена в справочнике кабелей. Принят оценочный вес: ${cMeta.weight} кг/м"><i class="bx bx-error-circle me-0_5"></i>нет в справочнике</span>`
@@ -1477,7 +1742,7 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
   if (cableMissingBadge) {
     if (cableWorksCalc.missingInRules.length > 0) {
       cableMissingBadge.classList.remove('d-none');
-      cableMissingBadge.innerHTML = `<i class='bx bx-alarm-exclamation me-1'></i>Неполные правила (${cableWorksCalc.missingInRules.length})`;
+      cableMissingBadge.innerHTML = `Неполные правила (${cableWorksCalc.missingInRules.length})`;
       cableMissingBadge.onclick = () => openWorksRulesModal('editor');
     } else {
       cableMissingBadge.classList.add('d-none');
@@ -1546,12 +1811,30 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
 
   cableWorksCalc.works.forEach((w, idx) => {
     if (w.type === 'материал') {
+      const isCableMaterial = !!w.cableType;
       const opticalMatBadge = w.isOptical
-        ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.65rem;"><i class="bx bx-broadcast me-0_5"></i>ВОЛС</span>`
+        ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.65rem;">ВОЛС</span>`
         : '';
       const catalogStatusBadge = (w.foundInCatalog === false)
         ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" style="font-size: 0.65rem;" title="Марка отсутствует в справочнике кабелей. Принят оценочный вес: ${w.weight} кг/м"><i class="bx bx-error me-0_5"></i>нет в справочнике (расч. ${w.weight} кг/м)</span>`
         : '';
+
+      let metaContent = '';
+      if (isCableMaterial) {
+        metaContent = `
+          <span class="meta-label">Марка: <span class="meta-cable fw-semibold">${escapeHtml(w.cableType || '')}</span>${opticalMatBadge}${catalogStatusBadge}</span>
+          <span class="text-muted opacity-50">•</span>
+          <span class="meta-label">Длина: <strong class="text-body">${Math.round(w.cableLength || 0)} м</strong></span>
+          <span class="text-muted opacity-50">•</span>
+          ${w.isOptical ? `<span class="meta-label">Категория: <strong class="text-info-emphasis">Оптический кабель</strong></span>` : `<span class="meta-label">Масса 1 м: <strong class="text-body">${w.weight} кг</strong></span>`}
+        `;
+      } else {
+        metaContent = `
+          <span class="meta-label">Способ: <span class="meta-method fw-semibold">${escapeHtml(w.routingType || w.ruleName)}</span></span>
+          ${w.tierKey ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border">ключ "${escapeHtml(w.tierKey)}"</span>` : ''}
+          ${w.comment ? `<span class="text-muted ms-1 fst-italic">(${escapeHtml(w.comment)})</span>` : ''}
+        `;
+      }
 
       cableWorksRowsHtml += `
         <tr class="work-material-row align-middle">
@@ -1562,11 +1845,7 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
               <div>
                 <div class="material-description">${escapeHtml(w.name)}</div>
                 <div class="work-item-meta fs-xs d-flex align-items-center gap-1 flex-wrap mt-0_5">
-                  <span class="meta-label">Марка: <span class="meta-cable fw-semibold">${escapeHtml(w.cableType || '')}</span>${opticalMatBadge}${catalogStatusBadge}</span>
-                  <span class="text-muted opacity-50">•</span>
-                  <span class="meta-label">Длина: <strong class="text-body">${Math.round(w.cableLength || 0)} м</strong></span>
-                  <span class="text-muted opacity-50">•</span>
-                  ${w.isOptical ? `<span class="meta-label">Категория: <strong class="text-info-emphasis">Оптический кабель</strong></span>` : `<span class="meta-label">Масса 1 м: <strong class="text-body">${w.weight} кг</strong></span>`}
+                  ${metaContent}
                 </div>
               </div>
             </div>
@@ -1578,12 +1857,12 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
       `;
     } else {
       const typeBadge = w.isOptical
-        ? `<span class="badge bg-info text-white" style="font-size: 0.65rem;"><i class="bx bx-broadcast me-0_5"></i>Оптический кабель</span>`
+        ? `<span class="badge bg-info text-white" style="font-size: 0.65rem;">Оптический кабель</span>`
         : `<span class="badge bg-primary text-white" style="font-size: 0.65rem;">Работа</span>`;
 
       const tierBadge = w.isOptical
         ? `<span class="badge bg-info-subtle text-info-emphasis border">ВОЛС</span>`
-        : (w.tierMax ? `<span class="badge bg-info-subtle text-info-emphasis border">до ${w.tierMax} кг/м</span>` : '');
+        : (w.tierMax ? `<span class="badge bg-info-subtle text-info-emphasis border">до ${w.tierMax} кг/м</span>` : (w.tierKey ? `<span class="badge bg-info-subtle text-info-emphasis border">ключ "${escapeHtml(w.tierKey)}"</span>` : ''));
 
       cableWorksRowsHtml += `
         <tr class="table-light border-top border-primary border-2">
@@ -1595,6 +1874,7 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
               <span class="meta-label">Способ: <span class="meta-method fw-semibold">${escapeHtml(w.routingType || w.ruleName)}</span></span>
               ${tierBadge}
               ${w.cablesCount ? `<span class="badge bg-secondary-subtle text-dark border">${w.cablesCount} мар. кабеля</span>` : ''}
+              ${w.comment ? `<span class="text-muted ms-1 fst-italic">(${escapeHtml(w.comment)})</span>` : ''}
             </div>
           </td>
           <td class="text-center small text-nowrap fw-bold">${escapeHtml(w.unit)}</td>
@@ -1761,7 +2041,7 @@ function renderRoutingResult(summary, totalCount, totalLength) {
   if (trenchMissingBadge) {
     if (worksCalc.missingInRules.length > 0) {
       trenchMissingBadge.classList.remove('d-none');
-      trenchMissingBadge.innerHTML = `<i class='bx bx-alarm-exclamation me-1'></i>Неполные правила (${worksCalc.missingInRules.length})`;
+      trenchMissingBadge.innerHTML = `Неполные правила (${worksCalc.missingInRules.length})`;
       trenchMissingBadge.onclick = () => openWorksRulesModal('editor');
     } else {
       trenchMissingBadge.classList.add('d-none');
@@ -2165,6 +2445,7 @@ function renderRulesModalContent() {
 
   let html = '';
   sections.forEach((sec) => {
+    const isCableSec = sec.name.toLowerCase().includes('монтаж') || sec.name.toLowerCase().includes('кабел');
     html += `
       <div class="mb-3">
         <div class="d-flex align-items-center gap-2 mb-2 pb-1 border-bottom">
@@ -2177,24 +2458,85 @@ function renderRulesModalContent() {
 
     sec.rules.forEach((rule, rIdx) => {
       const rName = rule["Название"] || rule.name || 'Без названия';
+      const rawWm = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] :
+                   (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
       const works = getRuleWorks(rule);
+      const isObjectStructure = rawWm && typeof rawWm === 'object' && !Array.isArray(rawWm);
 
       let worksHtml = '';
-      works.forEach((w, wIdx) => {
-        worksHtml += `
-          <div class="p-2 rounded bg-light border mb-2 small">
-            <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-              <div class="fw-semibold text-dark">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')}</div>
-              <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap">${escapeHtml(w["Единицы измерения"] || '')}</span>
+
+      if (isObjectStructure) {
+        Object.entries(rawWm).forEach(([key, itemsVal]) => {
+          const items = Array.isArray(itemsVal) ? itemsVal : (itemsVal ? [itemsVal] : []);
+          const isOptKey = key.toLowerCase().includes('оптич') || key.toLowerCase().includes('волс');
+          let groupTitle = `Ключ: "${escapeHtml(key)}"`;
+          if (isOptKey) {
+            groupTitle = `Оптический кабель (ключ "${escapeHtml(key)}")`;
+          } else {
+            const numK = parseFloat(String(key).replace(',', '.'));
+            if (!isNaN(numK)) {
+              groupTitle = `Категория до ${numK} кг/м (ключ "${escapeHtml(key)}")`;
+            }
+          }
+
+          let groupItemsHtml = '';
+          items.forEach((w, wIdx) => {
+            const threshold = isCableSec ? extractWeightThreshold(w) : null;
+            const isOver = isCableSec ? isOverWeightThreshold(w) : false;
+            const tierBadge = threshold !== null 
+              ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">до ${threshold} кг/м</span>`
+              : (isOver ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">свыше</span>` : '');
+
+            groupItemsHtml += `
+              <div class="p-2 rounded bg-white border mb-1 small">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                  <div class="fw-semibold text-dark">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')} ${tierBadge}</div>
+                  <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap">${escapeHtml(w["Единицы измерения"] || '')}</span>
+                </div>
+                <div class="d-flex align-items-center gap-1 text-muted fs-xs">
+                  <span class="fw-medium">Формула:</span>
+                  <code class="px-1 py-0 bg-light border rounded text-primary">${escapeHtml(w["Формула"] || 'ДЛИНА')}</code>
+                  ${w["Тип"] ? `<span class="badge badge-material ms-auto">${escapeHtml(w["Тип"])}</span>` : ''}
+                </div>
+              </div>
+            `;
+          });
+
+          worksHtml += `
+            <div class="mb-2 p-2 rounded bg-light border">
+              <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="fw-bold text-primary small d-flex align-items-center gap-1">
+                  <i class="bx bx-category-alt"></i> ${groupTitle}
+                </span>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs fw-semibold">${items.length} поз.</span>
+              </div>
+              ${groupItemsHtml || '<div class="text-muted small ps-2">Нет позиций</div>'}
             </div>
-            <div class="d-flex align-items-center gap-1 text-muted fs-xs">
-              <span class="fw-medium">Формула:</span>
-              <code class="px-1 py-0 bg-white border rounded text-primary">${escapeHtml(w["Формула"] || 'ДЛИНА')}</code>
-              ${w["Тип"] ? `<span class="badge badge-material ms-auto">${escapeHtml(w["Тип"])}</span>` : ''}
+          `;
+        });
+      } else {
+        works.forEach((w, wIdx) => {
+          const threshold = isCableSec ? extractWeightThreshold(w) : null;
+          const isOver = isCableSec ? isOverWeightThreshold(w) : false;
+          const tierBadge = threshold !== null 
+            ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">до ${threshold} кг/м</span>`
+            : (isOver ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">свыше</span>` : '');
+
+          worksHtml += `
+            <div class="p-2 rounded bg-light border mb-2 small">
+              <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                <div class="fw-semibold text-dark">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')} ${tierBadge}</div>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap">${escapeHtml(w["Единицы измерения"] || '')}</span>
+              </div>
+              <div class="d-flex align-items-center gap-1 text-muted fs-xs">
+                <span class="fw-medium">Формула:</span>
+                <code class="px-1 py-0 bg-white border rounded text-primary">${escapeHtml(w["Формула"] || 'ДЛИНА')}</code>
+                ${w["Тип"] ? `<span class="badge badge-material ms-auto">${escapeHtml(w["Тип"])}</span>` : ''}
+              </div>
             </div>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       html += `
         <div class="card border shadow-sm">
@@ -2352,7 +2694,7 @@ function renderCableCatalogModalContent() {
                 <th style="width: 28%;" class="ps-3">Марка / Обозначение</th>
                 <th style="width: 32%;">Полное наименование по ТУ/ГОСТ</th>
                 <th style="width: 14%;" class="text-center">Строит. длина, м</th>
-                <th style="width: 12%;" class="text-center">Вес, т/км</th>
+                <th style="width: 12%;" class="text-center">Вес, кг/м</th>
                 <th style="width: 14%;" class="pe-3">Тип муфты</th>
               </tr>
             </thead>
@@ -2602,11 +2944,11 @@ function calculateWorksFromCables(cableSummary, rulesData) {
     const ruleName = (rule["Название"] || rule.name || '').trim();
     if (!ruleName) return;
 
-    const worksInRule = getRuleWorks(rule);
+    const parsedWM = parseRuleWorksAndMaterials(rule);
     const template = (rule["Шаблон"] || rule.template || '').trim();
 
     // If the rule definition has no works or materials, flag it if any cable uses it
-    if (!worksInRule || worksInRule.length === 0) {
+    if (!parsedWM.allItems || parsedWM.allItems.length === 0) {
       let totLen = 0;
       let count = 0;
       cableEntries.forEach(([cType, cInfo]) => {
@@ -2631,11 +2973,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
       return;
     }
 
-    // Group matching cables:
-    // Optical cables are isolated into opticalCables (independent of weight, checked via catalog category)
-    // Electrical cables are grouped by weight tier into tierMap (1: <=1.0 kg/m, 2: <=2.0 kg/m, 3: <=3.0 kg/m, 6: >3.0 kg/m)
-    const tierMap = new Map();
-    const opticalCables = [];
+    // Collect matching cables for this rule
+    const matchedCables = [];
 
     cableEntries.forEach(([cType, cInfo]) => {
       const routingMap = cInfo.routingTypes || {};
@@ -2663,53 +3002,56 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             category: cMeta.category || (cMeta.isOptical ? 'Оптический кабель' : 'Электрический кабель'),
             foundInCatalog: !!cMeta.foundInCatalog
           };
-
-          if (cMeta.isOptical) {
-            opticalCables.push(cableItem);
-          } else {
-            const tierMax = getCableWeightTier(weight);
-            if (!tierMap.has(tierMax)) {
-              tierMap.set(tierMax, []);
-            }
-            tierMap.get(tierMax).push(cableItem);
-          }
+          matchedCables.push(cableItem);
         }
       }
     });
 
-    if (tierMap.size === 0 && opticalCables.length === 0) return;
+    if (matchedCables.length === 0) return;
 
-    // 1. Process OPTICAL cables separately (independent of weight tier, by dedicated catalog category)
+    // 1. Separate optical cables and electrical cables
+    const opticalCables = matchedCables.filter(c => c.isOptical);
+    const electricalCables = matchedCables.filter(c => !c.isOptical);
+
+    // 1. Process OPTICAL cables separately
     if (opticalCables.length > 0) {
       opticalCables.sort((a, b) => (b.length || 0) - (a.length || 0));
       const totalOpticalLength = Math.round(opticalCables.reduce((sum, c) => sum + c.length, 0) * 100) / 100;
 
-      // Find dedicated optical work in rule definition if present
-      const matchedOpticalDef = worksInRule.find(w => {
-        const cat = String(w["Категория"] || w.category || '').toLowerCase();
-        const nm = String(w["Наименование"] || w.name || '').toLowerCase();
-        return cat.includes('оптич') || nm.includes('оптическ');
-      });
+      if (parsedWM.optical && Array.isArray(parsedWM.optical.items) && parsedWM.optical.items.length > 0) {
+        const optItems = parsedWM.optical.items;
+        const primaryWork = optItems.find(w => (w["Тип"] || w.type) !== 'материал') || optItems[0];
+        const opticalPrimaryTitle = (primaryWork["Наименование"] || primaryWork.name || `Прокладка оптического кабеля (${ruleName})`).trim();
 
-      if (matchedOpticalDef && (matchedOpticalDef["Наименование"] || matchedOpticalDef.name)) {
-        const opticalWorkTitle = (matchedOpticalDef["Наименование"] || matchedOpticalDef.name).trim();
+        // Apply ALL works and materials from the optical list
+        optItems.forEach(item => {
+          const formula = item["Формула"] || item.formula || "ДЛИНА";
+          const rawVal = evaluateWorkFormula(formula, totalOpticalLength);
+          const isMaterial = (item["Тип"] || item.type) === 'материал';
+          const vol = isMaterial ? Math.round(rawVal * 1000) / 1000 : Math.round(rawVal * 100) / 100;
+          const unit = item["Единицы измерения"] || item.unit || 'м';
+          const itemName = (item["Наименование"] || item.name || opticalPrimaryTitle).trim();
+          const formulaDisplay = buildWorkFormulaDisplay(formula, totalOpticalLength, opticalCables.length, unit);
 
-        const opticalParentWork = {
-          name: opticalWorkTitle,
-          unit: matchedOpticalDef["Единицы измерения"] || matchedOpticalDef.unit || 'м',
-          volume: totalOpticalLength,
-          formulaDisplay: `${totalOpticalLength.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} м кабеля (${opticalCables.length} мар.)`,
-          ruleName: ruleName,
-          routingType: ruleName,
-          isOptical: true,
-          category: 'Оптический кабель',
-          section: sectionName,
-          type: 'работа',
-          cablesCount: opticalCables.length,
-          comment: ''
-        };
-        calculatedWorks.push(opticalParentWork);
+          calculatedWorks.push({
+            name: itemName,
+            unit: unit,
+            volume: vol,
+            formulaDisplay: formulaDisplay,
+            ruleName: ruleName,
+            routingType: ruleName,
+            tierKey: parsedWM.optical.key,
+            isOptical: true,
+            category: 'Оптический кабель',
+            section: sectionName,
+            type: isMaterial ? 'материал' : 'работа',
+            parentWorkName: isMaterial ? opticalPrimaryTitle : undefined,
+            cablesCount: opticalCables.length,
+            comment: item["Комментарий"] || item.comment || ''
+          });
+        });
 
+        // List all optical cables under this primary work
         opticalCables.forEach(c => {
           const kmVol = Number((c.length / 1000).toFixed(3));
           calculatedWorks.push({
@@ -2727,12 +3069,11 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             foundInCatalog: !!c.foundInCatalog,
             section: sectionName,
             type: 'материал',
-            parentWorkName: opticalWorkTitle,
+            parentWorkName: opticalPrimaryTitle,
             comment: ''
           });
         });
       } else {
-        // No guessing or hardcoded keywords! Flag missing optical work in rules
         missingInRules.push({
           type: `${ruleName} (оптический кабель)`,
           length: totalOpticalLength,
@@ -2743,75 +3084,141 @@ function calculateWorksFromCables(cableSummary, rulesData) {
       }
     }
 
-    // 2. Process electrical cables in ascending weight tiers (до: 1, до: 2, до: 3...)
-    const sortedTiers = Array.from(tierMap.keys()).sort((a, b) => a - b);
-
-    sortedTiers.forEach(tierMax => {
-      const cablesInTier = tierMap.get(tierMax);
-      // Sort cables in this tier by length descending
-      cablesInTier.sort((a, b) => (b.length || 0) - (a.length || 0));
-
-      const totalTierLength = Math.round(cablesInTier.reduce((sum, c) => sum + c.length, 0) * 100) / 100;
-
-      // Determine work title strictly from rule definition or explicit user template
-      let workTitle = '';
-      let unit = 'м';
-      const matchedDef = worksInRule.find(w => Number(w["МаксВес"] || w.maxWeight) === tierMax);
-      if (matchedDef && (matchedDef["Наименование"] || matchedDef.name)) {
-        workTitle = (matchedDef["Наименование"] || matchedDef.name).trim();
-        unit = matchedDef["Единицы измерения"] || matchedDef.unit || 'м';
-      } else if (template && (template.includes('{масса}') || template.includes('{вес}'))) {
-        workTitle = template.replace(/\{масса\}|\{вес\}/gi, String(tierMax)).trim();
-      }
-
-      if (workTitle) {
-        const parentWork = {
-          name: workTitle,
-          unit: unit,
-          volume: totalTierLength,
-          formulaDisplay: `${totalTierLength.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} м кабеля (${cablesInTier.length} мар.)`,
+    // 2. Process ELECTRICAL cables dynamically by rule's weight tiers (object keys)
+    if (electricalCables.length > 0) {
+      if (parsedWM.tiers.length === 0) {
+        let totElecLen = 0;
+        electricalCables.forEach(c => totElecLen += c.length);
+        missingInRules.push({
+          type: `${ruleName} (электрический кабель)`,
+          length: totElecLen,
+          count: electricalCables.length,
           ruleName: ruleName,
-          routingType: ruleName,
-          tierMax: tierMax,
-          section: sectionName,
-          type: 'работа',
-          cablesCount: cablesInTier.length,
-          comment: ''
-        };
-        calculatedWorks.push(parentWork);
-
-        // List all cables under this work as materials
-        cablesInTier.forEach(c => {
-          const kmVol = Number((c.length / 1000).toFixed(3));
-          calculatedWorks.push({
-            name: c.fullDescription || `Кабель ${c.type}`,
-            unit: 'км',
-            volume: kmVol,
-            formulaDisplay: `${kmVol.toFixed(3)} км (${Math.round(c.length)} м • масса 1 м: ${c.weight} кг)`,
-            ruleName: ruleName,
-            routingType: c.routingName,
-            cableType: c.type,
-            cableLength: c.length,
-            weight: c.weight,
-            foundInCatalog: !!c.foundInCatalog,
-            section: sectionName,
-            type: 'материал',
-            parentWorkName: workTitle,
-            comment: ''
-          });
+          missingType: 'tier'
         });
       } else {
-        // No guessing or mutating other lines! Flag missing tier work in rules
-        missingInRules.push({
-          type: `${ruleName} (кабель массой 1 м до ${tierMax} кг)`,
-          length: totalTierLength,
-          count: cablesInTier.length,
-          ruleName: ruleName,
-          missingType: 'tier',
-          tierMax: tierMax
+        const hasAnyThreshold = parsedWM.tiers.some(t => t.threshold !== null);
+
+        // Distribute each electrical cable to the matching tier (key in object)
+        electricalCables.forEach(cableItem => {
+          const w = cableItem.weight || 0.35;
+          let matchedTier = null;
+
+          if (hasAnyThreshold) {
+            // 1. Check "до X" tiers in ascending order
+            matchedTier = parsedWM.tiers.find(t => !t.isOver && t.threshold !== null && w <= t.threshold);
+
+            // 2. If not found, check "свыше X" tier
+            if (!matchedTier) {
+              matchedTier = parsedWM.tiers.find(t => t.isOver && (t.threshold === null || w > t.threshold));
+            }
+
+            // 3. If still not found, check if there is an unthresholded work in the rule
+            if (!matchedTier) {
+              matchedTier = parsedWM.tiers.find(t => !t.isOver && t.threshold === null);
+            }
+          } else {
+            // If no tiers have thresholds, assign to first
+            matchedTier = parsedWM.tiers[0];
+          }
+
+          if (matchedTier) {
+            matchedTier.cables.push(cableItem);
+          } else {
+            // Cable weight exceeds all defined tiers
+            const highestThreshold = Math.max(...parsedWM.tiers.map(t => t.threshold || 0).filter(t => t > 0));
+            missingInRules.push({
+              type: `${ruleName} (кабель массой 1 м: ${w} кг свыше ${highestThreshold || 3} кг)`,
+              length: cableItem.length,
+              count: 1,
+              ruleName: ruleName,
+              missingType: 'tier',
+              tierMax: Math.ceil(w)
+            });
+          }
+        });
+
+        // Add calculated works and materials for tiers that have cables
+        parsedWM.tiers.forEach(tier => {
+          if (tier.cables.length === 0) return;
+
+          // Sort cables in this tier by length descending
+          tier.cables.sort((a, b) => (b.length || 0) - (a.length || 0));
+
+          const totalTierLength = Math.round(tier.cables.reduce((sum, c) => sum + c.length, 0) * 100) / 100;
+
+          const tierItems = (Array.isArray(tier.items) && tier.items.length > 0)
+            ? tier.items
+            : [{
+                "Наименование": (template && (template.includes('{масса}') || template.includes('{вес}')))
+                  ? template.replace(/\{масса\}|\{вес\}/gi, String(tier.threshold || '')).trim()
+                  : (tier.threshold !== null ? `Прокладка кабеля массой 1 м, кг, до: ${tier.threshold} (${ruleName})` : `Прокладка кабеля (${ruleName})`),
+                "Единицы измерения": "м",
+                "Формула": "ДЛИНА",
+                "Тип": "работа"
+              }];
+
+          const primaryWork = tierItems.find(w => (w["Тип"] || w.type) !== 'материал') || tierItems[0];
+          let primaryWorkTitle = (primaryWork["Наименование"] || primaryWork.name || '').trim();
+          if (!primaryWorkTitle && template && (template.includes('{масса}') || template.includes('{вес}'))) {
+            primaryWorkTitle = template.replace(/\{масса\}|\{вес\}/gi, String(tier.threshold || '')).trim();
+          }
+          if (!primaryWorkTitle) {
+            primaryWorkTitle = tier.threshold !== null
+              ? `Прокладка кабеля массой 1 м, кг, до: ${tier.threshold} (${ruleName})`
+              : `Прокладка кабеля (${ruleName})`;
+          }
+
+          // APPLY ALL WORKS AND MATERIALS FROM THIS TIER LIST
+          tierItems.forEach(item => {
+            const formula = item["Формула"] || item.formula || "ДЛИНА";
+            const rawVal = evaluateWorkFormula(formula, totalTierLength);
+            const isMaterial = (item["Тип"] || item.type) === 'материал';
+            const vol = isMaterial ? Math.round(rawVal * 1000) / 1000 : Math.round(rawVal * 100) / 100;
+            const unit = item["Единицы измерения"] || item.unit || 'м';
+            const itemName = (item["Наименование"] || item.name || primaryWorkTitle).trim();
+            const formulaDisplay = buildWorkFormulaDisplay(formula, totalTierLength, tier.cables.length, unit);
+
+            calculatedWorks.push({
+              name: itemName,
+              unit: unit,
+              volume: vol,
+              formulaDisplay: formulaDisplay,
+              ruleName: ruleName,
+              routingType: ruleName,
+              tierMax: tier.threshold,
+              tierKey: tier.key,
+              section: sectionName,
+              type: isMaterial ? 'материал' : 'работа',
+              parentWorkName: isMaterial ? primaryWorkTitle : undefined,
+              cablesCount: tier.cables.length,
+              comment: item["Комментарий"] || item.comment || ''
+            });
+          });
+
+          // List all cables under this primary work as materials
+          tier.cables.forEach(c => {
+            const kmVol = Number((c.length / 1000).toFixed(3));
+            calculatedWorks.push({
+              name: c.fullDescription || `Кабель ${c.type}`,
+              unit: 'км',
+              volume: kmVol,
+              formulaDisplay: `${kmVol.toFixed(3)} км (${Math.round(c.length)} м • масса 1 м: ${c.weight} кг)`,
+              ruleName: ruleName,
+              routingType: c.routingName,
+              cableType: c.type,
+              cableLength: c.length,
+              weight: c.weight,
+              foundInCatalog: !!c.foundInCatalog,
+              section: sectionName,
+              type: 'материал',
+              parentWorkName: primaryWorkTitle,
+              comment: ''
+            });
+          });
         });
       }
-    });
+    }
   });
 
   // Identify any routing types in cables that have no matching works in "Монтажные работы"
@@ -3455,12 +3862,57 @@ function setupWorksRulesListeners() {
           currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }));
         }
 
-        const sample = {
+        const targetKey = (currentObj && typeof currentObj === 'object' && !Array.isArray(currentObj))
+          ? (Array.isArray(currentObj["Монтажные работы"]) ? "Монтажные работы" : (Array.isArray(currentObj["Строительные работы"]) ? "Строительные работы" : (Object.keys(currentObj).find(k => Array.isArray(currentObj[k])) || "Монтажные работы")))
+          : "Монтажные работы";
+
+        const isMr = targetKey.toLowerCase().includes('монтаж');
+        const sample = isMr ? {
           "Название": "Новый способ прокладки (например, ГНБ)",
+          "Работы и материалы": {
+            "1": [
+              {
+                "Наименование": "Прокладка кабеля массой 1 м, кг, до: 1 (ГНБ)",
+                "МаксВес": 1,
+                "Единицы измерения": "м",
+                "Формула": "ДЛИНА",
+                "Тип": "работа"
+              }
+            ],
+            "2": [
+              {
+                "Наименование": "Прокладка кабеля массой 1 м, кг, до: 2 (ГНБ)",
+                "МаксВес": 2,
+                "Единицы измерения": "м",
+                "Формула": "ДЛИНА",
+                "Тип": "работа"
+              }
+            ],
+            "3": [
+              {
+                "Наименование": "Прокладка кабеля массой 1 м, кг, до: 3 (ГНБ)",
+                "МаксВес": 3,
+                "Единицы измерения": "м",
+                "Формула": "ДЛИНА",
+                "Тип": "работа"
+              }
+            ],
+            "оптический": [
+              {
+                "Наименование": "Прокладка оптического кабеля (ГНБ)",
+                "Категория": "Оптический кабель",
+                "Единицы измерения": "м",
+                "Формула": "ДЛИНА",
+                "Тип": "работа"
+              }
+            ]
+          }
+        } : {
+          "Название": "Новый способ разработки грунта",
           "Работы и материалы": [
             {
-              "Наименование": "Разработка грунта и прокладка кабеля",
-              "Единицы измерения": "м",
+              "Наименование": "Разработка грунта механизированным способом",
+              "Единицы измерения": "м3",
               "Формула": "ДЛИНА",
               "Тип": "работа"
             }
@@ -3470,9 +3922,6 @@ function setupWorksRulesListeners() {
         if (Array.isArray(currentObj)) {
           currentObj.push(sample);
         } else if (currentObj && typeof currentObj === 'object') {
-          const targetKey = Array.isArray(currentObj["Строительные работы"])
-            ? "Строительные работы"
-            : (Object.keys(currentObj).find(k => Array.isArray(currentObj[k])) || "Строительные работы");
           if (!Array.isArray(currentObj[targetKey])) {
             currentObj[targetKey] = [];
           }
@@ -3482,7 +3931,7 @@ function setupWorksRulesListeners() {
         textarea.value = JSON.stringify(currentObj, null, 2);
         validateWorksJsonInput();
         textarea.scrollTop = textarea.scrollHeight;
-        showToast('Шаблон нового способа прокладки добавлен в раздел «Строительные работы»', 'success', 'Добавлено');
+        showToast(`Шаблон нового способа прокладки добавлен в раздел «${targetKey}»`, 'success', 'Добавлено');
       } catch (err) {
         showToast('Ошибка при добавлении шаблона: ' + err.message, 'error', 'Ошибка');
       }
@@ -3693,77 +4142,123 @@ function addMissingCableWaysToRules(missingList) {
     currentWorksRules["Монтажные работы"] = [];
   }
 
+  const createDefaultMrObj = (typeName) => ({
+    "1": [
+      {
+        "Наименование": `Прокладка кабеля массой 1 м, кг, до: 1 (${typeName})`,
+        "МаксВес": 1,
+        "Единицы измерения": "м",
+        "Формула": "ДЛИНА",
+        "Тип": "работа"
+      }
+    ],
+    "2": [
+      {
+        "Наименование": `Прокладка кабеля массой 1 м, кг, до: 2 (${typeName})`,
+        "МаксВес": 2,
+        "Единицы измерения": "м",
+        "Формула": "ДЛИНА",
+        "Тип": "работа"
+      }
+    ],
+    "3": [
+      {
+        "Наименование": `Прокладка кабеля массой 1 м, кг, до: 3 (${typeName})`,
+        "МаксВес": 3,
+        "Единицы измерения": "м",
+        "Формула": "ДЛИНА",
+        "Тип": "работа"
+      }
+    ],
+    "оптический": [
+      {
+        "Наименование": `Прокладка оптического кабеля (${typeName})`,
+        "Категория": "Оптический кабель",
+        "Единицы измерения": "м",
+        "Формула": "ДЛИНА",
+        "Тип": "работа"
+      }
+    ]
+  });
+
   let addedCount = 0;
   missingList.forEach(m => {
     if (m && typeof m === 'object' && m.missingType === 'optical') {
       const targetRule = currentWorksRules["Монтажные работы"].find(r => matchesRule(m.ruleName, r["Название"] || r.name));
       if (targetRule) {
-        if (!Array.isArray(targetRule["Работы и материалы"])) targetRule["Работы и материалы"] = [];
-        const hasOpt = targetRule["Работы и материалы"].some(w => {
-          const cat = String(w["Категория"] || w.category || '').toLowerCase();
-          const nm = String(w["Наименование"] || w.name || '').toLowerCase();
-          return cat.includes('оптич') || nm.includes('оптическ');
+        if (!targetRule["Работы и материалы"] || typeof targetRule["Работы и материалы"] !== 'object') {
+          targetRule["Работы и материалы"] = {};
+        }
+        if (Array.isArray(targetRule["Работы и материалы"])) {
+          // Convert legacy array to object
+          const oldArr = targetRule["Работы и материалы"];
+          targetRule["Работы и материалы"] = {};
+          oldArr.forEach(w => {
+            const th = extractWeightThreshold(w);
+            const k = th !== null ? String(th) : "1";
+            if (!targetRule["Работы и материалы"][k]) targetRule["Работы и материалы"][k] = [];
+            targetRule["Работы и материалы"][k].push(w);
+          });
+        }
+        const wmObj = targetRule["Работы и материалы"];
+        const hasOpt = Object.keys(wmObj).some(k => {
+          if (k.toLowerCase().includes('оптич') || k.toLowerCase().includes('волс')) return true;
+          const arr = wmObj[k];
+          return Array.isArray(arr) && arr.some(w => {
+            const cat = String(w["Категория"] || w.category || '').toLowerCase();
+            const nm = String(w["Наименование"] || w.name || '').toLowerCase();
+            return cat.includes('оптич') || nm.includes('оптическ');
+          });
         });
         if (!hasOpt) {
-          targetRule["Работы и материалы"].push({
-            "Наименование": `Прокладка оптического кабеля (${targetRule["Название"] || m.ruleName})`,
-            "Единицы измерения": "м",
-            "Категория": "Оптический кабель",
-            "Формула": "ДЛИНА",
-            "Тип": "работа"
-          });
+          wmObj["оптический"] = [
+            {
+              "Наименование": `Прокладка оптического кабеля (${targetRule["Название"] || m.ruleName})`,
+              "Единицы измерения": "м",
+              "Категория": "Оптический кабель",
+              "Формула": "ДЛИНА",
+              "Тип": "работа"
+            }
+          ];
           addedCount++;
         }
       }
     } else if (m && typeof m === 'object' && m.missingType === 'tier') {
       const targetRule = currentWorksRules["Монтажные работы"].find(r => matchesRule(m.ruleName, r["Название"] || r.name));
       if (targetRule) {
-        if (!Array.isArray(targetRule["Работы и материалы"])) targetRule["Работы и материалы"] = [];
-        const hasTier = targetRule["Работы и материалы"].some(w => Number(w["МаксВес"] || w.maxWeight) === m.tierMax);
-        if (!hasTier) {
-          targetRule["Работы и материалы"].push({
-            "Наименование": `Прокладка кабеля массой 1 м, кг, до: ${m.tierMax} (${targetRule["Название"] || m.ruleName})`,
-            "Единицы измерения": "м",
-            "МаксВес": m.tierMax,
-            "Формула": "ДЛИНА",
-            "Тип": "работа"
+        if (!targetRule["Работы и материалы"] || typeof targetRule["Работы и материалы"] !== 'object') {
+          targetRule["Работы и материалы"] = {};
+        }
+        if (Array.isArray(targetRule["Работы и материалы"])) {
+          const oldArr = targetRule["Работы и материалы"];
+          targetRule["Работы и материалы"] = {};
+          oldArr.forEach(w => {
+            const th = extractWeightThreshold(w);
+            const k = th !== null ? String(th) : "1";
+            if (!targetRule["Работы и материалы"][k]) targetRule["Работы и материалы"][k] = [];
+            targetRule["Работы и материалы"][k].push(w);
           });
+        }
+        const wmObj = targetRule["Работы и материалы"];
+        const tierKey = String(m.tierMax || 1);
+        const hasTier = wmObj[tierKey] && wmObj[tierKey].length > 0;
+        if (!hasTier) {
+          wmObj[tierKey] = [
+            {
+              "Наименование": `Прокладка кабеля массой 1 м, кг, до: ${tierKey} (${targetRule["Название"] || m.ruleName})`,
+              "Единицы измерения": "м",
+              "МаксВес": Number(tierKey) || m.tierMax || 1,
+              "Формула": "ДЛИНА",
+              "Тип": "работа"
+            }
+          ];
           addedCount++;
         }
       }
     } else if (m && typeof m === 'object' && m.missingType === 'empty_rule') {
       const targetRule = currentWorksRules["Монтажные работы"].find(r => matchesRule(m.ruleName, r["Название"] || r.name));
       if (targetRule) {
-        targetRule["Работы и материалы"] = [
-          {
-            "Наименование": `Прокладка кабеля массой 1 м, кг, до: 1 (${targetRule["Название"] || m.ruleName})`,
-            "Единицы измерения": "м",
-            "МаксВес": 1,
-            "Формула": "ДЛИНА",
-            "Тип": "работа"
-          },
-          {
-            "Наименование": `Прокладка кабеля массой 1 м, кг, до: 2 (${targetRule["Название"] || m.ruleName})`,
-            "Единицы измерения": "м",
-            "МаксВес": 2,
-            "Формула": "ДЛИНА",
-            "Тип": "работа"
-          },
-          {
-            "Наименование": `Прокладка кабеля массой 1 м, кг, до: 3 (${targetRule["Название"] || m.ruleName})`,
-            "Единицы измерения": "м",
-            "МаксВес": 3,
-            "Формула": "ДЛИНА",
-            "Тип": "работа"
-          },
-          {
-            "Наименование": `Прокладка оптического кабеля (${targetRule["Название"] || m.ruleName})`,
-            "Единицы измерения": "м",
-            "Категория": "Оптический кабель",
-            "Формула": "ДЛИНА",
-            "Тип": "работа"
-          }
-        ];
+        targetRule["Работы и материалы"] = createDefaultMrObj(targetRule["Название"] || m.ruleName);
         addedCount++;
       }
     } else {
@@ -3773,69 +4268,11 @@ function addMissingCableWaysToRules(missingList) {
       if (!targetRule) {
         currentWorksRules["Монтажные работы"].push({
           "Название": typeName,
-          "Работы и материалы": [
-            {
-              "Наименование": `Прокладка кабеля массой 1 м, кг, до: 1 (${typeName})`,
-              "Единицы измерения": "м",
-              "МаксВес": 1,
-              "Формула": "ДЛИНА",
-              "Тип": "работа"
-            },
-            {
-              "Наименование": `Прокладка кабеля массой 1 м, кг, до: 2 (${typeName})`,
-              "Единицы измерения": "м",
-              "МаксВес": 2,
-              "Формула": "ДЛИНА",
-              "Тип": "работа"
-            },
-            {
-              "Наименование": `Прокладка кабеля массой 1 м, кг, до: 3 (${typeName})`,
-              "Единицы измерения": "м",
-              "МаксВес": 3,
-              "Формула": "ДЛИНА",
-              "Тип": "работа"
-            },
-            {
-              "Наименование": `Прокладка оптического кабеля (${typeName})`,
-              "Единицы измерения": "м",
-              "Категория": "Оптический кабель",
-              "Формула": "ДЛИНА",
-              "Тип": "работа"
-            }
-          ]
+          "Работы и материалы": createDefaultMrObj(typeName)
         });
         addedCount++;
-      } else if (!targetRule["Работы и материалы"] || targetRule["Работы и материалы"].length === 0) {
-        targetRule["Работы и материалы"] = [
-          {
-            "Наименование": `Прокладка кабеля массой 1 м, кг, до: 1 (${typeName})`,
-            "Единицы измерения": "м",
-            "МаксВес": 1,
-            "Формула": "ДЛИНА",
-            "Тип": "работа"
-          },
-          {
-            "Наименование": `Прокладка кабеля массой 1 м, кг, до: 2 (${typeName})`,
-            "Единицы измерения": "м",
-            "МаксВес": 2,
-            "Формула": "ДЛИНА",
-            "Тип": "работа"
-          },
-          {
-            "Наименование": `Прокладка кабеля массой 1 м, кг, до: 3 (${typeName})`,
-            "Единицы измерения": "м",
-            "МаксВес": 3,
-            "Формула": "ДЛИНА",
-            "Тип": "работа"
-          },
-          {
-            "Наименование": `Прокладка оптического кабеля (${typeName})`,
-            "Единицы измерения": "м",
-            "Категория": "Оптический кабель",
-            "Формула": "ДЛИНА",
-            "Тип": "работа"
-          }
-        ];
+      } else if (!targetRule["Работы и материалы"] || (Array.isArray(targetRule["Работы и материалы"]) && targetRule["Работы и материалы"].length === 0) || Object.keys(targetRule["Работы и материалы"]).length === 0) {
+        targetRule["Работы и материалы"] = createDefaultMrObj(typeName);
         addedCount++;
       }
     }
