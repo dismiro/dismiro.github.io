@@ -29,17 +29,22 @@ function getRuleWorks(rule) {
   return [];
 }
 
-// Evaluate formula (e.g. "ДЛИНА", "0.36*ДЛИНА", "1.05*ДЛИНА") with a given length value
-function evaluateWorkFormula(formula, lengthValue) {
-  const len = Number(lengthValue) || 0;
+// Evaluate formula (e.g. "ДЛИНА", "0.36*ДЛИНА", "1.05*ДЛИНА", "КОЛИЧЕСТВО", "1*КОЛИЧЕСТВО") with a given base value
+function evaluateWorkFormula(formula, baseValue) {
+  const num = Number(baseValue) || 0;
   if (!formula || typeof formula !== 'string' || !formula.trim()) {
-    return len;
+    return num;
   }
   const clean = formula.trim();
-  if (clean.toUpperCase() === 'ДЛИНА') {
-    return len;
+  const upper = clean.toUpperCase();
+  if (upper === 'ДЛИНА' || upper === 'КОЛИЧЕСТВО' || upper === 'КОЛ-ВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
+    return num;
   }
-  const expr = clean.replace(/,/g, '.').replace(/ДЛИНА/gi, String(len));
+  const expr = clean.replace(/,/g, '.')
+    .replace(/ДЛИНА/gi, String(num))
+    .replace(/КОЛИЧЕСТВО_МУФТ/gi, String(num))
+    .replace(/КОЛИЧЕСТВО/gi, String(num))
+    .replace(/КОЛ-ВО/gi, String(num));
   try {
     if (/^[0-9+\-*/().\s]+$/.test(expr)) {
       const val = Function("'use strict'; return (" + expr + ");")();
@@ -50,7 +55,7 @@ function evaluateWorkFormula(formula, lengthValue) {
   } catch (e) {
     // fallback
   }
-  return len;
+  return num;
 }
 
 // Build display string for formula in VOR
@@ -61,6 +66,30 @@ function buildWorkFormulaDisplay(formula, totalLength, itemsCount, unit) {
   }
   let disp = clean.replace(/,/g, '.').replace(/\*/g, ' * ');
   disp = disp.replace(/ДЛИНА/gi, `${totalLength.toLocaleString('ru-RU')} м кабеля`);
+  return disp;
+}
+
+// Build display string for coupling installation work formula
+function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume) {
+  const clean = (formula || 'КОЛИЧЕСТВО').trim();
+  const rawCount = tierData.count || 0;
+  const upper = clean.toUpperCase();
+
+  if (upper === 'КОЛИЧЕСТВО' || upper === 'КОЛ-ВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
+    if (tierData.couplings && tierData.couplings.length > 1) {
+      return tierData.couplings.map(c => `${c.count} шт`).join(' + ') + ` = ${rawCount} шт`;
+    }
+    return `${rawCount} шт`;
+  }
+
+  let disp = clean.replace(/,/g, '.').replace(/\*/g, ' * ');
+  disp = disp.replace(/КОЛИЧЕСТВО_МУФТ/gi, `${rawCount} шт`)
+             .replace(/КОЛИЧЕСТВО/gi, `${rawCount} шт`)
+             .replace(/КОЛ-ВО/gi, `${rawCount} шт`)
+             .replace(/ДЛИНА/gi, `${rawCount} шт`);
+  if (calculatedVolume !== undefined && calculatedVolume !== rawCount) {
+    disp += ` = ${calculatedVolume} шт`;
+  }
   return disp;
 }
 
@@ -421,6 +450,286 @@ function lookupCableInfo(rawType, catalog) {
   };
 }
 
+// --------------------------------------------------------------------------
+// COUPLING CATALOG & HELPER FUNCTIONS
+// --------------------------------------------------------------------------
+
+// Helper to get active coupling catalog from rules data
+function getCouplingCatalog(rulesData) {
+  if (rulesData && typeof rulesData === 'object' && !Array.isArray(rulesData)) {
+    if (rulesData["Справочник муфт"] && typeof rulesData["Справочник муфт"] === 'object') {
+      return rulesData["Справочник муфт"];
+    }
+    if (rulesData["Муфты"] && typeof rulesData["Муфты"] === 'object') {
+      return rulesData["Муфты"];
+    }
+  }
+  if (cachedDefaultRules && cachedDefaultRules["Справочник муфт"] && typeof cachedDefaultRules["Справочник муфт"] === 'object') {
+    return cachedDefaultRules["Справочник муфт"];
+  }
+  return {};
+}
+
+// Parse max cores from string (e.g. "24х0,9", "3-24х0,9", "7х0,9", "до 27 жил")
+function parseMaxCoresFromString(str) {
+  if (!str) return 0;
+  const s = String(str);
+  // Match "до 12", "до: 27", etc.
+  const doMatch = s.match(/до[:\s]+(\d+)/i);
+  if (doMatch) return parseInt(doMatch[1], 10);
+  // Match "3-24х0,9" or "27-61х0,9" -> take the larger number before 'х'
+  const rangeMatch = s.match(/(\d+)[-–](\d+)х/i);
+  if (rangeMatch) return parseInt(rangeMatch[2], 10);
+  // Match "24х0,9" or "7х" -> number before 'х'
+  const xMatch = s.match(/(\d+)х/i);
+  if (xMatch) return parseInt(xMatch[1], 10);
+  // Match any standalone number
+  const numMatch = s.match(/(\d+)/);
+  if (numMatch) return parseInt(numMatch[1], 10);
+  return 0;
+}
+
+// Lookup coupling metadata (full name, max cores, unit, foundInCatalog)
+function lookupCouplingInfo(rawType, couplingCatalog) {
+  const cat = couplingCatalog || getCouplingCatalog(currentWorksRules);
+  const str = String(rawType || '').trim();
+  if (!str) {
+    return {
+      type: '',
+      fullName: 'Соединительная муфта',
+      maxCores: 27,
+      unit: 'шт',
+      foundInCatalog: false
+    };
+  }
+
+  // Exact match
+  if (cat[str] && typeof cat[str] === 'object') {
+    const entry = cat[str];
+    const maxCores = Number(entry["МаксЖил"] || entry["Максимальное количество жил"] || entry["Количество жил"] || entry.maxCores) || parseMaxCoresFromString(str);
+    return {
+      type: str,
+      fullName: entry["Полное наименование"] || entry["Наименование"] || entry.name || str,
+      maxCores: maxCores || 27,
+      unit: entry["Единицы измерения"] || entry.unit || 'шт',
+      foundInCatalog: true
+    };
+  }
+
+  // Normalized key match
+  const normStr = str.toLowerCase().replace(/[\s\-_]+/g, '');
+  for (const [k, v] of Object.entries(cat)) {
+    if (!v || typeof v !== 'object') continue;
+    const normK = k.toLowerCase().replace(/[\s\-_]+/g, '');
+    if (normStr === normK || normStr.includes(normK) || normK.includes(normStr)) {
+      const maxCores = Number(v["МаксЖил"] || v["Максимальное количество жил"] || v["Количество жил"] || v.maxCores) || parseMaxCoresFromString(k);
+      return {
+        type: k,
+        fullName: v["Полное наименование"] || v["Наименование"] || v.name || k,
+        maxCores: maxCores || 27,
+        unit: v["Единицы измерения"] || v.unit || 'шт',
+        foundInCatalog: true
+      };
+    }
+  }
+
+  // Fallback if not found in coupling catalog
+  const parsedCores = parseMaxCoresFromString(str) || 27;
+  return {
+    type: str,
+    fullName: str.startsWith('Муфта') ? str : `Муфта кабельная соединительная ${str}`,
+    maxCores: parsedCores,
+    unit: 'шт',
+    foundInCatalog: false
+  };
+}
+
+// Determine coupling installation tier: 12, 27, 48, 61
+function getCouplingInstallationTier(maxCores) {
+  const cores = Number(maxCores) || 0;
+  if (cores <= 12) return 12;
+  if (cores <= 27) return 27;
+  if (cores <= 48) return 48;
+  return 61;
+}
+
+// Get coupling installation works array from rules or fallback
+function getCouplingInstallationWorkItems(tier, rulesData) {
+  const cableRules = getCableRules(rulesData || currentWorksRules);
+  const foundItems = [];
+  for (const r of cableRules.rules) {
+    const rName = (r["Название"] || r.name || '').toLowerCase();
+    if (rName.includes('муфт')) {
+      const wm = r["Работы и материалы"] || r["Работы"] || {};
+      const tierKey = String(tier);
+      let tierItems = null;
+      if (wm[tierKey] !== undefined) {
+        tierItems = Array.isArray(wm[tierKey]) ? wm[tierKey] : [wm[tierKey]];
+      } else if (Array.isArray(wm)) {
+        tierItems = wm.filter(it => {
+          const maxCores = Number(it["МаксЖил"] || it["Количество жил"] || it.maxCores);
+          return maxCores === Number(tier);
+        });
+      }
+
+      if (tierItems && tierItems.length > 0) {
+        tierItems.forEach(it => {
+          if (!it || typeof it !== 'object') return;
+          foundItems.push({
+            name: it["Наименование"] || it.name || '',
+            unit: it["Единицы измерения"] || it.unit || 'шт',
+            type: (it["Тип"] || it.type || 'работа').toLowerCase(),
+            formula: it["Формула"] || it.formula || 'КОЛИЧЕСТВО',
+            maxCores: it["МаксЖил"] || it["Количество жил"] || it.maxCores || tier
+          });
+        });
+        if (foundItems.length > 0) break;
+      }
+    }
+  }
+
+  if (foundItems.length === 0) {
+    foundItems.push({
+      name: `Установка муфты кабельной соединительной подземной для кабеля с количеством жил до: ${tier} с гидрофобным заполнением`,
+      unit: 'шт',
+      type: 'работа',
+      formula: 'КОЛИЧЕСТВО',
+      maxCores: tier
+    });
+  }
+  return foundItems;
+}
+
+// Get single coupling installation work definition (backwards compatibility)
+function getCouplingInstallationWorkItem(tier, rulesData) {
+  const items = getCouplingInstallationWorkItems(tier, rulesData);
+  return items.find(it => it.type === 'работа') || items[0];
+}
+
+// Calculate active couplings summary from active cables and catalog
+function getActiveCouplingsSummary(rulesData) {
+  const rules = rulesData || currentWorksRules || cachedDefaultRules;
+  const cableCatalog = getCableCatalog(rules);
+  const couplingCatalog = getCouplingCatalog(rules);
+
+  // Extract individual cable runs from tableCables or currentData
+  const cableRows = [];
+  const cableTable = document.getElementById('tableCables');
+  if (cableTable) {
+    const rows = cableTable.querySelectorAll('tbody tr');
+    rows.forEach(r => {
+      const typeCell = r.querySelector('[data-field="type"]');
+      const lengthCell = r.querySelector('[data-field="length"]');
+      const cableCell = r.querySelector('[data-field="cable"]');
+      if (typeCell && lengthCell) {
+        const rawType = typeCell.textContent.trim();
+        const length = parseFloat(lengthCell.textContent.replace(/\s+/g, '').replace(/,/g, '.')) || 0;
+        const cableName = cableCell ? cableCell.textContent.trim() : '';
+        cableRows.push({ type: rawType, length, cable: cableName });
+      }
+    });
+  } else if (currentData && Array.isArray(currentData.cables)) {
+    currentData.cables.forEach(c => {
+      cableRows.push({
+        type: c.type || '',
+        length: Number(c.length) || 0,
+        cable: c.cable || ''
+      });
+    });
+  }
+
+  const couplingsMap = new Map();
+  const missingCouplings = [];
+  const missingInCatalog = [];
+  let totalCouplingsCount = 0;
+
+  cableRows.forEach(c => {
+    if (!c.type || c.length <= 0) return;
+    const cMeta = lookupCableInfo(c.type, cableCatalog);
+    const buildLen = Number(cMeta.buildingLength) || 0;
+    const count = buildLen > 0 ? Math.floor(c.length / buildLen) : 0;
+    if (count > 0) {
+      totalCouplingsCount += count;
+      const cTypeKey = cMeta.coupling ? cMeta.coupling.trim() : '';
+      if (!cTypeKey) {
+        // Missing coupling configuration for cable
+        missingCouplings.push({
+          cable: c.cable || c.type,
+          cableType: c.type,
+          length: c.length,
+          buildingLength: buildLen,
+          couplingsNeeded: count
+        });
+      } else {
+        if (!couplingsMap.has(cTypeKey)) {
+          couplingsMap.set(cTypeKey, {
+            couplingType: cTypeKey,
+            count: 0,
+            cableTypes: new Set(),
+            cables: []
+          });
+        }
+        const item = couplingsMap.get(cTypeKey);
+        item.count += count;
+        item.cableTypes.add(c.type);
+        item.cables.push({
+          cable: c.cable || c.type,
+          type: c.type,
+          length: c.length,
+          count: count
+        });
+      }
+    }
+  });
+
+  const tiers = {
+    12: { tier: 12, titleTier: 'до 12 жил', count: 0, couplings: [] },
+    27: { tier: 27, titleTier: 'до 27 жил', count: 0, couplings: [] },
+    48: { tier: 48, titleTier: 'до 48 жил', count: 0, couplings: [] },
+    61: { tier: 61, titleTier: 'до 61 жил', count: 0, couplings: [] }
+  };
+
+  couplingsMap.forEach((cData, cTypeKey) => {
+    const cInfo = lookupCouplingInfo(cTypeKey, couplingCatalog);
+    if (!cInfo.foundInCatalog) {
+      missingInCatalog.push({
+        couplingType: cTypeKey,
+        count: cData.count,
+        usedInCables: Array.from(cData.cableTypes)
+      });
+    }
+    const tier = getCouplingInstallationTier(cInfo.maxCores);
+    tiers[tier].count += cData.count;
+    tiers[tier].couplings.push({
+      couplingType: cTypeKey,
+      fullName: cInfo.fullName,
+      maxCores: cInfo.maxCores,
+      unit: cInfo.unit || 'шт',
+      count: cData.count,
+      tier: tier,
+      cableTypes: Array.from(cData.cableTypes),
+      cables: cData.cables,
+      foundInCatalog: cInfo.foundInCatalog
+    });
+  });
+
+  let totalCablesWithCouplings = 0;
+  couplingsMap.forEach(item => {
+    totalCablesWithCouplings += item.cables.length;
+  });
+
+  return {
+    totalCouplingsCount,
+    couplingsCount: couplingsMap.size,
+    totalCablesWithCouplings,
+    tiers,
+    couplingsList: Array.from(couplingsMap.values()),
+    missingCouplings,
+    missingInCatalog,
+    hasMissingInfo: missingCouplings.length > 0 || missingInCatalog.length > 0
+  };
+}
+
 // Extract numeric weight threshold (kg/m) from a work item
 // Supports explicit properties (МаксВес, maxWeight, вес, масса) and parsing from Наименование
 // Handles decimal comma or dot ("1,5" -> 1.5, "1.5" -> 1.5)
@@ -721,6 +1030,22 @@ function setupEventListeners() {
     });
   }
 
+  const exportVorBtn = document.getElementById('exportVorBtn');
+  if (exportVorBtn) {
+    exportVorBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      exportCalculationResults();
+    });
+  }
+
+  const exportVorExcelQuickBtn = document.getElementById('exportVorExcelQuickBtn');
+  if (exportVorExcelQuickBtn) {
+    exportVorExcelQuickBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      exportVorExcel();
+    });
+  }
+
   // Works rules (JSON) event listeners
   const rulesFileInput = document.getElementById('rulesFileInput');
   if (rulesFileInput) {
@@ -944,18 +1269,6 @@ function renderProcessedData(data, fileName) {
     totalRoutingLength = data.routingTypeBlocks.reduce((acc, r) => acc + (Number(r.length) || 0), 0);
   }
 
-  // Update header badges
-  const cableBadgeTotal = document.getElementById('cableBadgeTotal');
-  if (cableBadgeTotal) {
-    cableBadgeTotal.textContent = `${totalCablesCount} шт. / ${Math.round(totalCableLength).toLocaleString('ru-RU')} м`;
-    cableBadgeTotal.classList.remove('d-none');
-  }
-  const routingBadgeTotal = document.getElementById('routingBadgeTotal');
-  if (routingBadgeTotal) {
-    routingBadgeTotal.textContent = `${totalRoutingCount} шт. / ${Math.round(totalRoutingLength).toLocaleString('ru-RU')} м`;
-    routingBadgeTotal.classList.remove('d-none');
-  }
-
   // Activate header controls toolbar and reset button
   const dataToolbar = document.getElementById('dataToolbarControls');
   if (dataToolbar) dataToolbar.classList.remove('d-none');
@@ -1021,15 +1334,15 @@ function createCablesAccordion(cables, totalLength) {
   table.innerHTML = `
     <thead class="table-sticky-header">
       <tr>
-        <th style="width: 45px;" class="text-center">№</th>
-        <th style="width: 85px;">handle</th>
-        <th style="min-width: 130px;">Обозначение</th>
-        <th style="width: 90px;" class="text-end">Длина,м</th>
-        <th style="min-width: 110px;">Тип кабеля</th>
-        <th style="min-width: 210px;">Способ прокладки</th>
-        <th style="width: 110px;" class="text-center">Муфты (шт.)</th>
-        <th style="width: 90px;" class="text-center">Соответствие длин</th>
-        <th class="action-col d-none" style="width: 40px;"></th>
+        <th style="width: 35px;" class="text-center">№</th>
+        <th style="width: 75px;">handle</th>
+        <th style="min-width: 110px;">Обозначение</th>
+        <th style="width: 75px;" class="text-end">Длина,м</th>
+        <th style="min-width: 100px;">Тип кабеля</th>
+        <th style="min-width: 160px;">Способ прокладки</th>
+        <th style="width: 85px;" class="text-center">Муфты</th>
+        <th style="width: 65px;" class="text-center">Длина</th>
+        <th class="action-col d-none" style="width: 35px;"></th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -1058,7 +1371,7 @@ function createCablesAccordion(cables, totalLength) {
     if (rawRouting && typeof rawRouting === 'object') {
       const entries = Object.entries(rawRouting);
       if (entries.length > 0) {
-        routingHtml = `<div class="d-flex flex-wrap gap-1 cell-wrap py-1">` + 
+        routingHtml = `<div class="d-flex flex-wrap gap-1 cell-wrap py-0_5">` + 
           entries.map(([rtype, lengths]) => {
             const arr = Array.isArray(lengths) ? lengths : [lengths];
             const sumForType = arr.reduce((acc, val) => acc + (Number(val) || 0), 0);
@@ -1073,8 +1386,8 @@ function createCablesAccordion(cables, totalLength) {
     }
 
     const mismatchIcon = c.lengthMismatch 
-      ? '<span class="d-inline-flex align-items-center justify-content-center text-danger" title="Несоответствие длины трассы" data-bs-toggle="tooltip"><i class="bx bx-error fs-4"></i></span>' 
-      : '<span class="d-inline-flex align-items-center justify-content-center text-success" title="Длина соответствует" data-bs-toggle="tooltip"><i class="bx bx-check fs-4"></i></span>';
+      ? '<span class="d-inline-flex align-items-center justify-content-center text-danger" title="Несоответствие длины трассы" data-bs-toggle="tooltip"><i class="bx bx-error fs-5"></i></span>' 
+      : '<span class="d-inline-flex align-items-center justify-content-center text-success" title="Длина соответствует" data-bs-toggle="tooltip"><i class="bx bx-check fs-5"></i></span>';
 
     const rawType = c.type || '';
     const normType = normalizeCableType(rawType);
@@ -1100,24 +1413,24 @@ function createCablesAccordion(cables, totalLength) {
     let couplingHtml = '';
     if (hasCouplingInfo) {
       const countBadge = couplingCount > 0 
-        ? `<span class="badge bg-primary text-white fw-bold px-2 py-1">${couplingCount}</span>` 
+        ? `<span class="badge bg-primary text-white fw-semibold px-1_5 py-0_5" style="font-size: 0.72rem;">${couplingCount}</span>` 
         : `<span class="text-muted small">0</span>`;
       couplingHtml = `
         <div class="d-flex flex-column align-items-center justify-content-center">
           <div>${countBadge}</div>
-          <div class="text-muted text-truncate font-monospace" style="font-size: 0.72rem; max-width: 120px;" title="Тип муфты: ${escapeHtml(couplingName)} (строит. длина: ${buildLen} м)">
+          <div class="text-muted text-truncate font-monospace" style="font-size: 0.68rem; max-width: 110px;" title="Тип муфты: ${escapeHtml(couplingName)} (строит. длина: ${buildLen} м)">
             ${escapeHtml(couplingName)}
           </div>
         </div>
       `;
     } else {
       const countBadge = couplingCount > 0 
-        ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning fw-bold px-2 py-1">${couplingCount}</span>` 
+        ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning fw-semibold px-1_5 py-0_5" style="font-size: 0.72rem;">${couplingCount}</span>` 
         : `<span class="text-muted small">0</span>`;
       couplingHtml = `
         <div class="d-flex flex-column align-items-center justify-content-center">
           <div>${countBadge}</div>
-          <span class="badge bg-warning-subtle text-warning border border-warning-subtle d-inline-flex align-items-center gap-1 mt-0_5 py-0 px-1" style="font-size: 0.68rem; cursor: pointer;" title="Тип муфты не указан в справочнике кабелей. Кликните, чтобы открыть справочник" onclick="openWorksRulesModal('cables')">
+          <span class="badge bg-warning-subtle text-warning border border-warning-subtle d-inline-flex align-items-center gap-1 mt-0_5 py-0 px-1" style="font-size: 0.65rem; cursor: pointer;" title="Тип муфты не указан в справочнике кабелей. Кликните, чтобы открыть справочник" onclick="openWorksRulesModal('cables')">
             <i class='bx bx-error-circle'></i>Нет типа муфты
           </span>
         </div>
@@ -1126,10 +1439,10 @@ function createCablesAccordion(cables, totalLength) {
 
     row.innerHTML = `
       <td class="text-muted small text-center">${idx + 1}</td>
-      <td class="font-monospace text-muted small cell-wrap">${escapeHtml(c.handle || '')}</td>
-      <td class="fw-bold canEdit cell-wrap" data-field="cable">${escapeHtml(c.cable || '')}</td>
-      <td class="canEdit text-end font-monospace fw-semibold" data-field="length">${c.length ?? 0}</td>
-      <td class="canEdit cell-wrap" data-field="type"${typeTitleAttr}>${escapeHtml(rawType)}</td>
+      <td class="font-monospace text-muted small cell-wrap" style="font-size: 0.75rem;">${escapeHtml(c.handle || '')}</td>
+      <td class="fw-medium canEdit cell-wrap small" data-field="cable">${escapeHtml(c.cable || '')}</td>
+      <td class="canEdit text-end font-monospace fw-semibold small" data-field="length">${c.length ?? 0}</td>
+      <td class="canEdit cell-wrap small" data-field="type"${typeTitleAttr}>${escapeHtml(rawType)}</td>
       <td class="cell-wrap">${routingHtml}</td>
       <td class="text-center align-middle">${couplingHtml}</td>
       <td class="text-center align-middle">${mismatchIcon}</td>
@@ -1344,7 +1657,7 @@ function createGenericTableAccordion(title, items) {
 
   const thead = document.createElement('thead');
   thead.className = 'table-sticky-header';
-  let headerHtml = '<tr><th style="width: 45px;" class="text-center">№</th>';
+  let headerHtml = '<tr><th style="width: 35px;" class="text-center">№</th>';
   keys.forEach(k => {
     headerHtml += `<th class="cell-wrap">${escapeHtml(k)}</th>`;
   });
@@ -1361,7 +1674,7 @@ function createGenericTableAccordion(title, items) {
       if (typeof val === 'object' && val !== null) {
         val = JSON.stringify(val);
       }
-      rowHtml += `<td class="canEdit cell-wrap" data-field="${escapeHtml(k)}">${escapeHtml(String(val ?? ''))}</td>`;
+      rowHtml += `<td class="canEdit cell-wrap small" data-field="${escapeHtml(k)}">${escapeHtml(String(val ?? ''))}</td>`;
     });
     row.innerHTML = rowHtml;
     tbody.appendChild(row);
@@ -1434,11 +1747,23 @@ function resetDataToEmpty() {
     collapsedFileBadge.setAttribute('data-bs-original-title', 'Файл не выбран');
   }
 
-  const cableBadgeTotal = document.getElementById('cableBadgeTotal');
-  if (cableBadgeTotal) cableBadgeTotal.classList.add('d-none');
+  const constructionBadgeTotal = document.getElementById('constructionBadgeTotal');
+  if (constructionBadgeTotal) constructionBadgeTotal.classList.add('d-none');
 
-  const routingBadgeTotal = document.getElementById('routingBadgeTotal');
-  if (routingBadgeTotal) routingBadgeTotal.classList.add('d-none');
+  const installationBadgeTotal = document.getElementById('installationBadgeTotal');
+  if (installationBadgeTotal) installationBadgeTotal.classList.add('d-none');
+
+  const trenchMissingBadge = document.getElementById('trenchMissingBadge');
+  if (trenchMissingBadge) trenchMissingBadge.classList.add('d-none');
+
+  const cableMissingBadge = document.getElementById('cableMissingBadge');
+  if (cableMissingBadge) cableMissingBadge.classList.add('d-none');
+
+  const constructionMissingBadge = document.getElementById('constructionMissingBadge');
+  if (constructionMissingBadge) constructionMissingBadge.classList.add('d-none');
+
+  const installationMissingBadge = document.getElementById('installationMissingBadge');
+  if (installationMissingBadge) installationMissingBadge.classList.add('d-none');
 
   // Hide header search and expand/collapse controls
   const dataToolbar = document.getElementById('dataToolbarControls');
@@ -1500,6 +1825,41 @@ function resetDataToEmpty() {
         <i class='bx bx-layer fs-1 mb-2 text-muted opacity-50 d-block'></i>
         <div class="fw-medium mb-1">Сводка по траншеям</div>
         <p class="small text-muted mb-0 px-2">Нажмите «Расчет», чтобы сгруппировать типы траншей и трасс с подсчетом метража</p>
+      </div>
+    `;
+  }
+  const resultCouplingsStatement = document.getElementById('resultCouplingsStatement');
+  if (resultCouplingsStatement) {
+    resultCouplingsStatement.innerHTML = `
+      <div class="text-center py-4 py-md-5 text-muted">
+        <i class='bx bx-git-merge fs-1 mb-2 text-secondary opacity-50 d-block'></i>
+        <div class="fw-medium mb-1">Сводка по соединительным муфтам</div>
+        <p class="small text-muted mb-0 px-2">Нажмите «Расчет», чтобы выполнить подсчет муфт по строительным длинам кабелей и сгруппировать работы</p>
+      </div>
+    `;
+  }
+  const couplingBadgeTotal = document.getElementById('couplingBadgeTotal');
+  if (couplingBadgeTotal) couplingBadgeTotal.classList.add('d-none');
+  const couplingMissingBadge = document.getElementById('couplingMissingBadge');
+  if (couplingMissingBadge) couplingMissingBadge.classList.add('d-none');
+
+  const resultConstructionWorks = document.getElementById('resultConstructionWorks');
+  if (resultConstructionWorks) {
+    resultConstructionWorks.innerHTML = `
+      <div class="text-center py-4 py-md-5 text-muted">
+        <i class='bx bx-spreadsheet fs-1 mb-2 text-secondary opacity-50 d-block'></i>
+        <div class="fw-medium mb-1">Строительные работы (ВОР)</div>
+        <p class="small text-muted mb-0 px-2">Нажмите «Расчет», чтобы рассчитать объемы земляных и строительных работ по траншеям</p>
+      </div>
+    `;
+  }
+  const resultInstallationWorks = document.getElementById('resultInstallationWorks');
+  if (resultInstallationWorks) {
+    resultInstallationWorks.innerHTML = `
+      <div class="text-center py-4 py-md-5 text-muted">
+        <i class='bx bx-wrench fs-1 mb-2 text-secondary opacity-50 d-block'></i>
+        <div class="fw-medium mb-1">Монтажные работы (ВОР)</div>
+        <p class="small text-muted mb-0 px-2">Нажмите «Расчет», чтобы рассчитать объемы монтажных работ и кабельной продукции</p>
       </div>
     `;
   }
@@ -1744,11 +2104,18 @@ function calculateVolumes() {
 
   const trenchWorksCalc = renderRoutingResult(routingSummary, grandTotalRoutingCount, grandTotalRoutingLength);
 
-  // Check if any rules are missing in either Cable works or Trench works
+  // 3. Calculate and render Couplings summary
+  const couplingsSummary = getActiveCouplingsSummary(currentWorksRules);
+  renderCouplingsResult(couplingsSummary);
+
+  // Check if any rules or data are missing in Cable works, Trench works, or Couplings
   const cableMissingCount = (cableWorksCalc && cableWorksCalc.missingInRules) ? cableWorksCalc.missingInRules.length : 0;
   const trenchMissingCount = (trenchWorksCalc && trenchWorksCalc.missingInRules) ? trenchWorksCalc.missingInRules.length : 0;
+  const couplingMissingCount = couplingsSummary.hasMissingInfo
+    ? ((couplingsSummary.missingCouplings || []).length + (couplingsSummary.missingInCatalog || []).length)
+    : 0;
 
-  if (cableMissingCount > 0 || trenchMissingCount > 0) {
+  if (cableMissingCount > 0 || trenchMissingCount > 0 || couplingMissingCount > 0) {
     const missingItems = [];
     if (cableMissingCount > 0) {
       const names = cableWorksCalc.missingInRules.map(m => `«${m.type}»`).join(', ');
@@ -1758,10 +2125,13 @@ function calculateVolumes() {
       const names = trenchWorksCalc.missingInRules.map(m => `«${m.type}»`).join(', ');
       missingItems.push(`по траншеям: ${names}`);
     }
+    if (couplingMissingCount > 0) {
+      missingItems.push(`по муфтам: ${couplingMissingCount} неполных позиций`);
+    }
     showToast(
-      `Внимание: файл правил не полон (${missingItems.join('; ')}). Работы по ним не вошли в ВОР. Нажмите «Добавить в правила JSON» в блоке предупреждения.`,
+      `Внимание: обнаружены неполные данные (${missingItems.join('; ')}). Проверьте предупреждения в ведомостях.`,
       'warning',
-      'Файл правил не полон'
+      'Внимание'
     );
   } else {
     showToast('Расчет объемов успешно выполнен', 'success', 'Расчет завершен');
@@ -1820,29 +2190,94 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
     `</div>`;
   }
 
+  container.innerHTML = `
+    <div class="mb-2 d-flex flex-wrap gap-2">
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Длина кабелей</div>
+        <div class="fw-bold text-primary font-monospace" style="font-size: 0.9rem;">${Math.round(totalLength).toLocaleString('ru-RU')} <span class="fw-normal text-muted" style="font-size: 0.7rem;">м</span></div>
+      </div>
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Всего ниток</div>
+        <div class="fw-bold font-monospace" style="font-size: 0.9rem;">${totalCount} <span class="fw-normal text-muted" style="font-size: 0.7rem;">шт</span></div>
+      </div>
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Типов кабеля</div>
+        <div class="fw-bold font-monospace" style="font-size: 0.9rem;">${entries.length}</div>
+      </div>
+    </div>
+
+    <div class="table-responsive table-responsive-full rounded-2 border">
+      <table class="table table-sm table-hover text-start align-middle mb-0">
+        <thead class="table-sticky-header">
+          <tr>
+            <th style="width: 40px;" class="text-center">№</th>
+            <th style="min-width: 120px;">Марка кабеля</th>
+            <th class="text-center" style="width: 50px;">Шт</th>
+            <th class="text-end" style="width: 90px;">Длина,м</th>
+            <th style="min-width: 200px;">Способы прокладки</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+        <tfoot class="table-sticky-footer fw-bold">
+          <tr>
+            <td colspan="2" class="ps-2">Итого:</td>
+            <td class="text-center font-monospace">${totalCount}</td>
+            <td class="text-end font-monospace text-primary">${Math.round(totalLength).toLocaleString('ru-RU')}</td>
+            <td class="cell-wrap">${grandRoutingHtml}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+
   // Calculate works from cables according to rules JSON ("Монтажные работы")
   const cableWorksCalc = calculateWorksFromCables(summary, currentWorksRules);
   window.lastCableWorksCalc = cableWorksCalc;
 
-  // Update header badge on "Ведомость кабелей"
-  const cableMissingBadge = document.getElementById('cableMissingBadge');
-  if (cableMissingBadge) {
-    if (cableWorksCalc.missingInRules.length > 0) {
-      cableMissingBadge.classList.remove('d-none');
-      cableMissingBadge.innerHTML = `Неполные правила (${cableWorksCalc.missingInRules.length})`;
-      cableMissingBadge.onclick = () => openWorksRulesModal('editor');
-    } else {
-      cableMissingBadge.classList.add('d-none');
-    }
+  // Render "Монтажные работы" into Column 3
+  renderInstallationWorks(cableWorksCalc);
+
+  return cableWorksCalc;
+}
+
+function renderInstallationWorks(cableWorksCalc) {
+  const container = document.getElementById('resultInstallationWorks');
+  if (!container) return;
+
+  const worksCount = cableWorksCalc.works.filter(w => w.type === 'работа').length;
+  const materialsCount = cableWorksCalc.works.filter(w => w.type === 'материал').length;
+
+  const badgeTotal = document.getElementById('installationBadgeTotal');
+  if (badgeTotal) {
+    badgeTotal.textContent = `${worksCount} раб. / ${materialsCount} мат.`;
+    badgeTotal.classList.remove('d-none');
   }
 
+  // Update header badges
+  const cableMissingBadge = document.getElementById('cableMissingBadge');
+  const installationMissingBadge = document.getElementById('installationMissingBadge');
+  const hasMissing = cableWorksCalc.missingInRules && cableWorksCalc.missingInRules.length > 0;
+
+  [cableMissingBadge, installationMissingBadge].forEach(b => {
+    if (!b) return;
+    if (hasMissing) {
+      b.classList.remove('d-none');
+      b.innerHTML = `Неполные правила (${cableWorksCalc.missingInRules.length})`;
+      b.onclick = () => openWorksRulesModal('editor');
+    } else {
+      b.classList.add('d-none');
+    }
+  });
+
   let missingCableAlertHtml = '';
-  if (cableWorksCalc.missingInRules.length > 0) {
+  if (hasMissing) {
     const missingBadges = cableWorksCalc.missingInRules
       .map(m => `<span class="badge bg-body text-body border me-1 font-monospace" style="font-size: 0.75rem;">${escapeHtml(m.type)} <span class="text-muted">(${Math.round(m.length)} м)</span></span>`)
       .join(' ');
     missingCableAlertHtml = `
-      <div class="alert alert-warning py-2 px-3 small d-flex align-items-start justify-content-between gap-2 mb-3 mt-2 flex-wrap border-warning shadow-sm">
+      <div class="alert alert-warning py-2 px-3 small d-flex align-items-start justify-content-between gap-2 mb-3 flex-wrap border-warning shadow-sm">
         <div class="d-flex align-items-start gap-2">
           <i class="bx bx-error-circle fs-5 text-warning flex-shrink-0 mt-0_5"></i>
           <div>
@@ -1870,7 +2305,7 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
       .map(m => `<span class="badge bg-body text-body border me-1 font-monospace" style="font-size: 0.75rem;">${escapeHtml(m.type)} <span class="text-muted">(${Math.round(m.length)} м, расч. ~${m.fallbackWeight} кг/м)</span></span>`)
       .join(' ');
     missingCatalogAlertHtml = `
-      <div class="alert alert-warning py-2 px-3 small d-flex align-items-start justify-content-between gap-2 mb-3 mt-2 flex-wrap border-warning shadow-sm">
+      <div class="alert alert-warning py-2 px-3 small d-flex align-items-start justify-content-between gap-2 mb-3 flex-wrap border-warning shadow-sm">
         <div class="d-flex align-items-start gap-2">
           <i class="bx bx-error-circle fs-5 text-warning flex-shrink-0 mt-0_5"></i>
           <div>
@@ -1881,7 +2316,7 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
               ${missingBadges}
             </div>
             <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
-              Для данных кабелей применен приблизительный вес 1 м (до 1 кг/м). Рекомендуется дополнить справочник кабелей точными паспортными данными (масса 1 м, строительная длина, муфта) для корректного распределения по весовым подвидам работ («до: 1», «до: 2», «до: 3»).
+              Для данных кабелей применен приблизительный вес 1 м (до 1 кг/м). Рекомендуется дополнить справочник точными паспортными данными.
             </div>
           </div>
         </div>
@@ -1893,187 +2328,78 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
   }
 
   let cableWorksRowsHtml = '';
-  const worksCount = cableWorksCalc.works.filter(w => w.type === 'работа').length;
-  const materialsCount = cableWorksCalc.works.filter(w => w.type === 'материал').length;
-
   cableWorksCalc.works.forEach((w, idx) => {
-    if (w.type === 'материал') {
-      const isCableMaterial = !!w.cableType;
-      const opticalMatBadge = w.isOptical
-        ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.65rem;">ВОЛС</span>`
-        : '';
-      const catalogStatusBadge = (w.foundInCatalog === false)
-        ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" style="font-size: 0.65rem;" title="Марка отсутствует в справочнике кабелей. Принят оценочный вес: ${w.weight} кг/м"><i class="bx bx-error me-0_5"></i>нет в справочнике (расч. ${w.weight} кг/м)</span>`
-        : '';
+    const isMaterial = (w.type === 'материал' || (w.type && String(w.type).toLowerCase().trim() === 'материал'));
+    const isWork = !isMaterial;
+    const rowClass = isWork ? 'table-row-work' : 'table-row-material';
 
-      let metaContent = '';
-      if (isCableMaterial) {
-        metaContent = `
-          <span class="meta-label">Марка: <span class="meta-cable fw-semibold">${escapeHtml(w.cableType || '')}</span>${opticalMatBadge}${catalogStatusBadge}</span>
-          <span class="text-muted opacity-50">•</span>
-          <span class="meta-label">Длина: <strong class="text-body">${Math.round(w.cableLength || 0)} м</strong></span>
-          <span class="text-muted opacity-50">•</span>
-          ${w.isOptical ? `<span class="meta-label">Категория: <strong class="text-info-emphasis">Оптический кабель</strong></span>` : `<span class="meta-label">Масса 1 м: <strong class="text-body">${w.weight} кг</strong></span>`}
-        `;
-      } else {
-        metaContent = `
-          <span class="meta-label">Способ: <span class="meta-method fw-semibold">${escapeHtml(w.routingType || w.ruleName)}</span></span>
-          ${w.tierKey ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border">ключ "${escapeHtml(w.tierKey)}"</span>` : ''}
-          ${w.comment ? `<span class="text-muted ms-1 fst-italic">(${escapeHtml(w.comment)})</span>` : ''}
-        `;
-      }
+    const tagBadge = isMaterial
+      ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">материал</span>`
+      : '';
+    const opticalBadge = w.isOptical
+      ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">ВОЛС</span>`
+      : '';
+    const catalogBadge = (w.foundInCatalog === false)
+      ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;" title="Марка не найдена в справочнике кабелей"><i class="bx bx-error me-0_5"></i>нет в справочнике</span>`
+      : '';
 
-      cableWorksRowsHtml += `
-        <tr class="work-material-row align-middle">
-          <td class="text-muted small text-center opacity-75">${idx + 1}</td>
-          <td class="cell-wrap small ps-4">
-            <div class="d-flex align-items-start gap-1">
-              <span class="badge badge-material me-1 mt-0_5 flex-shrink-0">материал</span>
-              <div>
-                <div class="material-description">${escapeHtml(w.name)}</div>
-                <div class="work-item-meta fs-xs d-flex align-items-center gap-1 flex-wrap mt-0_5">
-                  ${metaContent}
-                </div>
-              </div>
-            </div>
-          </td>
-          <td class="text-center small text-nowrap fw-medium text-body">${escapeHtml(w.unit)}</td>
-          <td class="text-end font-monospace fw-semibold text-primary">${w.volume.toLocaleString('ru-RU', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
-          <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.72rem;">${escapeHtml(w.formulaDisplay)}</td>
-        </tr>
-      `;
-    } else {
-      const typeBadge = w.isOptical
-        ? `<span class="badge bg-info text-white" style="font-size: 0.65rem;">Оптический кабель</span>`
-        : `<span class="badge bg-primary text-white" style="font-size: 0.65rem;">Работа</span>`;
+    const volumeStr = w.volume.toLocaleString('ru-RU', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: w.unit === 'км' ? 3 : 2
+    });
 
-      const tierBadge = w.isOptical
-        ? `<span class="badge bg-info-subtle text-info-emphasis border">ВОЛС</span>`
-        : (w.tierMax ? `<span class="badge bg-info-subtle text-info-emphasis border">до ${w.tierMax} кг/м</span>` : (w.tierKey ? `<span class="badge bg-info-subtle text-info-emphasis border">ключ "${escapeHtml(w.tierKey)}"</span>` : ''));
+    const commentHtml = w.comment
+      ? `<div class="text-muted small mt-0_5" style="font-size: 0.74rem; font-weight: normal;"><i class='bx bx-detail me-1 opacity-75'></i>${escapeHtml(w.comment)}</div>`
+      : '';
 
-      cableWorksRowsHtml += `
-        <tr class="table-light border-top border-primary border-2">
-          <td class="small text-center fw-bold text-primary">${idx + 1}</td>
-          <td class="cell-wrap small">
-            <div class="fw-bold text-dark fs-6">${escapeHtml(w.name)}</div>
-            <div class="work-item-meta fs-xs d-flex align-items-center gap-1 flex-wrap mt-0_5">
-              ${typeBadge}
-              <span class="meta-label">Способ: <span class="meta-method fw-semibold">${escapeHtml(w.routingType || w.ruleName)}</span></span>
-              ${tierBadge}
-              ${w.cablesCount ? `<span class="badge bg-secondary-subtle text-dark border">${w.cablesCount} мар. кабеля</span>` : ''}
-              ${w.comment ? `<span class="text-muted ms-1 fst-italic">(${escapeHtml(w.comment)})</span>` : ''}
-            </div>
-          </td>
-          <td class="text-center small text-nowrap fw-bold">${escapeHtml(w.unit)}</td>
-          <td class="text-end font-monospace fw-bold text-success fs-6">${w.volume.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.72rem;">${escapeHtml(w.formulaDisplay)}</td>
-        </tr>
-      `;
-    }
+    cableWorksRowsHtml += `
+      <tr class="${rowClass}">
+        <td class="text-muted small text-center">${idx + 1}</td>
+        <td class="cell-wrap ${isWork ? 'fw-semibold' : 'fw-medium ps-3'}">
+          ${escapeHtml(w.name)}${tagBadge}${opticalBadge}${catalogBadge}
+          ${commentHtml}
+        </td>
+        <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
+        <td class="text-end font-monospace fw-bold text-success">${volumeStr}</td>
+        <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${escapeHtml(w.formulaDisplay)}</td>
+      </tr>
+    `;
   });
 
-  const cableWorksSectionHtml = `
-    <div class="mt-3 pt-3 border-top">
-      <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bx bx-wrench text-primary fs-5"></i>
-          <span class="fw-bold fs-6">Монтажные работы (ВОР)</span>
-          <span class="badge bg-primary-subtle text-primary border">${worksCount} работ, ${materialsCount} мат.</span>
-        </div>
-      </div>
-
+  if (cableWorksCalc.works.length > 0) {
+    container.innerHTML = `
       ${missingCableAlertHtml}
       ${missingCatalogAlertHtml}
 
-      ${cableWorksCalc.works.length > 0 ? `
-        <div class="table-responsive rounded-2 border mb-2" style="max-height: 260px; overflow-y: auto;">
-          <table class="table table-sm table-hover text-start align-middle mb-0" style="font-size: 0.8rem;">
-            <thead class="table-sticky-header">
-              <tr>
-                <th style="width: 30px;" class="text-center">№</th>
-                <th>Наименование работ</th>
-                <th class="text-center" style="width: 55px;">Ед.</th>
-                <th class="text-end" style="width: 75px;">Объем</th>
-                <th style="width: 100px;">Формула</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${cableWorksRowsHtml}
-            </tbody>
-          </table>
-        </div>
-
-        <button type="button" id="exportCableVorBtn" class="btn btn-sm btn-outline-success w-100 d-flex align-items-center justify-content-center gap-2 py-1_5 shadow-sm">
-          <i class="bx bx-file fs-5"></i> Скачать ВОР в формате GGE (.gge / XML)
+      <div class="table-responsive rounded-2 border mb-0 custom-table-scroll" style="max-height: 420px;">
+        <table class="table table-sm table-hover text-start align-middle mb-0">
+          <thead class="table-sticky-header">
+            <tr>
+              <th style="width: 35px;" class="text-center">№</th>
+              <th>Работы и материалы</th>
+              <th class="text-center" style="width: 55px;">Ед.</th>
+              <th class="text-end" style="width: 75px;">Объем</th>
+              <th style="width: 110px;">Формула</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${cableWorksRowsHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      ${missingCableAlertHtml}
+      ${missingCatalogAlertHtml}
+      <div class="text-center py-4 px-2 text-muted small bg-light rounded border">
+        <i class="bx bx-info-circle fs-4 d-block mb-1 text-secondary"></i>
+        <div>Работы не определены для текущих способов прокладки кабелей.</div>
+        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('editor')">
+          <i class="bx bx-edit"></i> Настроить раздел «Монтажные работы» в JSON
         </button>
-      ` : `
-        <div class="text-center py-3 px-2 text-muted small bg-light rounded border">
-          <i class="bx bx-info-circle fs-5 d-block mb-1 text-secondary"></i>
-          <div>Работы не определены для текущих способов прокладки кабелей.</div>
-          <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('editor')">
-            <i class="bx bx-edit"></i> Настроить раздел «Монтажные работы» в JSON
-          </button>
-        </div>
-      `}
-    </div>
-  `;
-
-  container.innerHTML = `
-    <div class="mb-3 d-flex flex-wrap gap-2">
-      <div class="stat-summary-card flex-fill text-center">
-        <div class="text-muted small text-uppercase fs-xs">Длина кабелей</div>
-        <div class="fw-bold fs-5 text-primary font-monospace">${Math.round(totalLength).toLocaleString('ru-RU')} <span class="fs-xs fw-normal text-muted">м</span></div>
       </div>
-      <div class="stat-summary-card flex-fill text-center">
-        <div class="text-muted small text-uppercase fs-xs">Всего ниток</div>
-        <div class="fw-bold fs-5 font-monospace">${totalCount} <span class="fs-xs fw-normal text-muted">шт</span></div>
-      </div>
-      <div class="stat-summary-card flex-fill text-center">
-        <div class="text-muted small text-uppercase fs-xs">Типов кабеля</div>
-        <div class="fw-bold fs-5 font-monospace">${entries.length}</div>
-      </div>
-    </div>
-
-    <div class="table-responsive table-responsive-full rounded-2 border">
-      <table class="table table-sm table-hover text-start align-middle mb-0">
-        <thead class="table-sticky-header">
-          <tr>
-            <th style="width: 40px;" class="text-center">№</th>
-            <th style="min-width: 120px;">Марка кабеля</th>
-            <th class="text-center" style="width: 50px;">Шт</th>
-            <th class="text-end" style="width: 90px;">Длина,м</th>
-            <th style="min-width: 220px;">Способы прокладки</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rowsHtml}
-        </tbody>
-        <tfoot class="table-sticky-footer fw-bold">
-          <tr>
-            <td colspan="2" class="ps-2">Итого:</td>
-            <td class="text-center font-monospace">${totalCount}</td>
-            <td class="text-end font-monospace text-primary">${Math.round(totalLength).toLocaleString('ru-RU')}</td>
-            <td class="cell-wrap">${grandRoutingHtml}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-
-    ${cableWorksSectionHtml}
-  `;
-
-  const exportCableVorBtn = document.getElementById('exportCableVorBtn');
-  if (exportCableVorBtn) {
-    exportCableVorBtn.addEventListener('click', () => {
-      exportCalculationResults();
-    });
-  }
-
-  const editCableWorksRulesQuickBtn = document.getElementById('editCableWorksRulesQuickBtn');
-  if (editCableWorksRulesQuickBtn) {
-    editCableWorksRulesQuickBtn.addEventListener('click', () => {
-      openWorksRulesModal('editor');
-    });
+    `;
   }
 
   const addMissingCableRulesBtn = document.getElementById('addMissingCableRulesBtn');
@@ -2089,8 +2415,6 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
       addMissingCablesToCatalog(cableWorksCalc.missingInCatalog);
     });
   }
-
-  return cableWorksCalc;
 }
 
 function renderRoutingResult(summary, totalCount, totalLength) {
@@ -2118,122 +2442,19 @@ function renderRoutingResult(summary, totalCount, totalLength) {
     `;
   });
 
-  // Calculate works from trenches according to rules JSON
-  const trenchSummary = getActiveTrenchSummary();
-  const worksCalc = calculateWorksFromTrenches(trenchSummary, currentWorksRules);
-  window.lastTrenchWorksCalc = worksCalc;
-
-  // Update header badge on "Ведомость траншей и типов прокладки"
-  const trenchMissingBadge = document.getElementById('trenchMissingBadge');
-  if (trenchMissingBadge) {
-    if (worksCalc.missingInRules.length > 0) {
-      trenchMissingBadge.classList.remove('d-none');
-      trenchMissingBadge.innerHTML = `Неполные правила (${worksCalc.missingInRules.length})`;
-      trenchMissingBadge.onclick = () => openWorksRulesModal('editor');
-    } else {
-      trenchMissingBadge.classList.add('d-none');
-    }
-  }
-
-  let missingAlertHtml = '';
-  if (worksCalc.missingInRules.length > 0) {
-    const missingBadges = worksCalc.missingInRules
-      .map(m => `<span class="badge bg-body text-body border me-1 font-monospace" style="font-size: 0.75rem;">${escapeHtml(m.type)} <span class="text-muted">(${Math.round(m.length)} м)</span></span>`)
-      .join(' ');
-    missingAlertHtml = `
-      <div class="alert alert-warning py-2 px-3 small d-flex align-items-start justify-content-between gap-2 mb-3 mt-2 flex-wrap border-warning shadow-sm">
-        <div class="d-flex align-items-start gap-2">
-          <i class="bx bx-error-circle fs-5 text-warning flex-shrink-0 mt-0_5"></i>
-          <div>
-            <div class="fw-bold text-dark mb-1">
-              Внимание: в разделе «Строительные работы» отсутствуют сметные нормы для ${worksCalc.missingInRules.length} способов прокладки:
-            </div>
-            <div class="d-flex flex-wrap gap-1 align-items-center mb-1">
-              ${missingBadges}
-            </div>
-            <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
-              Для данных способов прокладки работы не определены в правилах и не вошли в итоговую ведомость (ВОР). Рекомендуется дополнить сметные нормы соответствующими позициями работ и материалов.
-            </div>
-          </div>
-        </div>
-        <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" id="addMissingRulesBtn" style="font-size: 0.75rem;" title="Добавить эти способы прокладки в правила JSON">
-          <i class="bx bx-plus-circle"></i> Добавить в правила JSON
-        </button>
-      </div>
-    `;
-  }
-
-  let worksRowsHtml = '';
-  worksCalc.works.forEach((w, idx) => {
-    worksRowsHtml += `
-      <tr>
-        <td class="text-muted small text-center">${idx + 1}</td>
-        <td class="cell-wrap small fw-medium">${escapeHtml(w.name)}</td>
-        <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
-        <td class="text-end font-monospace fw-bold text-success">${w.volume.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.72rem;">${escapeHtml(w.formulaDisplay)}</td>
-      </tr>
-    `;
-  });
-
-  const worksSectionHtml = `
-    <div class="mt-3 pt-3 border-top">
-      <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bx bx-spreadsheet text-success fs-5"></i>
-          <span class="fw-bold fs-6">Строительные работы (ВОР)</span>
-          <span class="badge bg-success-subtle text-success-emphasis border">${worksCalc.works.length} поз.</span>
-        </div>
-      </div>
-
-      ${missingAlertHtml}
-
-      ${worksCalc.works.length > 0 ? `
-        <div class="table-responsive rounded-2 border mb-2" style="max-height: 260px; overflow-y: auto;">
-          <table class="table table-sm table-hover text-start align-middle mb-0" style="font-size: 0.8rem;">
-            <thead class="table-sticky-header">
-              <tr>
-                <th style="width: 30px;" class="text-center">№</th>
-                <th>Наименование работ</th>
-                <th class="text-center" style="width: 55px;">Ед.</th>
-                <th class="text-end" style="width: 75px;">Объем</th>
-                <th style="width: 100px;">Формула</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${worksRowsHtml}
-            </tbody>
-          </table>
-        </div>
-
-        <button type="button" id="exportVorBtn" class="btn btn-sm btn-success w-100 d-flex align-items-center justify-content-center gap-2 py-1_5 shadow-sm">
-          <i class="bx bx-file fs-5"></i> Скачать ВОР в формате GGE (.gge / XML)
-        </button>
-      ` : `
-        <div class="text-center py-3 px-2 text-muted small bg-light rounded border">
-          <i class="bx bx-info-circle fs-5 d-block mb-1 text-secondary"></i>
-          <div>Работы не определены для текущих способов прокладки.</div>
-          <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('editor')">
-            <i class="bx bx-edit"></i> Настроить правила в JSON
-          </button>
-        </div>
-      `}
-    </div>
-  `;
-
   container.innerHTML = `
-    <div class="mb-3 d-flex flex-wrap gap-2">
-      <div class="stat-summary-card flex-fill text-center">
-        <div class="text-muted small text-uppercase fs-xs">Длина трасс</div>
-        <div class="fw-bold fs-5 text-info-emphasis font-monospace">${Math.round(totalLength).toLocaleString('ru-RU')} <span class="fs-xs fw-normal text-muted">м</span></div>
+    <div class="mb-2 d-flex flex-wrap gap-2">
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Длина трасс</div>
+        <div class="fw-bold text-info-emphasis font-monospace" style="font-size: 0.9rem;">${Math.round(totalLength).toLocaleString('ru-RU')} <span class="fw-normal text-muted" style="font-size: 0.7rem;">м</span></div>
       </div>
-      <div class="stat-summary-card flex-fill text-center">
-        <div class="text-muted small text-uppercase fs-xs">Участков</div>
-        <div class="fw-bold fs-5 font-monospace">${totalCount} <span class="fs-xs fw-normal text-muted">шт</span></div>
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Участков</div>
+        <div class="fw-bold font-monospace" style="font-size: 0.9rem;">${totalCount} <span class="fw-normal text-muted" style="font-size: 0.7rem;">шт</span></div>
       </div>
-      <div class="stat-summary-card flex-fill text-center">
-        <div class="text-muted small text-uppercase fs-xs">Типов траншей</div>
-        <div class="fw-bold fs-5 font-monospace">${entries.length}</div>
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Типов траншей</div>
+        <div class="fw-bold font-monospace" style="font-size: 0.9rem;">${entries.length}</div>
       </div>
     </div>
 
@@ -2261,22 +2482,127 @@ function renderRoutingResult(summary, totalCount, totalLength) {
         </tfoot>
       </table>
     </div>
-
-    ${worksSectionHtml}
   `;
 
-  const exportVorBtn = document.getElementById('exportVorBtn');
-  if (exportVorBtn) {
-    exportVorBtn.addEventListener('click', () => {
-      exportCalculationResults();
-    });
+  // Calculate works from trenches according to rules JSON ("Строительные работы")
+  const trenchSummary = getActiveTrenchSummary();
+  const worksCalc = calculateWorksFromTrenches(trenchSummary, currentWorksRules);
+  window.lastTrenchWorksCalc = worksCalc;
+
+  // Render "Строительные работы" into Column 3
+  renderConstructionWorks(worksCalc);
+
+  return worksCalc;
+}
+
+function renderConstructionWorks(worksCalc) {
+  const container = document.getElementById('resultConstructionWorks');
+  if (!container) return;
+
+  const badgeTotal = document.getElementById('constructionBadgeTotal');
+  if (badgeTotal) {
+    badgeTotal.textContent = `${worksCalc.works.length} поз.`;
+    badgeTotal.classList.remove('d-none');
   }
 
-  const editWorksRulesQuickBtn = document.getElementById('editWorksRulesQuickBtn');
-  if (editWorksRulesQuickBtn) {
-    editWorksRulesQuickBtn.addEventListener('click', () => {
-      openWorksRulesModal('editor');
-    });
+  // Update header badges
+  const trenchMissingBadge = document.getElementById('trenchMissingBadge');
+  const constructionMissingBadge = document.getElementById('constructionMissingBadge');
+  const hasMissing = worksCalc.missingInRules && worksCalc.missingInRules.length > 0;
+
+  [trenchMissingBadge, constructionMissingBadge].forEach(badge => {
+    if (!badge) return;
+    if (hasMissing) {
+      badge.classList.remove('d-none');
+      badge.innerHTML = `Неполные правила (${worksCalc.missingInRules.length})`;
+      badge.onclick = () => openWorksRulesModal('editor');
+    } else {
+      badge.classList.add('d-none');
+    }
+  });
+
+  let missingAlertHtml = '';
+  if (hasMissing) {
+    const missingBadges = worksCalc.missingInRules
+      .map(m => `<span class="badge bg-body text-body border me-1 font-monospace" style="font-size: 0.75rem;">${escapeHtml(m.type)} <span class="text-muted">(${Math.round(m.length)} м)</span></span>`)
+      .join(' ');
+    missingAlertHtml = `
+      <div class="alert alert-warning py-2 px-3 small d-flex align-items-start justify-content-between gap-2 mb-3 flex-wrap border-warning shadow-sm">
+        <div class="d-flex align-items-start gap-2">
+          <i class="bx bx-error-circle fs-5 text-warning flex-shrink-0 mt-0_5"></i>
+          <div>
+            <div class="fw-bold text-dark mb-1">
+              Внимание: в разделе «Строительные работы» отсутствуют сметные нормы для ${worksCalc.missingInRules.length} способов прокладки:
+            </div>
+            <div class="d-flex flex-wrap gap-1 align-items-center mb-1">
+              ${missingBadges}
+            </div>
+            <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
+              Для данных способов прокладки работы не определены в правилах и не вошли в итоговую ведомость (ВОР). Рекомендуется дополнить сметные нормы соответствующими позициями работ и материалов.
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" id="addMissingRulesBtn" style="font-size: 0.75rem;" title="Добавить эти способы прокладки в правила JSON">
+          <i class="bx bx-plus-circle"></i> Добавить в правила JSON
+        </button>
+      </div>
+    `;
+  }
+
+  let worksRowsHtml = '';
+  worksCalc.works.forEach((w, idx) => {
+    const isMaterial = (w.type === 'материал' || (w.type && String(w.type).toLowerCase().trim() === 'материал'));
+    const isWork = !isMaterial;
+    const rowClass = isWork ? 'table-row-work' : 'table-row-material';
+    const tagBadge = isMaterial
+      ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">материал</span>`
+      : '';
+
+    worksRowsHtml += `
+      <tr class="${rowClass}">
+        <td class="text-muted small text-center">${idx + 1}</td>
+        <td class="cell-wrap ${isWork ? 'fw-semibold' : 'fw-medium ps-3'}">
+          ${escapeHtml(w.name)}${tagBadge}
+        </td>
+        <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
+        <td class="text-end font-monospace fw-bold text-success">${w.volume.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${escapeHtml(w.formulaDisplay)}</td>
+      </tr>
+    `;
+  });
+
+  if (worksCalc.works.length > 0) {
+    container.innerHTML = `
+      ${missingAlertHtml}
+
+      <div class="table-responsive rounded-2 border mb-0 custom-table-scroll" style="max-height: 420px;">
+        <table class="table table-sm table-hover text-start align-middle mb-0">
+          <thead class="table-sticky-header">
+            <tr>
+              <th style="width: 35px;" class="text-center">№</th>
+              <th>Наименование работ</th>
+              <th class="text-center" style="width: 55px;">Ед.</th>
+              <th class="text-end" style="width: 75px;">Объем</th>
+              <th style="width: 110px;">Формула</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${worksRowsHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      ${missingAlertHtml}
+      <div class="text-center py-4 px-2 text-muted small bg-light rounded border">
+        <i class="bx bx-info-circle fs-4 d-block mb-1 text-secondary"></i>
+        <div>Работы не определены для текущих способов прокладки.</div>
+        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('editor')">
+          <i class="bx bx-edit"></i> Настроить правила в JSON
+        </button>
+      </div>
+    `;
   }
 
   const addMissingRulesBtn = document.getElementById('addMissingRulesBtn');
@@ -2285,8 +2611,196 @@ function renderRoutingResult(summary, totalCount, totalLength) {
       addMissingTrenchTypesToRules(worksCalc.missingInRules);
     });
   }
+}
 
-  return worksCalc;
+// --------------------------------------------------------------------------
+// RENDER COUPLINGS STATEMENT ("Ведомость соединительных муфт")
+// --------------------------------------------------------------------------
+
+function renderCouplingsResult(couplingsSummary) {
+  const container = document.getElementById('resultCouplingsStatement');
+  if (!container) return;
+
+  const totalCouplingsCount = couplingsSummary.totalCouplingsCount || 0;
+  const activeCouplingTypesCount = couplingsSummary.couplingsCount || 0;
+  const totalCablesWithCouplings = couplingsSummary.totalCablesWithCouplings || 0;
+
+  // Header badges update
+  const couplingBadgeTotal = document.getElementById('couplingBadgeTotal');
+  if (couplingBadgeTotal) {
+    couplingBadgeTotal.textContent = `${totalCouplingsCount} шт`;
+    couplingBadgeTotal.classList.remove('d-none');
+  }
+
+  const couplingMissingBadge = document.getElementById('couplingMissingBadge');
+  if (couplingMissingBadge) {
+    if (couplingsSummary.hasMissingInfo) {
+      const missingTotal = (couplingsSummary.missingCouplings || []).length + (couplingsSummary.missingInCatalog || []).length;
+      couplingMissingBadge.classList.remove('d-none');
+      couplingMissingBadge.innerHTML = `<i class='bx bx-error-circle me-1'></i>Неполные данные (${missingTotal})`;
+      couplingMissingBadge.onclick = () => openWorksRulesModal('couplings');
+    } else {
+      couplingMissingBadge.classList.add('d-none');
+    }
+  }
+
+  // Missing info alert HTML if applicable
+  let missingAlertHtml = '';
+  if (couplingsSummary.hasMissingInfo) {
+    const missingItemsList = [];
+    if (couplingsSummary.missingCouplings && couplingsSummary.missingCouplings.length > 0) {
+      couplingsSummary.missingCouplings.forEach(mc => {
+        missingItemsList.push(
+          `<li><strong>Кабель «${escapeHtml(mc.cable)}» (${escapeHtml(mc.cableType)})</strong>: длина ${Math.round(mc.length)} м, требуется ${mc.couplingsNeeded} муфт, но тип муфты не указан в справочнике кабелей.</li>`
+        );
+      });
+    }
+    if (couplingsSummary.missingInCatalog && couplingsSummary.missingInCatalog.length > 0) {
+      couplingsSummary.missingInCatalog.forEach(mc => {
+        missingItemsList.push(
+          `<li><strong>Муфта «${escapeHtml(mc.couplingType)}»</strong> (${mc.count} шт, кабели: ${escapeHtml(mc.usedInCables.join(', '))}): отсутствует в «Справочнике муфт».</li>`
+        );
+      });
+    }
+
+    missingAlertHtml = `
+      <div class="alert alert-warning py-2 px-3 small mb-2 border-warning shadow-sm">
+        <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+          <div class="d-flex align-items-start gap-2">
+            <i class="bx bx-error-circle fs-5 text-warning flex-shrink-0 mt-0_5"></i>
+            <div>
+              <div class="fw-bold text-dark mb-1">
+                Внимание: неполная информация о соединительных муфтах (${missingItemsList.length} поз.)
+              </div>
+              <ul class="mb-1 ps-3 text-muted" style="font-size: 0.8rem; line-height: 1.35;">
+                ${missingItemsList.join('')}
+              </ul>
+              <div class="text-muted" style="font-size: 0.75rem;">
+                Рекомендуется добавить отсутствующие марки муфт в «Справочник муфт» или указать муфты в справочнике кабелей для точного формирования сметных норм.
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('couplings')">
+            <i class="bx bx-edit"></i> Справочник муфт
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Stat summary cards
+  const statsHtml = `
+    <div class="mb-2 d-flex flex-wrap gap-2">
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Всего муфт</div>
+        <div class="fw-bold text-warning-emphasis font-monospace" style="font-size: 0.9rem;">${totalCouplingsCount} <span class="fw-normal text-muted" style="font-size: 0.7rem;">шт</span></div>
+      </div>
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Марок муфт</div>
+        <div class="fw-bold font-monospace" style="font-size: 0.9rem;">${activeCouplingTypesCount}</div>
+      </div>
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Кабелей с муфтами</div>
+        <div class="fw-bold font-monospace" style="font-size: 0.9rem;">${totalCablesWithCouplings} <span class="fw-normal text-muted" style="font-size: 0.7rem;">шт</span></div>
+      </div>
+    </div>
+  `;
+
+  if (totalCouplingsCount === 0 && !couplingsSummary.hasMissingInfo) {
+    container.innerHTML = `
+      ${statsHtml}
+      <div class="alert alert-light border py-3 text-center text-muted small mb-0 rounded-2">
+        <i class="bx bx-check-circle fs-3 text-success d-block mb-1"></i>
+        Все кабели в проекте укладываются в строительные длины без соединительных муфт (0 шт).
+      </div>
+    `;
+    return;
+  }
+
+  // Build rows for Column 2: purely coupling specification (Типы, количество муфт и кабели, на которые она устанавливается)
+  let rowsHtml = '';
+  let rowIdx = 1;
+
+  const allCouplings = [];
+  [12, 27, 48, 61].forEach(tier => {
+    const tierData = couplingsSummary.tiers[tier];
+    if (!tierData || tierData.count <= 0) return;
+    tierData.couplings.forEach(c => allCouplings.push(c));
+  });
+
+  allCouplings.forEach(coupling => {
+    const missingWarning = !coupling.foundInCatalog
+      ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" style="font-size: 0.65rem;" title="Марка муфты не найдена в справочнике муфт"><i class="bx bx-error-circle me-0_5"></i>нет в справочнике</span>`
+      : '';
+
+    // Group cables by cableType
+    const cablesByTypeHtml = Array.from(coupling.cableTypes).map(cType => {
+      const cablesOfType = (coupling.cables || []).filter(c => c.type === cType);
+      const cablePills = cablesOfType.map(c => `
+        <span class="routing-tag font-monospace" title="Трасса: ${escapeHtml(c.cable)}, строительная длина: ${Math.round(c.length)} м">
+          <i class='bx bx-cable me-1 text-muted'></i><strong>${escapeHtml(c.cable)}</strong> <span class="text-muted">(${Math.round(c.length)} м — ${c.count} шт)</span>
+        </span>
+      `).join(' ');
+
+      return `
+        <div class="mb-1_5">
+          <div class="d-flex align-items-center gap-1 mb-1">
+            <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace" style="font-size: 0.72rem;">${escapeHtml(cType)}</span>
+            <span class="text-muted small" style="font-size: 0.74rem;">${cablesOfType.length} ${cablesOfType.length === 1 ? 'кабель' : 'кабелей'}, ${cablesOfType.reduce((s, x) => s + x.count, 0)} шт:</span>
+          </div>
+          <div class="d-flex flex-wrap gap-1 ps-1">
+            ${cablePills}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    rowsHtml += `
+      <tr>
+        <td class="text-muted small text-center">${rowIdx++}</td>
+        <td class="cell-wrap">
+          <div class="fw-bold text-dark font-monospace" style="font-size: 0.88rem;">${escapeHtml(coupling.couplingType)}${missingWarning}</div>
+          <div class="text-muted small mt-0_5" style="font-size: 0.75rem; line-height: 1.35;">${escapeHtml(coupling.fullName)}</div>
+          <div class="mt-1">
+            <span class="badge bg-info-subtle text-info-emphasis border" style="font-size: 0.68rem;">группа монтажа до ${coupling.tier || getCouplingInstallationTier(coupling.maxCores)} жил</span>
+          </div>
+        </td>
+        <td class="text-center align-middle">
+          <span class="badge bg-warning-subtle text-warning-emphasis border font-monospace fw-bold fs-6 px-2 py-1">${coupling.count} шт</span>
+        </td>
+        <td class="cell-wrap align-middle">
+          ${cablesByTypeHtml}
+        </td>
+      </tr>
+    `;
+  });
+
+  container.innerHTML = `
+    ${statsHtml}
+    ${missingAlertHtml}
+    <div class="table-responsive table-responsive-full rounded-2 border">
+      <table class="table table-sm table-hover text-start align-middle mb-0">
+        <thead class="table-sticky-header">
+          <tr>
+            <th style="width: 35px;" class="text-center align-middle">№</th>
+            <th style="min-width: 150px;" class="align-middle">Тип и марка муфты</th>
+            <th class="text-center align-middle" style="width: 85px;">Кол-во</th>
+            <th style="min-width: 180px;" class="align-middle">Кабели, на которые устанавливается</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+        <tfoot class="table-sticky-footer fw-bold">
+          <tr>
+            <td colspan="2" class="ps-2">Всего соединительных муфт:</td>
+            <td class="text-center font-monospace text-warning-emphasis">${totalCouplingsCount} шт</td>
+            <td class="small text-muted font-monospace">Кабельных трасс с муфтами: ${totalCablesWithCouplings} шт</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
 }
 
 // Export current data as JSON
@@ -2463,6 +2977,7 @@ function renderRulesModalContent() {
   
   // Render cables tab content as well
   renderCableCatalogModalContent();
+  renderCouplingCatalogModalContent();
 
   if (!container) return;
 
@@ -2842,6 +3357,108 @@ function renderCableCatalogModalContent() {
   `;
 }
 
+// --------------------------------------------------------------------------
+// RENDER COUPLING CATALOG TAB IN WORKS RULES MODAL
+// --------------------------------------------------------------------------
+
+function renderCouplingCatalogModalContent() {
+  const container = document.getElementById('couplingCatalogContainer');
+  const tabBadge = document.getElementById('tabWorksCouplingsCountBadge');
+  if (!container) return;
+
+  const catalog = getCouplingCatalog(currentWorksRules) || {};
+  const entries = Object.entries(catalog);
+  const totalCouplingsCount = entries.length;
+
+  if (tabBadge) {
+    tabBadge.textContent = totalCouplingsCount;
+  }
+
+  // Search filter query
+  const searchInput = document.getElementById('couplingCatalogSearchInput');
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const clearBtn = document.getElementById('couplingCatalogClearSearchBtn');
+  if (clearBtn) {
+    if (query) clearBtn.classList.remove('d-none');
+    else clearBtn.classList.add('d-none');
+  }
+
+  const filtered = entries.filter(([mark, data]) => {
+    if (!query) return true;
+    const fullName = (data && data["Полное наименование"]) || '';
+    const maxCores = (data && data["МаксЖил"]) !== undefined ? String(data["МаксЖил"]) : '';
+    const unit = (data && data["Единицы измерения"]) || '';
+    const haystack = `${mark} ${fullName} ${maxCores} ${unit}`.toLowerCase();
+    return haystack.includes(query);
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-5 text-muted bg-light rounded border">
+        <i class="bx bx-search-alt fs-1 text-muted opacity-50 mb-2 d-block"></i>
+        <div class="fw-semibold">По вашему запросу муфты не найдены</div>
+        <div class="small text-muted mt-1">Попробуйте изменить поисковый запрос или добавьте новую муфту через кнопку «Добавить шаблон муфты»</div>
+      </div>
+    `;
+    return;
+  }
+
+  let rowsHtml = '';
+  filtered.forEach(([mark, data], idx) => {
+    const fullName = (data && data["Полное наименование"]) || mark;
+    const maxCores = (data && data["МаксЖил"]) !== undefined ? data["МаксЖил"] : parseMaxCoresFromString(mark);
+    const unit = (data && data["Единицы измерения"]) || 'шт';
+    const tier = getCouplingInstallationTier(maxCores);
+
+    rowsHtml += `
+      <tr>
+        <td class="text-center text-muted small ps-3">${idx + 1}</td>
+        <td>
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace py-1 px-2" style="font-size: 0.82rem;">${escapeHtml(mark)}</span>
+        </td>
+        <td>
+          <div class="text-body fw-medium" style="line-height: 1.35;">${escapeHtml(fullName)}</div>
+        </td>
+        <td class="text-center">
+          <span class="badge bg-body-secondary text-body border" style="font-size: 0.78rem;">до ${maxCores} жил</span>
+        </td>
+        <td class="text-center">
+          <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle font-monospace" style="font-size: 0.75rem;">до ${tier} жил</span>
+        </td>
+        <td class="text-center font-monospace text-muted small pe-3">${escapeHtml(unit)}</td>
+      </tr>
+    `;
+  });
+
+  container.innerHTML = `
+    <div class="small text-muted mb-2 d-flex justify-content-between align-items-center">
+      <div>Показано: <strong>${filtered.length}</strong> из ${totalCouplingsCount} позиций муфт в справочнике</div>
+      <div class="fs-xs text-muted">
+        <i class='bx bx-info-circle me-1'></i>Монтажные работы распределяются по группам жил: <strong>до 12, 27, 48, 61</strong>
+      </div>
+    </div>
+    <div class="card border shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 40px;" class="text-center ps-3">№</th>
+              <th style="width: 240px;">Обозначение / Марка</th>
+              <th>Полное наименование</th>
+              <th style="width: 120px;" class="text-center">Макс. жил</th>
+              <th style="width: 140px;" class="text-center">Группа монтажа</th>
+              <th style="width: 70px;" class="text-center pe-3">Ед. изм.</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 // Match trench/routing type against rule name strictly without heuristic guessing
 function matchesRule(trenchTypeName, ruleName) {
   if (!trenchTypeName || !ruleName) return false;
@@ -3026,10 +3643,62 @@ function calculateWorksFromCables(cableSummary, rulesData) {
     }
   });
 
+  // Calculate and prepend coupling installation works and materials
+  const couplingsSummary = getActiveCouplingsSummary(rulesData);
+  const activeCouplingTiers = [12, 27, 48, 61];
+  activeCouplingTiers.forEach(tier => {
+    const tierData = couplingsSummary.tiers[tier];
+    if (tierData && tierData.count > 0) {
+      const workItems = getCouplingInstallationWorkItems(tier, rulesData);
+      
+      // 1. Add all defined work/material items from rules array for this tier
+      workItems.forEach(workItem => {
+        const formula = workItem.formula || 'КОЛИЧЕСТВО';
+        const rawVol = evaluateWorkFormula(formula, tierData.count);
+        const volume = Math.round(rawVol * 100) / 100;
+        const formulaDisplay = buildCouplingWorkFormulaDisplay(formula, tierData, volume);
+
+        calculatedWorks.push({
+          name: workItem.name,
+          unit: workItem.unit || 'шт',
+          volume: volume,
+          volumeFormatted: String(volume),
+          formula: formula,
+          formulaDisplay: formulaDisplay,
+          tier: tier,
+          section: sectionName,
+          type: workItem.type || 'работа',
+          parentWorkName: null,
+          comment: `Установка соединительных муфт (до ${tier} жил)`
+        });
+      });
+
+      // 2. Following material lines for each coupling type
+      const primaryWorkName = workItems[0] ? workItems[0].name : null;
+      tierData.couplings.forEach(coupling => {
+        calculatedWorks.push({
+          name: coupling.fullName,
+          unit: coupling.unit || 'шт',
+          volume: coupling.count,
+          volumeFormatted: String(coupling.count),
+          formula: 'КОЛИЧЕСТВО',
+          formulaDisplay: `${coupling.count} шт`,
+          tier: tier,
+          maxCores: coupling.maxCores,
+          section: sectionName,
+          type: 'материал',
+          parentWorkName: primaryWorkName,
+          comment: `Кабели: ${coupling.cableTypes.join(', ')}`
+        });
+      });
+    }
+  });
+
   // Iterate rules in the JSON file order
   rules.forEach(rule => {
     const ruleName = (rule["Название"] || rule.name || '').trim();
     if (!ruleName) return;
+    if (ruleName.toLowerCase().includes('муфт')) return; // Handled specifically above by couplings calculation
 
     const parsedWM = parseRuleWorksAndMaterials(rule);
     const template = (rule["Шаблон"] || rule.template || '').trim();
@@ -3351,7 +4020,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
   return {
     works: calculatedWorks,
     missingInRules,
-    missingInCatalog
+    missingInCatalog,
+    couplingsSummary
   };
 }
 
@@ -3370,7 +4040,8 @@ function getAllCalculatedWorks() {
     missingInRules: [ ...trenchCalc.missingInRules, ...cableCalc.missingInRules ],
     trenchMissing: trenchCalc.missingInRules,
     cableMissing: cableCalc.missingInRules,
-    cableMissingInCatalog: cableCalc.missingInCatalog || []
+    cableMissingInCatalog: cableCalc.missingInCatalog || [],
+    couplingsSummary: cableCalc.couplingsSummary
   };
 }
 
@@ -3622,6 +4293,11 @@ function generateVorWorkbook(worksData, currentFileName) {
     const wsRouting = XLSX.utils.table_to_sheet(resRouting);
     XLSX.utils.book_append_sheet(wb, wsRouting, 'Ведомость траншей');
   }
+  const resCouplings = document.querySelector('#resultCouplingsStatement table');
+  if (resCouplings) {
+    const wsCouplings = XLSX.utils.table_to_sheet(resCouplings);
+    XLSX.utils.book_append_sheet(wb, wsCouplings, 'Ведомость муфт');
+  }
 
   return wb;
 }
@@ -3787,7 +4463,7 @@ function syncTableToCurrentData() {
 // WORKS RULES & NORMS JSON EDITOR
 // --------------------------------------------------------------------------
 
-// Open Works Rules Modal with specific tab active ('editor', 'cards', or 'cables')
+// Open Works Rules Modal with specific tab active ('editor', 'cards', 'cables', or 'couplings')
 function openWorksRulesModal(activeTab = 'editor') {
   const modalEl = document.getElementById('worksRulesModal');
   if (!modalEl) return;
@@ -3809,6 +4485,11 @@ function openWorksRulesModal(activeTab = 'editor') {
     const cablesTabBtn = document.getElementById('tabWorksCablesBtn');
     if (cablesTabBtn && window.bootstrap && bootstrap.Tab) {
       bootstrap.Tab.getOrCreateInstance(cablesTabBtn).show();
+    }
+  } else if (activeTab === 'couplings') {
+    const couplingsTabBtn = document.getElementById('tabWorksCouplingsBtn');
+    if (couplingsTabBtn && window.bootstrap && bootstrap.Tab) {
+      bootstrap.Tab.getOrCreateInstance(couplingsTabBtn).show();
     }
   } else {
     const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
@@ -3834,6 +4515,7 @@ function validateWorksJsonInput() {
   const statChars = document.getElementById('worksStatChars');
   const statTrenches = document.getElementById('worksStatTrenches');
   const statCables = document.getElementById('worksStatCables');
+  const statCouplings = document.getElementById('worksStatCouplings');
   const statWorks = document.getElementById('worksStatWorks');
 
   if (!textarea) return false;
@@ -3869,9 +4551,17 @@ function validateWorksJsonInput() {
       });
     }
 
+    // Count couplings in catalog
+    const couplingCatalog = getCouplingCatalog(parsed) || {};
+    const totalCouplingsCount = (couplingCatalog && typeof couplingCatalog === 'object') ? Object.keys(couplingCatalog).length : 0;
+
     if (statTrenches) statTrenches.textContent = totalWaysCount.toLocaleString('ru-RU');
     if (statCables) statCables.textContent = totalCablesCount.toLocaleString('ru-RU');
+    if (statCouplings) statCouplings.textContent = totalCouplingsCount.toLocaleString('ru-RU');
     if (statWorks) statWorks.textContent = totalWorksCount.toLocaleString('ru-RU');
+
+    const tabCouplingsBadge = document.getElementById('tabWorksCouplingsCountBadge');
+    if (tabCouplingsBadge) tabCouplingsBadge.textContent = totalCouplingsCount;
 
     if (badge) {
       badge.className = 'badge bg-success-subtle text-success border border-success-subtle ms-2';
@@ -3886,6 +4576,7 @@ function validateWorksJsonInput() {
   } catch (err) {
     if (statTrenches) statTrenches.textContent = '—';
     if (statCables) statCables.textContent = '—';
+    if (statCouplings) statCouplings.textContent = '—';
     if (statWorks) statWorks.textContent = '—';
 
     if (badge) {
@@ -4100,6 +4791,68 @@ function setupWorksRulesListeners() {
   const cableCatFilter = document.getElementById('cableCatalogCategoryFilter');
   if (cableCatFilter) {
     cableCatFilter.addEventListener('change', renderCableCatalogModalContent);
+  }
+
+  // Add coupling template sample (+ Муфта)
+  const insertCouplingSample = () => {
+    try {
+      let currentObj;
+      try {
+        currentObj = JSON.parse(textarea.value);
+      } catch {
+        currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || {}));
+      }
+
+      if (!currentObj["Справочник муфт"] || typeof currentObj["Справочник муфт"] !== 'object' || Array.isArray(currentObj["Справочник муфт"])) {
+        currentObj["Справочник муфт"] = {};
+      }
+
+      const sampleMark = "МСХз-Новая-48";
+      currentObj["Справочник муфт"][sampleMark] = {
+        "Полное наименование": "Муфта соединительная холодноусаживаемая МСХз-Новая до 48 жил",
+        "МаксЖил": 48,
+        "Единицы измерения": "шт"
+      };
+
+      textarea.value = JSON.stringify(currentObj, null, 2);
+      validateWorksJsonInput();
+      textarea.scrollTop = textarea.scrollHeight;
+
+      // Switch to editor tab if not there
+      const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
+      if (jsonTabBtn && window.bootstrap && bootstrap.Tab) {
+        bootstrap.Tab.getOrCreateInstance(jsonTabBtn).show();
+      }
+
+      showToast(`Шаблон муфты «${sampleMark}» добавлен в «Справочник муфт» в редакторе JSON. Отредактируйте параметры и примените.`, 'success', 'Шаблон муфты добавлен', 6000);
+    } catch (err) {
+      showToast('Ошибка при добавлении шаблона муфты: ' + err.message, 'error', 'Ошибка');
+    }
+  };
+
+  const addCouplingTemplateBtn = document.getElementById('addCouplingTemplateBtn');
+  if (addCouplingTemplateBtn && textarea) {
+    addCouplingTemplateBtn.addEventListener('click', insertCouplingSample);
+  }
+
+  const quickAddCouplingInTabBtn = document.getElementById('quickAddCouplingInTabBtn');
+  if (quickAddCouplingInTabBtn && textarea) {
+    quickAddCouplingInTabBtn.addEventListener('click', insertCouplingSample);
+  }
+
+  // Coupling catalog tab search and filter listeners
+  const couplingSearchInput = document.getElementById('couplingCatalogSearchInput');
+  if (couplingSearchInput) {
+    couplingSearchInput.addEventListener('input', renderCouplingCatalogModalContent);
+  }
+
+  const couplingClearSearchBtn = document.getElementById('couplingCatalogClearSearchBtn');
+  if (couplingClearSearchBtn && couplingSearchInput) {
+    couplingClearSearchBtn.addEventListener('click', () => {
+      couplingSearchInput.value = '';
+      renderCouplingCatalogModalContent();
+      couplingSearchInput.focus();
+    });
   }
 
   // Reset rules button
