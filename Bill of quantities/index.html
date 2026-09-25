@@ -1,16 +1,14 @@
 <!doctype html>
 <html lang="ru" data-bs-theme="auto">
+<head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Модуль автоматизированного расчета ведомостей объемов работ (ВОР) по кабельным трассам и сметным нормам">
   <title>Модуль заполнения ведомостей объемов работ (ВОР)</title>
 
-  <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@3"> -->
   <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
   <link href="../assets/theme.min.css" rel="stylesheet">
   <link href="../assets/bootstrap-icons.css" rel="stylesheet">
-  <!-- <link href="./assets/dist/css/bootstrap.min.css" rel="stylesheet"> -->
-
 
   <style>
   .main-container { 
@@ -545,9 +543,7 @@
       </p>
     </div>
  
-    <div class="input-group mb-2">
-      <input class='d-none' type="file" class="form-control" id="input" accept=".json,application/json" multiple>
-    </div>
+    <input type="file" class="d-none form-control" id="input" accept=".json,application/json" multiple>
 
     <!-- Main Grid: 3 columns:
          Столбец 1: Исходные данные (rawCol)
@@ -1093,13 +1089,6 @@
 <script src="../assets/theme.min.js"></script>
 <script src="../assets/theme-switcher.js"></script>
 <script src="./code.js"></script>
-<script lang = "javascript" src = "../assets/js/xlsx.full.min.js" > </script>
-
- <!-- <script src="./assets/js/modal.js"></script> -->
-
-<!-- <script src="./assets/js/code.js"></script> -->
-
-
-
-    </body>
+<script src="../assets/js/xlsx.full.min.js"></script>
+</body>
 </html>

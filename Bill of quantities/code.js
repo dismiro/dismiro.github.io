@@ -69,6 +69,25 @@ function buildWorkFormulaDisplay(formula, totalLength, itemsCount, unit) {
   return disp;
 }
 
+// Check if calculation formula should be displayed for work or material item
+// Controlled by "ОтображатьФормулу": true/false (or "Отображать формулу": true/false)
+function shouldShowFormula(item) {
+  if (!item || typeof item !== 'object') return true;
+  const val = item["ОтображатьФормулу"] !== undefined ? item["ОтображатьФормулу"] : item["Отображать формулу"];
+
+  if (val === undefined || val === null) return true;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'false' || s === '0' || s === 'нет' || s === 'ложь') {
+      return false;
+    }
+    return true;
+  }
+  return !!val;
+}
+
 // Build display string for coupling installation work formula
 function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume) {
   const clean = (formula || 'КОЛИЧЕСТВО').trim();
@@ -91,6 +110,84 @@ function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume) {
     disp += ` = ${calculatedVolume} шт`;
   }
   return disp;
+}
+
+// Parse condition for cable count in a trench segment
+// Supports "Условие": "кабелей > 4", "более 4 кабелей", "свыше 4", ">= 5", "до 4 кабелей", "от 2 до 4 кабелей"
+// (and group key in object structure e.g. "более 4 кабелей")
+function parseCableCountCondition(work) {
+  if (!work || typeof work !== 'object') {
+    return { hasCondition: false, minCables: null, maxCables: null, description: '' };
+  }
+
+  const condText = [
+    work["Условие"],
+    work["condition"],
+    work._tierKey
+  ].filter(Boolean).map(String).join(' ').trim();
+
+  if (!condText) {
+    return { hasCondition: false, minCables: null, maxCables: null, description: '' };
+  }
+
+  let minCables = null;
+  let maxCables = null;
+
+  // Range: "от 2 до 4 кабелей"
+  const mRange = condText.match(/от\s*(\d+)\s*до\s*(\d+)\s*(?:кабел|каб|\b)/i);
+  if (mRange) {
+    minCables = parseInt(mRange[1], 10);
+    maxCables = parseInt(mRange[2], 10);
+  } else {
+    // Greater than: "> 4", "кабелей > 4", "более 4 кабелей", "свыше 4"
+    const mGt = condText.match(/(?:кабелей|кабеля|каб\.?|\b)\s*(?:более|свыше|>)\s*(\d+)/i) ||
+                condText.match(/(?:более|свыше|>)\s*(\d+)\s*(?:кабелей|кабеля|каб\.?|\b)/i);
+    if (mGt) {
+      minCables = parseInt(mGt[1], 10) + 1;
+    }
+
+    // Greater or equal: ">= 5", "кабелей >= 5", "от 5 кабелей"
+    const mGte = condText.match(/(?:кабелей|кабеля|каб\.?|\b)\s*(?:>=|от)\s*(\d+)/i) ||
+                 condText.match(/(?:>=|от)\s*(\d+)\s*(?:кабелей|кабеля|каб\.?|\b)/i);
+    if (mGte && !mGt) {
+      minCables = parseInt(mGte[1], 10);
+    }
+
+    // Less or equal / up to: "<= 4", "до 4 кабелей", "не более 4"
+    const mLte = condText.match(/(?:кабелей|кабеля|каб\.?|\b)\s*(?:до|не более|<=)\s*(\d+)/i) ||
+                 condText.match(/(?:до|не более|<=)\s*(\d+)\s*(?:кабелей|кабеля|каб\.?|\b)/i);
+    if (mLte) {
+      maxCables = parseInt(mLte[1], 10);
+    }
+
+    // Less than: "< 5", "менее 5 кабелей"
+    const mLt = condText.match(/(?:кабелей|кабеля|каб\.?|\b)\s*(?:менее|<)\s*(\d+)/i) ||
+                condText.match(/(?:менее|<)\s*(\d+)\s*(?:кабелей|кабеля|каб\.?|\b)/i);
+    if (mLt && !mLte) {
+      maxCables = parseInt(mLt[1], 10) - 1;
+    }
+  }
+
+  const hasCondition = (minCables !== null) || (maxCables !== null);
+  let desc = '';
+  if (hasCondition) {
+    if (work["Условие"]) {
+      desc = String(work["Условие"]);
+    } else if (minCables !== null && maxCables !== null) {
+      desc = `от ${minCables} до ${maxCables} каб.`;
+    } else if (minCables !== null) {
+      desc = `кабелей > ${minCables - 1}`;
+    } else if (maxCables !== null) {
+      desc = `до ${maxCables} каб.`;
+    }
+  }
+
+  return {
+    hasCondition,
+    minCables,
+    maxCables,
+    description: desc
+  };
 }
 
 // Parse and normalize rule's "Работы и материалы" supporting both the new object structure:
@@ -144,7 +241,19 @@ function parseRuleWorksAndMaterials(rule) {
 
   let optical = null;
   const tiers = [];
+  const materials = [];
   const allItems = [];
+
+  const isMaterialItem = item => {
+    if (!item || typeof item !== 'object') return false;
+    const t = String(item["Тип"] || item.type || '').toLowerCase();
+    return t === 'материал' || t === 'материалы';
+  };
+
+  const isMaterialKey = k => {
+    const s = String(k || '').toLowerCase();
+    return s.includes('материал') || s.includes('труб') || s.includes('material');
+  };
 
   for (const [key, itemsVal] of Object.entries(wmObj)) {
     const items = Array.isArray(itemsVal) ? itemsVal : (itemsVal ? [itemsVal] : []);
@@ -156,6 +265,8 @@ function parseRuleWorksAndMaterials(rule) {
         items,
         isOptical: true
       };
+    } else if (isMaterialKey(key) || (items.length > 0 && items.every(isMaterialItem))) {
+      materials.push(...items);
     } else {
       let threshold = null;
       let isOver = false;
@@ -214,7 +325,7 @@ function parseRuleWorksAndMaterials(rule) {
     return (a.threshold || 0) - (b.threshold || 0);
   });
 
-  return { optical, tiers, allItems, isObjectStructure, rawObj: wmObj };
+  return { optical, tiers, materials, allItems, isObjectStructure, rawObj: wmObj };
 }
 
 // Helper to extract all sections from rules object (where top-level keys are section names)
@@ -363,6 +474,7 @@ function lookupCableInfo(rawType, catalog) {
             fullDescription: sVal["Полное описание"] || `Кабель связи оптический ${str}`,
             buildingLength: sVal["Строительная длина"] || 2000,
             coupling: sVal["Муфта"] || 'МТОК-А1/216-1Т3-44',
+            showFormula: shouldShowFormula(sVal),
             foundInCatalog: true
           };
         }
@@ -387,6 +499,7 @@ function lookupCableInfo(rawType, catalog) {
           fullDescription: sVal["Полное описание"] || `Кабель ${str}`,
           buildingLength: sVal["Строительная длина"] || 600,
           coupling: sVal["Муфта"] || '',
+          showFormula: shouldShowFormula(sVal),
           foundInCatalog: true
         };
       }
@@ -430,6 +543,7 @@ function lookupCableInfo(rawType, catalog) {
       fullDescription: entry["Полное описание"] || `${descPrefix}${brandName ? brandName + ' ' : ''}${str}`.trim(),
       buildingLength: entry["Строительная длина"] || 300,
       coupling: entry["Муфта"] || '',
+      showFormula: shouldShowFormula(entry),
       foundInCatalog: true
     };
   }
@@ -512,6 +626,7 @@ function lookupCouplingInfo(rawType, couplingCatalog) {
       fullName: entry["Полное наименование"] || entry["Наименование"] || entry.name || str,
       maxCores: maxCores || 27,
       unit: entry["Единицы измерения"] || entry.unit || 'шт',
+      showFormula: shouldShowFormula(entry),
       foundInCatalog: true
     };
   }
@@ -528,6 +643,7 @@ function lookupCouplingInfo(rawType, couplingCatalog) {
         fullName: v["Полное наименование"] || v["Наименование"] || v.name || k,
         maxCores: maxCores || 27,
         unit: v["Единицы измерения"] || v.unit || 'шт',
+        showFormula: shouldShowFormula(v),
         foundInCatalog: true
       };
     }
@@ -540,6 +656,7 @@ function lookupCouplingInfo(rawType, couplingCatalog) {
     fullName: str.startsWith('Муфта') ? str : `Муфта кабельная соединительная ${str}`,
     maxCores: parsedCores,
     unit: 'шт',
+    showFormula: true,
     foundInCatalog: false
   };
 }
@@ -580,7 +697,9 @@ function getCouplingInstallationWorkItems(tier, rulesData) {
             unit: it["Единицы измерения"] || it.unit || 'шт',
             type: (it["Тип"] || it.type || 'работа').toLowerCase(),
             formula: it["Формула"] || it.formula || 'КОЛИЧЕСТВО',
-            maxCores: it["МаксЖил"] || it["Количество жил"] || it.maxCores || tier
+            maxCores: it["МаксЖил"] || it["Количество жил"] || it.maxCores || tier,
+            showFormula: shouldShowFormula(it),
+            rawItem: it
           });
         });
         if (foundItems.length > 0) break;
@@ -594,16 +713,12 @@ function getCouplingInstallationWorkItems(tier, rulesData) {
       unit: 'шт',
       type: 'работа',
       formula: 'КОЛИЧЕСТВО',
-      maxCores: tier
+      maxCores: tier,
+      showFormula: true,
+      rawItem: null
     });
   }
   return foundItems;
-}
-
-// Get single coupling installation work definition (backwards compatibility)
-function getCouplingInstallationWorkItem(tier, rulesData) {
-  const items = getCouplingInstallationWorkItems(tier, rulesData);
-  return items.find(it => it.type === 'работа') || items[0];
 }
 
 // Calculate active couplings summary from active cables and catalog
@@ -709,6 +824,7 @@ function getActiveCouplingsSummary(rulesData) {
       tier: tier,
       cableTypes: Array.from(cData.cableTypes),
       cables: cData.cables,
+      showFormula: cInfo.showFormula,
       foundInCatalog: cInfo.foundInCatalog
     });
   });
@@ -1190,28 +1306,117 @@ function handleFileInput(e) {
   e.target.value = '';
 }
 
-function processFile(file) {
+/**
+ * Считывает файл как текст с надежным автоопределением кодировки (UTF-8, Windows-1251 / CP1251).
+ * Автоматически корректно распознает русскоязычные файлы JSON, сформированные в кодировке Windows-1251.
+ * @param {File|Blob} file 
+ * @returns {Promise<string>}
+ */
+function readFileAsTextWithEncoding(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) return reject(new Error('Файл не задан'));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Ошибка чтения файла'));
+    reader.onload = (event) => {
+      try {
+        const buffer = event.target.result;
+        const uint8 = new Uint8Array(buffer);
+
+        // 1. Проверка BOM UTF-8 (EF BB BF)
+        if (uint8.length >= 3 && uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) {
+          const text = new TextDecoder('utf-8').decode(uint8.subarray(3));
+          return resolve(text.replace(/^\uFEFF/, '').trim());
+        }
+
+        // 2. Проверка BOM UTF-16 LE / BE
+        if (uint8.length >= 2 && uint8[0] === 0xFF && uint8[1] === 0xFE) {
+          const text = new TextDecoder('utf-16le').decode(uint8.subarray(2));
+          return resolve(text.replace(/^\uFEFF/, '').trim());
+        }
+        if (uint8.length >= 2 && uint8[0] === 0xFE && uint8[1] === 0xFF) {
+          const text = new TextDecoder('utf-16be').decode(uint8.subarray(2));
+          return resolve(text.replace(/^\uFEFF/, '').trim());
+        }
+
+        // 3. Пытаемся строго декодировать через UTF-8 (fatal: true)
+        let utf8Text = null;
+        let utf8Valid = false;
+        try {
+          utf8Text = new TextDecoder('utf-8', { fatal: true }).decode(uint8);
+          utf8Valid = true;
+        } catch (e) {
+          utf8Valid = false;
+        }
+
+        // Если это валидный UTF-8, проверим, парсится ли как валидный JSON
+        if (utf8Valid && utf8Text) {
+          try {
+            JSON.parse(utf8Text.replace(/^\uFEFF/, '').trim());
+            return resolve(utf8Text.replace(/^\uFEFF/, '').trim());
+          } catch (e) {
+            // Если не JSON, всё равно может быть текстом UTF-8
+          }
+        }
+
+        // 4. Пробуем декодировать как Windows-1251 (CP1251)
+        let winText = null;
+        try {
+          const winDecoder = new TextDecoder('windows-1251');
+          winText = winDecoder.decode(uint8);
+        } catch (e) {
+          try {
+            const cpDecoder = new TextDecoder('cp1251');
+            winText = cpDecoder.decode(uint8);
+          } catch (err) {}
+        }
+
+        if (winText) {
+          try {
+            JSON.parse(winText.replace(/^\uFEFF/, '').trim());
+            return resolve(winText.replace(/^\uFEFF/, '').trim());
+          } catch (e) {}
+        }
+
+        // Если UTF-8 не прошел проверку байтов, отдаем Windows-1251
+        if (!utf8Valid && winText) {
+          return resolve(winText.replace(/^\uFEFF/, '').trim());
+        }
+
+        if (utf8Text) {
+          return resolve(utf8Text.replace(/^\uFEFF/, '').trim());
+        }
+
+        if (winText) {
+          return resolve(winText.replace(/^\uFEFF/, '').trim());
+        }
+
+        // Резервный вариант
+        const fallback = new TextDecoder('utf-8').decode(uint8);
+        return resolve(fallback.replace(/^\uFEFF/, '').trim());
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function processFile(file) {
   const fileName = file.name;
   currentFileName = fileName;
 
-  if (fileName.endsWith('.json')) {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target.result);
-        currentData = json;
-        renderProcessedData(json, fileName);
-        toggleRawColumnCollapse(false);
-        calculateVolumes();
-        showToast(`Файл "${fileName}" успешно загружен и рассчитан`, 'success', 'Успешно');
-      } catch (err) {
-        showToast(`Ошибка парсинга JSON: ${err.message}`, 'error', 'Ошибка');
-      }
-    };
-    reader.onerror = () => {
-      showToast('Ошибка чтения файла', 'error', 'Ошибка');
-    };
-    reader.readAsText(file);
+  if (fileName.toLowerCase().endsWith('.json')) {
+    try {
+      const fileText = await readFileAsTextWithEncoding(file);
+      const json = JSON.parse(fileText);
+      currentData = json;
+      renderProcessedData(json, fileName);
+      toggleRawColumnCollapse(false);
+      calculateVolumes();
+      showToast(`Файл "${fileName}" успешно загружен и рассчитан`, 'success', 'Успешно');
+    } catch (err) {
+      showToast(`Ошибка обработки JSON: ${err.message}`, 'error', 'Ошибка');
+    }
   } else {
     showToast('Пожалуйста, выберите файл с исходными данными в формате .json', 'error', 'Неверный формат');
   }
@@ -1562,6 +1767,7 @@ function createRoutingAccordion(blocks, totalLength) {
         <th style="min-width: 140px;">Тип прокладки</th>
         <th style="width: 90px;" class="text-end">Длина, м</th>
         <th style="width: 70px;" class="text-center">Кабелей</th>
+        <th style="width: 75px;" class="text-center" title="Количество пересекаемых железнодорожных путей (countTrackCrossing)">Путей</th>
         <th style="min-width: 240px;">Состав кабелей в траншее</th>
         <th class="action-col d-none" style="width: 40px;"></th>
       </tr>
@@ -1570,9 +1776,14 @@ function createRoutingAccordion(blocks, totalLength) {
   `;
 
   const tbody = table.querySelector('tbody');
+  let totalTrackCrossings = 0;
+
   blocks.forEach((b, idx) => {
     const row = document.createElement('tr');
     row.dataset.index = idx;
+
+    const trackCrossingVal = Number(b.countTrackCrossing !== undefined ? b.countTrackCrossing : (b.count_track_crossing !== undefined ? b.count_track_crossing : (b.trackCrossing !== undefined ? b.trackCrossing : 0))) || 0;
+    totalTrackCrossings += trackCrossingVal;
 
     // Multiline wrapped pills for contained cables - NEVER TRUNCATE
     let containedHtml = '<span class="text-muted">-</span>';
@@ -1594,6 +1805,7 @@ function createRoutingAccordion(blocks, totalLength) {
       <td class="canEdit fw-bold cell-wrap" data-field="type">${escapeHtml(b.type || '')}</td>
       <td class="canEdit text-end font-monospace fw-semibold" data-field="length">${b.length ?? 0}</td>
       <td class="text-center font-monospace">${b.cablesCount ?? 0}</td>
+      <td class="canEdit text-center font-monospace" data-field="countTrackCrossing">${trackCrossingVal}</td>
       <td class="cell-wrap">${containedHtml}</td>
       <td class="action-col d-none text-center">
         <button type="button" class="btn btn-sm btn-outline-danger p-0 border-0 removeRowBtn" title="Удалить строку">
@@ -1614,6 +1826,10 @@ function createRoutingAccordion(blocks, totalLength) {
 
   tableWrapper.appendChild(table);
 
+  const trackBadgeHtml = totalTrackCrossings > 0
+    ? `<span class="badge bg-warning-subtle text-warning-emphasis border font-monospace ms-1"><i class="bx bx-git-commit me-0_5"></i>${totalTrackCrossings} перес. путей</span>`
+    : '';
+
   accItem.innerHTML = `
     <h2 class="accordion-header" id="${headerId}">
       <button class="accordion-button collapsed py-2 px-3 fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
@@ -1622,7 +1838,10 @@ function createRoutingAccordion(blocks, totalLength) {
             <i class='bx bx-layer text-info fs-4'></i>
             <span>Участки трассы / траншеи</span>
           </div>
-          <span class="badge bg-info-subtle text-info-emphasis border">${blocks.length} шт. / ${Math.round(totalLength).toLocaleString('ru-RU')} м</span>
+          <div class="d-flex align-items-center gap-1">
+            <span class="badge bg-info-subtle text-info-emphasis border">${blocks.length} шт. / ${Math.round(totalLength).toLocaleString('ru-RU')} м</span>
+            ${trackBadgeHtml}
+          </div>
         </div>
       </button>
     </h2>
@@ -1904,30 +2123,34 @@ function updateEditableElements() {
  * Нормализует марку/тип кабеля для ведомости объемов работ.
  * 
  * Правила:
- * 1. Кабели вида «4х2(2)» и «4х2(4)» — это один и тот же тип кабеля («4х2»),
- *    содержащий разное количество запасных жил в скобках.
- * 2. Оптические кабели связи: в марках вида «ОКБ-Н-Сп-4/2(2,0)Сп-16(2) "8кН"»:
- *    - «16» — общее число волокон;
- *    - «(2)» — число запасных волокон (отбрасывается при определении типа);
- *    - «(2,0)» — конструктивный диаметр ЦСЭ в мм (содержит запятую, НЕ является числом запаса и сохраняется);
- *    - «"8кН"» — маркировка допустимого растягивающего усилия (кН / kN) со сносками или без (сохраняется).
- *    В результате кабель нормализуется в точное наименование: «ОКБ-Н-Сп-4/2(2,0)Сп-16 "8кН"».
+ * 1. Оптические кабели связи: в марках вида «ОКБ-Н-Сп-4/2(2,0)Сп-16(2) "8кН"»:
+ *    - «(2,0)» — конструктивный диаметр ЦСЭ в мм;
+ *    - «16(2)» — часть номенклатуры оптического кабеля (не является запасными жилами);
+ *    - «"8кН"» — маркировка допустимого растягивающего усилия (кН / kN).
+ *    Для оптических кабелей марка сохраняется полностью: «ОКБ-Н-Сп-4/2(2,0)Сп-16(2) "8кН"».
+ * 2. Электрические кабели (СЦБ, сигнализация, связь): кабели вида «4х2(2)» и «4х2(4)» — это один и тот же
+ *    тип кабеля («4х2»), содержащий разное количество запасных жил в скобках. Запас жил отбрасывается.
  * 3. Буквенные индексы горючести/исполнения: «(А)» в «ВБШвнг(А)-LS» или «(A)» в «ТехноКИПКПнг(A)-HF»
  *    НЕ являются запасом жил/волокон и гарантированно сохраняются.
- * 4. Число запаса жил/волокон отбрасывается:
- *    - Либо перед механической маркировкой прочности оптического кабеля (кН / kN, в кавычках или без);
- *    - Либо в конце строки или непосредственно перед условными знаками чертежа (*, **, #, &, Δ, \U+...).
  */
 function normalizeCableType(typeStr) {
   if (!typeStr || typeof typeStr !== 'string') return typeStr || 'Без типа';
   const str = typeStr.trim();
   if (!str) return 'Без типа';
 
-  // Отбрасываем (целое число) запаса волокон/жил:
-  // 1) Либо перед маркировкой растягивающего усилия оптического кабеля (кН/kN), например 16(2) "8кН" -> 16 "8кН"
-  // 2) Либо в конце строки или перед сносками чертежа (*, **, #, &, \U+..., Δ)
+  // Оптические кабели (ОКБ, ОКЛ, ВОЛС, ДПС, марки с кН/kN, Сп- и т.д.):
+  // Все скобки с цифрами являются частью заводской номенклатуры и сохраняются.
+  const isOptical = /^(?:ОК|ВОЛС|ДП|ДТ|ТОС|ИКА|ЭКБ)/i.test(str) ||
+                    /(?:кН|кн|kN|kn)/i.test(str) ||
+                    /(?:Сп-|\/2\(|\(2,0\))/i.test(str);
+
+  if (isOptical) {
+    return str;
+  }
+
+  // Для электрических кабелей отбрасываем (целое число) запаса жил перед сносками чертежа (*, **, #, &, \U+..., Δ) или в конце строки
   const cleaned = str.replace(
-    /\s*\(\d+\)(?=(?:\s*[-—]?\s*["«']?\d+(?:[.,]\d+)?\s*(?:кН|кн|kN|kn)["»']?)?(?:\s*(?:[*#&^~!Δ§†‡№]|\\U\+[0-9a-fA-F]+))*$)/gi,
+    /\s*\(\d+\)(?=(?:\s*(?:[*#&^~!Δ§†‡№]|\\U\+[0-9a-fA-F]+))*$)/gi,
     ''
   ).trim();
 
@@ -2876,48 +3099,46 @@ async function initWorksRules() {
 }
 
 // Upload custom rules JSON
-function handleRulesFileInput(e) {
+async function handleRulesFileInput(e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    try {
-      const parsed = JSON.parse(event.target.result);
-      if (!parsed || typeof parsed !== 'object') {
-        showToast('Неверный формат JSON: ожидается JSON-объект со структурой разделов или массив', 'error', 'Ошибка файла');
-        return;
-      }
-
-      if (Array.isArray(parsed)) {
-        currentWorksRules = { "Строительные работы": parsed };
-      } else {
-        currentWorksRules = parsed;
-      }
-
-      // Synchronize editor textarea if modal exists
-      const textarea = document.getElementById('worksJsonEditorTextarea');
-      if (textarea) {
-        textarea.value = JSON.stringify(currentWorksRules, null, 2);
-        validateWorksJsonInput();
-      }
-
-      renderRulesModalContent();
-      const sections = getRulesSections(currentWorksRules);
-      let totalWays = 0;
-      sections.forEach(s => totalWays += s.rules.length);
-      showToast(`Сметные нормы успешно загружены из «${file.name}» (${totalWays} способов в ${sections.length} разд.). Выполнен автоматический перерасчет работ.`, 'success', 'Перерасчет выполнен');
-
-      // Refresh calculation if data is loaded
-      if (currentData) {
-        calculateVolumes();
-      }
-    } catch (err) {
-      showToast('Ошибка синтаксиса JSON: ' + err.message, 'error', 'Ошибка файла');
+  try {
+    const fileText = await readFileAsTextWithEncoding(file);
+    const parsed = JSON.parse(fileText);
+    if (!parsed || typeof parsed !== 'object') {
+      showToast('Неверный формат JSON: ожидается JSON-объект со структурой разделов или массив', 'error', 'Ошибка файла');
+      return;
     }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
+
+    if (Array.isArray(parsed)) {
+      currentWorksRules = { "Строительные работы": parsed };
+    } else {
+      currentWorksRules = parsed;
+    }
+
+    // Synchronize editor textarea if modal exists
+    const textarea = document.getElementById('worksJsonEditorTextarea');
+    if (textarea) {
+      textarea.value = JSON.stringify(currentWorksRules, null, 2);
+      validateWorksJsonInput();
+    }
+
+    renderRulesModalContent();
+    const sections = getRulesSections(currentWorksRules);
+    let totalWays = 0;
+    sections.forEach(s => totalWays += s.rules.length);
+    showToast(`Сметные нормы успешно загружены из «${file.name}» (${totalWays} способов в ${sections.length} разд.). Выполнен автоматический перерасчет работ.`, 'success', 'Перерасчет выполнен');
+
+    // Refresh calculation if data is loaded
+    if (currentData) {
+      calculateVolumes();
+    }
+  } catch (err) {
+    showToast('Ошибка синтаксиса JSON: ' + err.message, 'error', 'Ошибка файла');
+  } finally {
+    e.target.value = '';
+  }
 }
 
 // Reset rules to standard works_rules.json
@@ -3089,15 +3310,26 @@ function renderRulesModalContent() {
               ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">до ${threshold} кг/м</span>`
               : (isOver ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">свыше</span>` : '');
 
+            const cond = parseCableCountCondition(w);
+            const condBadge = cond.hasCondition
+              ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1 font-monospace" style="font-size: 0.7rem;" title="Условие применения: ${escapeHtml(cond.description)}"><i class="bx bx-git-branch me-0_5"></i>${escapeHtml(cond.description)}</span>`
+              : '';
+
+            const showFormulaOpt = shouldShowFormula(w);
+            const formulaDispBadge = showFormulaOpt
+              ? `<span class="badge bg-light text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы включено"><i class="bx bx-show me-0_5"></i>в формулах</span>`
+              : `<span class="badge bg-secondary-subtle text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы отключено («ОтображатьФормулу»: false)"><i class="bx bx-hide me-0_5"></i>без формулы</span>`;
+
             groupItemsHtml += `
               <div class="p-2 rounded bg-white border mb-1 small">
                 <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                  <div class="fw-semibold text-dark">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')} ${tierBadge}</div>
+                  <div class="fw-semibold text-dark">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')} ${tierBadge}${condBadge}</div>
                   <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap">${escapeHtml(w["Единицы измерения"] || '')}</span>
                 </div>
                 <div class="d-flex align-items-center gap-1 text-muted fs-xs">
                   <span class="fw-medium">Формула:</span>
                   <code class="px-1 py-0 bg-light border rounded text-primary">${escapeHtml(w["Формула"] || 'ДЛИНА')}</code>
+                  ${formulaDispBadge}
                   ${w["Тип"] ? `<span class="badge badge-material ms-auto">${escapeHtml(w["Тип"])}</span>` : ''}
                 </div>
               </div>
@@ -3124,15 +3356,26 @@ function renderRulesModalContent() {
             ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">до ${threshold} кг/м</span>`
             : (isOver ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">свыше</span>` : '');
 
+          const cond = parseCableCountCondition(w);
+          const condBadge = cond.hasCondition
+            ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1 font-monospace" style="font-size: 0.7rem;" title="Условие применения: ${escapeHtml(cond.description)}"><i class="bx bx-git-branch me-0_5"></i>${escapeHtml(cond.description)}</span>`
+            : '';
+
+          const showFormulaOpt = shouldShowFormula(w);
+          const formulaDispBadge = showFormulaOpt
+            ? `<span class="badge bg-light text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы включено"><i class="bx bx-show me-0_5"></i>в формулах</span>`
+            : `<span class="badge bg-secondary-subtle text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы отключено («ОтображатьФормулу»: false)"><i class="bx bx-hide me-0_5"></i>без формулы</span>`;
+
           worksHtml += `
             <div class="p-2 rounded bg-light border mb-2 small">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                <div class="fw-semibold text-dark">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')} ${tierBadge}</div>
+                <div class="fw-semibold text-dark">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')} ${tierBadge}${condBadge}</div>
                 <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap">${escapeHtml(w["Единицы измерения"] || '')}</span>
               </div>
               <div class="d-flex align-items-center gap-1 text-muted fs-xs">
                 <span class="fw-medium">Формула:</span>
                 <code class="px-1 py-0 bg-white border rounded text-primary">${escapeHtml(w["Формула"] || 'ДЛИНА')}</code>
+                ${formulaDispBadge}
                 ${w["Тип"] ? `<span class="badge badge-material ms-auto">${escapeHtml(w["Тип"])}</span>` : ''}
               </div>
             </div>
@@ -3505,21 +3748,39 @@ function getActiveTrenchSummary() {
 
         const handleCell = row.children[1];
         const handle = handleCell ? handleCell.textContent.trim() : '';
-        const containedCell = row.children[5];
+        const cablesCountCell = row.children[4];
+        let cablesCount = cablesCountCell ? (parseInt(cablesCountCell.textContent.trim(), 10) || 0) : 0;
+        const trackCell = row.querySelector('[data-field="countTrackCrossing"]');
+        const countTrackCrossing = trackCell ? (parseInt(trackCell.textContent.trim(), 10) || 0) : 0;
+        const containedCell = row.querySelector('.cell-wrap') || row.children[6];
         const contained = containedCell ? containedCell.textContent.trim() : '';
+
+        if (cablesCount === 0 && contained && contained !== '-') {
+          const pills = row.querySelectorAll('.cable-pill');
+          if (pills.length > 0) {
+            cablesCount = pills.length;
+          } else {
+            cablesCount = contained.split(',').filter(Boolean).length;
+          }
+        }
 
         if (!summary[type]) {
           summary[type] = { totalLength: 0, count: 0, segments: [] };
         }
         summary[type].totalLength += length;
         summary[type].count += 1;
-        summary[type].segments.push({ handle, length, contained, type });
+        summary[type].segments.push({ handle, length, cablesCount, contained, type, countTrackCrossing });
       }
     });
   } else if (currentData && currentData.routingTypeBlocks) {
     currentData.routingTypeBlocks.forEach(b => {
       const type = (b.type || 'Без типа').trim();
       const length = Number(b.length) || 0;
+      let cablesCount = Number(b.cablesCount) || 0;
+      if (cablesCount === 0 && Array.isArray(b.contained)) {
+        cablesCount = b.contained.length;
+      }
+      const countTrackCrossing = Number(b.countTrackCrossing !== undefined ? b.countTrackCrossing : (b.count_track_crossing !== undefined ? b.count_track_crossing : (b.trackCrossing !== undefined ? b.trackCrossing : 0))) || 0;
       if (!summary[type]) {
         summary[type] = { totalLength: 0, count: 0, segments: [] };
       }
@@ -3528,13 +3789,499 @@ function getActiveTrenchSummary() {
       summary[type].segments.push({
         handle: b.handle || '',
         length,
+        cablesCount,
         contained: Array.isArray(b.contained) ? b.contained.join(', ') : (b.contained || ''),
-        type
+        type,
+        countTrackCrossing
       });
     });
   }
 
   return summary;
+}
+
+// Extract active track crossing segments from table or state
+function getActiveTrackCrossingSegments() {
+  const segments = [];
+  const routingTable = document.getElementById('tableRouting');
+  if (routingTable) {
+    const rows = routingTable.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      const typeCell = row.querySelector('[data-field="type"]');
+      const lengthCell = row.querySelector('[data-field="length"]');
+      const trackCell = row.querySelector('[data-field="countTrackCrossing"]');
+      const handleCell = row.children[1];
+      const handle = handleCell ? handleCell.textContent.trim() : '';
+      const type = typeCell ? (typeCell.textContent.trim() || 'Без типа') : 'Без типа';
+      const length = lengthCell ? (parseFloat(lengthCell.textContent.replace(/\s+/g, '').replace(/,/g, '.')) || 0) : 0;
+      let trackCount = trackCell ? (parseInt(trackCell.textContent.trim(), 10) || 0) : 0;
+
+      const cablesCountCell = row.children[4];
+      let cablesCount = cablesCountCell ? (parseInt(cablesCountCell.textContent.trim(), 10) || 0) : 0;
+      const containedCell = row.querySelector('.cell-wrap') || row.children[6];
+      const contained = containedCell ? containedCell.textContent.trim() : '';
+
+      let containedList = [];
+      const pills = row.querySelectorAll('.cable-pill');
+      if (pills.length > 0) {
+        containedList = Array.from(pills).map(p => p.textContent.trim()).filter(Boolean);
+      } else if (contained && contained !== '-') {
+        containedList = contained.split(',').map(s => s.trim()).filter(Boolean);
+      }
+
+      const idx = parseInt(row.dataset.index, 10);
+      if (trackCount === 0 && !isNaN(idx) && currentData && currentData.routingTypeBlocks && currentData.routingTypeBlocks[idx]) {
+        const b = currentData.routingTypeBlocks[idx];
+        trackCount = Number(b.countTrackCrossing !== undefined ? b.countTrackCrossing : (b.count_track_crossing !== undefined ? b.count_track_crossing : (b.trackCrossing !== undefined ? b.trackCrossing : 0))) || 0;
+      }
+
+      if (containedList.length === 0 && !isNaN(idx) && currentData && currentData.routingTypeBlocks && currentData.routingTypeBlocks[idx]) {
+        const b = currentData.routingTypeBlocks[idx];
+        if (Array.isArray(b.contained)) containedList = b.contained.slice();
+        else if (b.contained) containedList = String(b.contained).split(',').map(s => s.trim()).filter(Boolean);
+      }
+
+      if (cablesCount === 0 && containedList.length > 0) {
+        cablesCount = containedList.length;
+      }
+
+      if (trackCount > 0) {
+        segments.push({
+          handle,
+          type,
+          length,
+          cablesCount,
+          countTrackCrossing: trackCount,
+          contained: containedList
+        });
+      }
+    });
+  } else if (currentData && currentData.routingTypeBlocks) {
+    currentData.routingTypeBlocks.forEach(b => {
+      const trackCount = Number(b.countTrackCrossing !== undefined ? b.countTrackCrossing : (b.count_track_crossing !== undefined ? b.count_track_crossing : (b.trackCrossing !== undefined ? b.trackCrossing : 0))) || 0;
+      if (trackCount > 0) {
+        let containedList = [];
+        if (Array.isArray(b.contained)) containedList = b.contained.slice();
+        else if (b.contained) containedList = String(b.contained).split(',').map(s => s.trim()).filter(Boolean);
+        let cablesCount = Number(b.cablesCount) || 0;
+        if (cablesCount === 0 && containedList.length > 0) cablesCount = containedList.length;
+        segments.push({
+          handle: b.handle || '',
+          type: (b.type || 'Без типа').trim(),
+          length: Number(b.length) || 0,
+          cablesCount,
+          countTrackCrossing: trackCount,
+          contained: containedList
+        });
+      }
+    });
+  }
+  return segments;
+}
+
+// Find track crossing rule in rules data
+function getTrackCrossingRule(rulesData) {
+  const cableRules = getCableRules(rulesData || currentWorksRules);
+  for (const r of cableRules.rules) {
+    const rName = (r["Название"] || r.name || '').toLowerCase();
+    if (rName.includes('пересечен') || (rName.includes('путей') && !rName.includes('траншея'))) {
+      return r;
+    }
+  }
+  return {
+    "Название": "Пересечение путей",
+    "Шаблон": "Прокладка кабеля массой 1 м, кг, до: {масса} в трубах под путями",
+    "КабелейВТрубе": 3,
+    "ДлинаТрубы": 5,
+    "Работы и материалы": {
+      "1": [
+        {
+          "Наименование": "Прокладка кабеля массой 1 м, кг, до: 1 в трубах под путями",
+          "МаксВес": 1,
+          "Единицы измерения": "м",
+          "Формула": "ПЕРЕСЕЧЕНИЙ*КАБЕЛЕЙ*5",
+          "ДлинаТрубы": 5,
+          "Тип": "работа",
+          "ОтображатьФормулу": true
+        }
+      ],
+      "2": [
+        {
+          "Наименование": "Прокладка кабеля массой 1 м, кг, до: 2 в трубах под путями",
+          "МаксВес": 2,
+          "Единицы измерения": "м",
+          "Формула": "ПЕРЕСЕЧЕНИЙ*КАБЕЛЕЙ*5",
+          "ДлинаТрубы": 5,
+          "Тип": "работа",
+          "ОтображатьФормулу": true
+        }
+      ],
+      "3": [
+        {
+          "Наименование": "Прокладка кабеля массой 1 м, кг, до: 3 в трубах под путями",
+          "МаксВес": 3,
+          "Единицы измерения": "м",
+          "Формула": "ПЕРЕСЕЧЕНИЙ*КАБЕЛЕЙ*5",
+          "ДлинаТрубы": 5,
+          "Тип": "работа",
+          "ОтображатьФормулу": true
+        }
+      ],
+      "оптический": [
+        {
+          "Наименование": "Прокладка оптического кабеля в трубах под путями",
+          "Категория": "Оптический кабель",
+          "Единицы измерения": "м",
+          "Формула": "ПЕРЕСЕЧЕНИЙ*КАБЕЛЕЙ*5",
+          "ДлинаТрубы": 5,
+          "Тип": "работа",
+          "ОтображатьФормулу": true
+        }
+      ],
+      "материалы": [
+        {
+          "Наименование": "Трубы для прокладки кабеля под железнодорожными путями L=5м",
+          "Единицы измерения": "шт",
+          "Формула": "ПЕРЕСЕЧЕНИЙ*ОКРУГЛВВЕРХ(КАБЕЛЕЙ/3)",
+          "КабелейВТрубе": 3,
+          "Тип": "материал",
+          "ОтображатьФормулу": true
+        }
+      ]
+    }
+  };
+}
+
+// Evaluate formula for track crossing (supports ПЕРЕСЕЧЕНИЙ, КАБЕЛЕЙ, ОКРУГЛВВЕРХ/CEIL, N, L)
+function evaluateTrackCrossingFormula(formula, trackCrossings, cablesCount, nVal, lVal) {
+  const t = Number(trackCrossings) || 0;
+  const c = Number(cablesCount) || 0;
+  const n = Number(nVal) || 3;
+  const l = Number(lVal) || 5;
+
+  if (!formula || typeof formula !== 'string') {
+    return 0;
+  }
+
+  const clean = formula.trim();
+
+  try {
+    let expr = clean.replace(/,/g, '.')
+      .replace(/ОКРУГЛИТЬВВЕРХ|ОКРУГЛВВЕРХ|CEIL/gi, 'Math.ceil')
+      .replace(/(?:ПЕРЕСЕЧЕНИЙ|ПЕРЕСЕЧЕНИЯ|ПЕРЕСЕЧЕНИЕ|COUNT_TRACK_CROSSING|TRACK_CROSSING|ПУТЕЙ)/gi, `(${t})`)
+      .replace(/(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|КОЛ[-_]?ВО[_\s]?КАБЕЛЕЙ|КОЛ_КАБЕЛЕЙ|КАБЕЛЕ[ЙЯИ]|CABLES(?:_COUNT)?)/gi, `(${c})`)
+      .replace(/(?:ДЛИНА[_\s]?ТРУБЫ|PIPE_LENGTH|\bДЛИНА\b|\bL\b)/gi, `(${l})`)
+      .replace(/(?:КАБЕЛЕЙ[_\s]?В[_\s]?ТРУБЕ|ВМЕСТИМОСТЬ|\bN\b)/gi, `(${n})`);
+
+    if (/^[0-9+\-*/().\sMathceil]+$/.test(expr)) {
+      const val = Function("'use strict'; return (" + expr + ");")();
+      if (typeof val === 'number' && !isNaN(val)) {
+        return val;
+      }
+    }
+  } catch (e) {
+    // fallback
+  }
+
+  if (clean.toLowerCase().includes('округл') || clean.toLowerCase().includes('ceil') || clean.toLowerCase().includes('/')) {
+    return t * Math.ceil(c / n);
+  }
+  return t * c * l;
+}
+
+// Calculate track crossing works and materials from rules and active segments
+// Cables in crossing blocks are normalized and checked for weight in catalog to choose appropriate work tier
+function calculateTrackCrossingWorks(rulesData) {
+  const rule = getTrackCrossingRule(rulesData || currentWorksRules);
+  const segments = getActiveTrackCrossingSegments();
+  if (!segments || segments.length === 0) {
+    return { works: [], totalTrackCrossings: 0, segmentsCount: 0 };
+  }
+
+  const catalog = getCableCatalog(rulesData || currentWorksRules);
+  const parsedWM = parseRuleWorksAndMaterials(rule);
+  const template = rule["Шаблон"] || rule.template || '';
+  const defaultN = Number(rule["КабелейВТрубе"] || rule["n"] || rule["N"] || 3);
+  const defaultL = Number(rule["ДлинаТрубы"] || rule["l"] || rule["L"] || 5);
+  const sectionName = "Монтажные работы";
+  const ruleName = rule["Название"] || "Пересечение путей";
+  const totalTrackCrossings = segments.reduce((sum, s) => sum + (s.countTrackCrossing || 0), 0);
+
+  // Initialize tier cable tracking
+  const opticalData = {
+    tier: parsedWM.optical,
+    segCounts: {}, // segIdx -> count of optical cables
+    cablesList: []
+  };
+
+  const tierDataList = (parsedWM.tiers || []).map(t => ({
+    tier: t,
+    threshold: t.threshold,
+    isOver: t.isOver,
+    key: t.key,
+    items: t.items || [],
+    segCounts: {}, // segIdx -> count of cables
+    cablesList: []
+  }));
+
+  const hasAnyThreshold = tierDataList.some(t => t.threshold !== null);
+
+  // Distribute each cable in each segment to the matching tier
+  segments.forEach((seg, sIdx) => {
+    let cableNames = Array.isArray(seg.contained) ? seg.contained :
+                     (seg.contained ? String(seg.contained).split(',').map(s => s.trim()).filter(Boolean) : []);
+    
+    if (cableNames.length === 0 && seg.cablesCount > 0) {
+      cableNames = new Array(seg.cablesCount).fill('Кабель');
+    }
+
+    cableNames.forEach(cStr => {
+      const normCable = normalizeCableType(cStr);
+      const cMeta = lookupCableInfo(normCable, catalog);
+      const isOptical = cMeta.isOptical;
+      const weight = cMeta.weight || 0.35;
+
+      if (isOptical) {
+        opticalData.segCounts[sIdx] = (opticalData.segCounts[sIdx] || 0) + 1;
+        opticalData.cablesList.push({ seg, cableName: cStr, cMeta, weight });
+      } else {
+        let matchedTierData = null;
+        if (tierDataList.length > 0) {
+          if (hasAnyThreshold) {
+            matchedTierData = tierDataList.find(t => !t.isOver && t.threshold !== null && weight <= t.threshold);
+            if (!matchedTierData) {
+              matchedTierData = tierDataList.find(t => t.isOver && (t.threshold === null || weight > t.threshold));
+            }
+            if (!matchedTierData) {
+              matchedTierData = tierDataList.find(t => !t.isOver && t.threshold === null);
+            }
+          } else {
+            matchedTierData = tierDataList[0];
+          }
+          if (!matchedTierData) {
+            matchedTierData = tierDataList[0];
+          }
+        }
+
+        if (matchedTierData) {
+          matchedTierData.segCounts[sIdx] = (matchedTierData.segCounts[sIdx] || 0) + 1;
+          matchedTierData.cablesList.push({ seg, cableName: cStr, cMeta, weight });
+        }
+      }
+    });
+  });
+
+  const calculatedWorks = [];
+
+  // Helper to add calculated work item for a tier
+  function processTierWorks(tierObj, segCounts, cablesList, isOpt) {
+    if (!cablesList || cablesList.length === 0) return;
+
+    let workItems = (tierObj && Array.isArray(tierObj.items))
+      ? tierObj.items.filter(it => (it["Тип"] || it.type || '').toLowerCase() !== 'материал')
+      : [];
+
+    if (workItems.length === 0) {
+      let defaultTitle = '';
+      if (isOpt) {
+        defaultTitle = 'Прокладка оптического кабеля в трубах под железнодорожными путями';
+      } else if (template && (template.includes('{масса}') || template.includes('{вес}'))) {
+        defaultTitle = template.replace(/\{масса\}|\{вес\}/gi, String(tierObj.threshold || '')).trim();
+      } else if (tierObj && tierObj.threshold !== null) {
+        defaultTitle = `Прокладка кабеля массой 1 м, кг, до: ${tierObj.threshold} в трубах под железнодорожными путями`;
+      } else {
+        defaultTitle = 'Прокладка кабеля в трубах под железнодорожными путями';
+      }
+      workItems = [{
+        "Наименование": defaultTitle,
+        "Единицы измерения": "м",
+        "Формула": "ПЕРЕСЕЧЕНИЙ*КАБЕЛЕЙ*5",
+        "ДлинаТрубы": defaultL,
+        "Тип": "работа",
+        "ОтображатьФормулу": true
+      }];
+    }
+
+    workItems.forEach(item => {
+      const formula = item["Формула"] || item.formula || "ПЕРЕСЕЧЕНИЙ*КАБЕЛЕЙ*5";
+      const itemL = Number(item["ДлинаТрубы"] || item["l"] || item["L"] || defaultL);
+      const itemN = Number(item["КабелейВТрубе"] || item["n"] || item["N"] || defaultN);
+      const showFormula = shouldShowFormula(item);
+      const unit = item["Единицы измерения"] || item.unit || 'м';
+      const name = (item["Наименование"] || item.name || '').trim();
+
+      let totalTierVol = 0;
+      const breakdownParts = [];
+
+      segments.forEach((seg, sIdx) => {
+        const cInSeg = segCounts[sIdx] || 0;
+        if (cInSeg === 0) return;
+        const t = seg.countTrackCrossing || 0;
+        const segVol = evaluateTrackCrossingFormula(formula, t, cInSeg, itemN, itemL);
+        totalTierVol += segVol;
+        breakdownParts.push(`${t} перес. × ${cInSeg} каб.`);
+      });
+
+      totalTierVol = Math.round(totalTierVol * 100) / 100;
+
+      let formulaDisplay = '';
+      if (showFormula) {
+        if (breakdownParts.length === 1) {
+          const sIdx = segments.findIndex((_, idx) => (segCounts[idx] || 0) > 0);
+          const seg0 = segments[sIdx];
+          const c0 = segCounts[sIdx];
+          formulaDisplay = `${seg0.countTrackCrossing} перес. × ${c0} каб. × ${itemL} м = ${totalTierVol} м`;
+        } else if (breakdownParts.length <= 3) {
+          formulaDisplay = `(${breakdownParts.join(' + ')}) × ${itemL} м = ${totalTierVol} м`;
+        } else {
+          const tierCrossings = segments.reduce((sum, seg, idx) => sum + ((segCounts[idx] || 0) > 0 ? (seg.countTrackCrossing || 0) : 0), 0);
+          formulaDisplay = `${totalTierVol} м (${tierCrossings} перес. путей, ${cablesList.length} каб., l=${itemL} м)`;
+        }
+      }
+
+      calculatedWorks.push({
+        name: name,
+        unit: unit,
+        volume: totalTierVol,
+        volumeFormatted: String(totalTierVol),
+        formula: formula,
+        formulaDisplay: formulaDisplay,
+        showFormula: showFormula,
+        ruleName: ruleName,
+        routingType: ruleName,
+        tierMax: tierObj ? tierObj.threshold : null,
+        tierKey: tierObj ? tierObj.key : (isOpt ? 'оптический' : null),
+        section: sectionName,
+        type: 'работа',
+        parentWorkName: undefined,
+        cablesCount: cablesList.length,
+        comment: `Пересечение путей (${cablesList.length} каб.)`
+      });
+    });
+  }
+
+  // 1. Process optical tier
+  if (opticalData.cablesList.length > 0) {
+    processTierWorks(opticalData.tier, opticalData.segCounts, opticalData.cablesList, true);
+  }
+
+  // 2. Process electrical tiers
+  tierDataList.forEach(tData => {
+    if (tData.cablesList.length > 0) {
+      processTierWorks(tData.tier, tData.segCounts, tData.cablesList, false);
+    }
+  });
+
+  // 3. Process Materials (Трубы)
+  let materialItems = [];
+  if (parsedWM.materials && parsedWM.materials.length > 0) {
+    materialItems.push(...parsedWM.materials);
+  }
+  if (parsedWM.allItems) {
+    parsedWM.allItems.forEach(it => {
+      if ((it["Тип"] || it.type || '').toLowerCase() === 'материал' && !materialItems.includes(it)) {
+        materialItems.push(it);
+      }
+    });
+  }
+  if (materialItems.length === 0) {
+    materialItems = [{
+      "Наименование": "Трубы для прокладки кабеля под железнодорожными путями L=5м",
+      "Единицы измерения": "шт",
+      "Формула": "ПЕРЕСЕЧЕНИЙ*ОКРУГЛВВЕРХ(КАБЕЛЕЙ/3)",
+      "КабелейВТрубе": defaultN,
+      "Тип": "материал",
+      "ОтображатьФормулу": true
+    }];
+  }
+
+  materialItems.forEach(item => {
+    const formula = item["Формула"] || item.formula || "ПЕРЕСЕЧЕНИЙ*ОКРУГЛВВЕРХ(КАБЕЛЕЙ/3)";
+    const itemN = Number(item["КабелейВТрубе"] || item["n"] || item["N"] || defaultN);
+    const itemL = Number(item["ДлинаТрубы"] || item["l"] || item["L"] || defaultL);
+    const showFormula = shouldShowFormula(item);
+    const unit = item["Единицы измерения"] || item.unit || 'шт';
+    const name = (item["Наименование"] || item.name || '').trim();
+
+    let totalMatVol = 0;
+    const matBreakdownParts = [];
+
+    segments.forEach(seg => {
+      const t = seg.countTrackCrossing || 0;
+      let c = seg.cablesCount || 0;
+      if (c === 0 && Array.isArray(seg.contained)) c = seg.contained.length;
+      const segVol = evaluateTrackCrossingFormula(formula, t, c, itemN, itemL);
+      totalMatVol += segVol;
+      matBreakdownParts.push(`${t} перес. × ⌈${c}/${itemN}⌉`);
+    });
+
+    totalMatVol = Math.round(totalMatVol * 100) / 100;
+
+    let formulaDisplay = '';
+    if (showFormula) {
+      if (segments.length === 1) {
+        const s0 = segments[0];
+        let c0 = s0.cablesCount || 0;
+        if (c0 === 0 && Array.isArray(s0.contained)) c0 = s0.contained.length;
+        formulaDisplay = `${s0.countTrackCrossing} перес. × ⌈${c0}/${itemN}⌉ = ${totalMatVol} шт`;
+      } else if (segments.length <= 3) {
+        formulaDisplay = `${matBreakdownParts.join(' + ')} = ${totalMatVol} шт`;
+      } else {
+        formulaDisplay = `${totalMatVol} шт (${totalTrackCrossings} перес. путей в ${segments.length} блоках, n=${itemN})`;
+      }
+    }
+
+    calculatedWorks.push({
+      name: name,
+      unit: unit,
+      volume: totalMatVol,
+      volumeFormatted: String(totalMatVol),
+      formula: formula,
+      formulaDisplay: formulaDisplay,
+      showFormula: showFormula,
+      ruleName: ruleName,
+      routingType: ruleName,
+      section: sectionName,
+      type: 'материал',
+      parentWorkName: undefined,
+      comment: `Пересечение путей (${totalTrackCrossings} перес. в ${segments.length} блоках)`
+    });
+  });
+
+  return {
+    works: calculatedWorks,
+    totalTrackCrossings,
+    segmentsCount: segments.length
+  };
+}
+
+// Evaluate formula for a single trench segment (supports both ДЛИНА and cable count variables)
+function evaluateTrenchSegmentFormula(formula, length, cablesCount) {
+  const clean = (formula || 'ДЛИНА').trim();
+  const len = Number(length) || 0;
+  const cab = Number(cablesCount) || 0;
+
+  let expr = clean.replace(/,/g, '.')
+    .replace(/ДЛИНА/gi, String(len))
+    .replace(/КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ/gi, String(cab))
+    .replace(/КОЛ[-_]?ВО[_\s]?КАБЕЛЕЙ/gi, String(cab))
+    .replace(/КОЛ_КАБЕЛЕЙ/gi, String(cab))
+    .replace(/CABLES_COUNT/gi, String(cab))
+    .replace(/CABLES/gi, String(cab))
+    .replace(/КАБЕЛЕЙ/gi, String(cab))
+    .replace(/КАБЕЛЯ/gi, String(cab))
+    .replace(/КАБЕЛИ/gi, String(cab))
+    .replace(/\bКОЛИЧЕСТВО\b/gi, String(cab))
+    .replace(/\bКОЛ-ВО\b/gi, String(cab));
+
+  try {
+    if (/^[0-9+\-*/().\s]+$/.test(expr)) {
+      const val = Function("'use strict'; return (" + expr + ");")();
+      if (typeof val === 'number' && !isNaN(val)) return val;
+    }
+  } catch (e) {}
+
+  return len;
 }
 
 // Calculate works based on trench summary and rules JSON
@@ -3566,34 +4313,94 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
       const works = getRuleWorks(rule);
 
       works.forEach((work, workIdx) => {
-        const formula = work["Формула"] || "ДЛИНА";
-        const evalExpr = formula.replace(/,/g, '.').replace(/ДЛИНА/gi, String(tInfo.totalLength));
-        let val = 0;
-        try {
-          if (/^[0-9+\-*/().\s]+$/.test(evalExpr)) {
-            val = Function("'use strict'; return (" + evalExpr + ");")();
-          } else {
-            val = tInfo.totalLength;
-          }
-        } catch (e) {
-          val = tInfo.totalLength;
-        }
-        val = Math.round(val * 100) / 100;
+        const cond = parseCableCountCondition(work);
+        let conditionNote = '';
 
-        // Build formula display string (e.g. "0,36 * 1132 м траншеи")
-        let displayFormula = formula.replace(/\*/g, ' * ');
+        // Filter matching segments by cable count condition if specified
+        let matchingSegments = tInfo.segments || [];
+        if (cond.hasCondition) {
+          matchingSegments = matchingSegments.filter(seg => {
+            const cCount = Number(seg.cablesCount) || 0;
+            if (cond.minCables !== null && cCount < cond.minCables) return false;
+            if (cond.maxCables !== null && cCount > cond.maxCables) return false;
+            return true;
+          });
+          conditionNote = cond.description;
+        }
+
+        if (matchingSegments.length === 0) {
+          // No segments match condition
+          return;
+        }
+
+        const effectiveLength = matchingSegments.reduce((sum, s) => sum + (Number(s.length) || 0), 0);
+        if (effectiveLength <= 0 && matchingSegments.length === 0) return;
+
+        const formula = (work["Формула"] || "ДЛИНА").trim();
+        const hasCableVar = /(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|КОЛ[-_]?ВО[_\s]?КАБЕЛЕЙ|КОЛ_КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|\bКОЛИЧЕСТВО\b|\bКОЛ-ВО\b)/i.test(formula);
+
+        let totalVolume = 0;
+        matchingSegments.forEach(seg => {
+          const segLen = Number(seg.length) || 0;
+          const segCables = Number(seg.cablesCount) || 0;
+          const segVol = evaluateTrenchSegmentFormula(formula, segLen, segCables);
+          totalVolume += segVol;
+        });
+        totalVolume = Math.round(totalVolume * 100) / 100;
+
+        // Build formula display string for VOR
+        let displayFormula = '';
         const isTrench = tName.toLowerCase().includes('транше') || ruleName.toLowerCase().includes('транше');
         const unitSuffix = isTrench ? 'м траншеи' : (tName.toLowerCase().includes('канализац') ? 'м канализации' : 'м');
-        displayFormula = displayFormula.replace(/ДЛИНА/gi, `${tInfo.totalLength} ${unitSuffix}`);
+        const condSuffix = conditionNote ? ` (${conditionNote})` : '';
 
+        if (!hasCableVar) {
+          // Standard formula without cable count variable (e.g. "0.36 * ДЛИНА")
+          displayFormula = formula.replace(/\*/g, ' * ');
+          displayFormula = displayFormula.replace(/ДЛИНА/gi, `${effectiveLength} ${unitSuffix}${condSuffix}`);
+        } else {
+          // Formula uses cable count variable (e.g. "ДЛИНА * КОЛИЧЕСТВО_КАБЕЛЕЙ" or "0.1 * ДЛИНА * КАБЕЛЕЙ")
+          if (matchingSegments.length === 1) {
+            const seg = matchingSegments[0];
+            const segLen = Number(seg.length) || 0;
+            const segCables = Number(seg.cablesCount) || 0;
+            displayFormula = formula.replace(/\*/g, ' * ')
+              .replace(/ДЛИНА/gi, `${segLen} ${unitSuffix}`)
+              .replace(/(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|КОЛ[-_]?ВО[_\s]?КАБЕЛЕЙ|КОЛ_КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|\bКОЛИЧЕСТВО\b|\bКОЛ-ВО\b)/gi, `${segCables} каб.`);
+            if (condSuffix) displayFormula += condSuffix;
+          } else if (matchingSegments.length <= 3) {
+            // Detailed segment breakdown: "(100 м × 5 каб + 250 м × 6 каб)"
+            const parts = matchingSegments.map(seg => {
+              const segLen = Number(seg.length) || 0;
+              const segCables = Number(seg.cablesCount) || 0;
+              return `${segLen} м × ${segCables} каб`;
+            });
+            const formulaPrefix = formula.replace(/ДЛИНА.*КОЛИЧЕСТВО.*КАБЕЛЕЙ|ДЛИНА.*КАБЕЛЕЙ|КОЛИЧЕСТВО.*КАБЕЛЕЙ.*ДЛИНА/gi, '').replace(/\*/g, '').trim();
+            if (formulaPrefix && formulaPrefix !== '1') {
+              displayFormula = `${formulaPrefix} × (${parts.join(' + ')})${condSuffix}`;
+            } else {
+              displayFormula = `(${parts.join(' + ')})${condSuffix}`;
+            }
+          } else {
+            // More than 3 segments: compact summary
+            displayFormula = `${formula.replace(/\*/g, ' * ')} по ${matchingSegments.length} блокам (всего ${effectiveLength} ${unitSuffix})${condSuffix}`;
+          }
+        }
+
+        const showFormula = shouldShowFormula(work);
         calculatedWorks.push({
           name: work["Наименование"] || work.name || '',
           unit: work["Единицы измерения"] || work.unit || '',
-          volume: val,
-          formulaDisplay: displayFormula,
+          volume: totalVolume,
+          formulaDisplay: showFormula ? displayFormula : '',
+          showFormula: showFormula,
+          rawFormulaDisplay: displayFormula,
           ruleName: ruleName,
           trenchType: tName,
-          trenchLength: tInfo.totalLength,
+          trenchLength: effectiveLength,
+          totalTrenchLength: tInfo.totalLength,
+          matchedSegmentsCount: matchingSegments.length,
+          condition: conditionNote,
           section: sectionName,
           type: work["Тип"] || work.type || '',
           comment: work["Комментарий"] || work.comment || ''
@@ -3656,7 +4463,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
         const formula = workItem.formula || 'КОЛИЧЕСТВО';
         const rawVol = evaluateWorkFormula(formula, tierData.count);
         const volume = Math.round(rawVol * 100) / 100;
-        const formulaDisplay = buildCouplingWorkFormulaDisplay(formula, tierData, volume);
+        const showFormula = (workItem.showFormula !== undefined) ? workItem.showFormula : shouldShowFormula(workItem.rawItem || workItem);
+        const formulaDisplay = showFormula ? buildCouplingWorkFormulaDisplay(formula, tierData, volume) : '';
 
         calculatedWorks.push({
           name: workItem.name,
@@ -3665,6 +4473,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           volumeFormatted: String(volume),
           formula: formula,
           formulaDisplay: formulaDisplay,
+          showFormula: showFormula,
           tier: tier,
           section: sectionName,
           type: workItem.type || 'работа',
@@ -3676,13 +4485,15 @@ function calculateWorksFromCables(cableSummary, rulesData) {
       // 2. Following material lines for each coupling type
       const primaryWorkName = workItems[0] ? workItems[0].name : null;
       tierData.couplings.forEach(coupling => {
+        const showFormula = (coupling.showFormula !== undefined) ? coupling.showFormula : shouldShowFormula(coupling);
         calculatedWorks.push({
           name: coupling.fullName,
           unit: coupling.unit || 'шт',
           volume: coupling.count,
           volumeFormatted: String(coupling.count),
           formula: 'КОЛИЧЕСТВО',
-          formulaDisplay: `${coupling.count} шт`,
+          formulaDisplay: showFormula ? `${coupling.count} шт` : '',
+          showFormula: showFormula,
           tier: tier,
           maxCores: coupling.maxCores,
           section: sectionName,
@@ -3756,7 +4567,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             routingName: trimmedRName,
             isOptical: !!cMeta.isOptical,
             category: cMeta.category || (cMeta.isOptical ? 'Оптический кабель' : 'Электрический кабель'),
-            foundInCatalog: !!cMeta.foundInCatalog
+            foundInCatalog: !!cMeta.foundInCatalog,
+            showFormula: cMeta.showFormula
           };
           matchedCables.push(cableItem);
         }
@@ -3787,13 +4599,15 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           const vol = isMaterial ? Math.round(rawVal * 1000) / 1000 : Math.round(rawVal * 100) / 100;
           const unit = item["Единицы измерения"] || item.unit || 'м';
           const itemName = (item["Наименование"] || item.name || opticalPrimaryTitle).trim();
-          const formulaDisplay = buildWorkFormulaDisplay(formula, totalOpticalLength, opticalCables.length, unit);
+          const showFormula = shouldShowFormula(item);
+          const formulaDisplay = showFormula ? buildWorkFormulaDisplay(formula, totalOpticalLength, opticalCables.length, unit) : '';
 
           calculatedWorks.push({
             name: itemName,
             unit: unit,
             volume: vol,
             formulaDisplay: formulaDisplay,
+            showFormula: showFormula,
             ruleName: ruleName,
             routingType: ruleName,
             tierKey: parsedWM.optical.key,
@@ -3810,11 +4624,13 @@ function calculateWorksFromCables(cableSummary, rulesData) {
         // List all optical cables under this primary work
         opticalCables.forEach(c => {
           const kmVol = Number((c.length / 1000).toFixed(3));
+          const showFormula = (c.showFormula !== undefined) ? c.showFormula : shouldShowFormula(c);
           calculatedWorks.push({
             name: c.fullDescription || `Кабель ${c.type}`,
             unit: 'км',
             volume: kmVol,
-            formulaDisplay: `${kmVol.toFixed(3)} км (${Math.round(c.length)} м • ВОЛС)`,
+            formulaDisplay: showFormula ? `${kmVol.toFixed(3)} км (${Math.round(c.length)} м • ВОЛС)` : '',
+            showFormula: showFormula,
             ruleName: ruleName,
             routingType: c.routingName,
             cableType: c.type,
@@ -3933,13 +4749,15 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             const vol = isMaterial ? Math.round(rawVal * 1000) / 1000 : Math.round(rawVal * 100) / 100;
             const unit = item["Единицы измерения"] || item.unit || 'м';
             const itemName = (item["Наименование"] || item.name || primaryWorkTitle).trim();
-            const formulaDisplay = buildWorkFormulaDisplay(formula, totalTierLength, tier.cables.length, unit);
+            const showFormula = shouldShowFormula(item);
+            const formulaDisplay = showFormula ? buildWorkFormulaDisplay(formula, totalTierLength, tier.cables.length, unit) : '';
 
             calculatedWorks.push({
               name: itemName,
               unit: unit,
               volume: vol,
               formulaDisplay: formulaDisplay,
+              showFormula: showFormula,
               ruleName: ruleName,
               routingType: ruleName,
               tierMax: tier.threshold,
@@ -3955,11 +4773,13 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           // List all cables under this primary work as materials
           tier.cables.forEach(c => {
             const kmVol = Number((c.length / 1000).toFixed(3));
+            const showFormula = (c.showFormula !== undefined) ? c.showFormula : shouldShowFormula(c);
             calculatedWorks.push({
               name: c.fullDescription || `Кабель ${c.type}`,
               unit: 'км',
               volume: kmVol,
-              formulaDisplay: `${kmVol.toFixed(3)} км (${Math.round(c.length)} м • масса 1 м: ${c.weight} кг)`,
+              formulaDisplay: showFormula ? `${kmVol.toFixed(3)} км (${Math.round(c.length)} м • масса 1 м: ${c.weight} кг)` : '',
+              showFormula: showFormula,
               ruleName: ruleName,
               routingType: c.routingName,
               cableType: c.type,
@@ -3976,6 +4796,13 @@ function calculateWorksFromCables(cableSummary, rulesData) {
       }
     }
   });
+
+  // Add track crossing works and materials calculated from blocks with countTrackCrossing
+  const trackCrossingCalc = calculateTrackCrossingWorks(rulesData);
+  if (trackCrossingCalc && Array.isArray(trackCrossingCalc.works) && trackCrossingCalc.works.length > 0) {
+    calculatedWorks.push(...trackCrossingCalc.works);
+    matchedRoutingTypes.add("Пересечение путей");
+  }
 
   // Identify any routing types in cables that have no matching works in "Монтажные работы"
   for (const rName of allUsedRoutingTypes) {
@@ -4449,10 +5276,15 @@ function syncTableToCurrentData() {
       if (!isNaN(idx) && currentData.routingTypeBlocks[idx]) {
         const typeField = row.querySelector('[data-field="type"]');
         const lengthField = row.querySelector('[data-field="length"]');
+        const trackField = row.querySelector('[data-field="countTrackCrossing"]');
         if (typeField) currentData.routingTypeBlocks[idx].type = typeField.textContent.trim();
         if (lengthField) {
           const num = parseFloat(lengthField.textContent.replace(/\s+/g, '').replace(/,/g, '.'));
           if (!isNaN(num)) currentData.routingTypeBlocks[idx].length = num;
+        }
+        if (trackField) {
+          const num = parseInt(trackField.textContent.replace(/\s+/g, ''), 10);
+          currentData.routingTypeBlocks[idx].countTrackCrossing = isNaN(num) ? 0 : num;
         }
       }
     });
@@ -4654,7 +5486,8 @@ function setupWorksRulesListeners() {
                 "МаксВес": 1,
                 "Единицы измерения": "м",
                 "Формула": "ДЛИНА",
-                "Тип": "работа"
+                "Тип": "работа",
+                "ОтображатьФормулу": true
               }
             ],
             "2": [
@@ -4663,7 +5496,8 @@ function setupWorksRulesListeners() {
                 "МаксВес": 2,
                 "Единицы измерения": "м",
                 "Формула": "ДЛИНА",
-                "Тип": "работа"
+                "Тип": "работа",
+                "ОтображатьФормулу": true
               }
             ],
             "3": [
@@ -4672,7 +5506,8 @@ function setupWorksRulesListeners() {
                 "МаксВес": 3,
                 "Единицы измерения": "м",
                 "Формула": "ДЛИНА",
-                "Тип": "работа"
+                "Тип": "работа",
+                "ОтображатьФормулу": true
               }
             ],
             "оптический": [
@@ -4681,7 +5516,8 @@ function setupWorksRulesListeners() {
                 "Категория": "Оптический кабель",
                 "Единицы измерения": "м",
                 "Формула": "ДЛИНА",
-                "Тип": "работа"
+                "Тип": "работа",
+                "ОтображатьФормулу": true
               }
             ]
           }
@@ -4692,7 +5528,8 @@ function setupWorksRulesListeners() {
               "Наименование": "Разработка грунта механизированным способом",
               "Единицы измерения": "м3",
               "Формула": "ДЛИНА",
-              "Тип": "работа"
+              "Тип": "работа",
+              "ОтображатьФормулу": true
             }
           ]
         };
@@ -4937,13 +5774,15 @@ function addMissingTrenchTypesToRules(missingList) {
             "Наименование": `Разработка грунта в траншеях (${typeName})`,
             "Единицы измерения": "м3 грунта",
             "Формула": "0,36*ДЛИНА",
-            "Тип": "работа"
+            "Тип": "работа",
+            "ОтображатьФормулу": true
           },
           {
             "Наименование": `Засыпка траншей (${typeName})`,
             "Единицы измерения": "м3 грунта",
             "Формула": "0,36*ДЛИНА",
-            "Тип": "работа"
+            "Тип": "работа",
+            "ОтображатьФормулу": true
           }
         ]
       });
@@ -4954,13 +5793,15 @@ function addMissingTrenchTypesToRules(missingList) {
           "Наименование": `Разработка грунта в траншеях (${targetRule["Название"] || typeName})`,
           "Единицы измерения": "м3 грунта",
           "Формула": "0,36*ДЛИНА",
-          "Тип": "работа"
+          "Тип": "работа",
+          "ОтображатьФормулу": true
         },
         {
           "Наименование": `Засыпка траншей (${targetRule["Название"] || typeName})`,
           "Единицы измерения": "м3 грунта",
           "Формула": "0,36*ДЛИНА",
-          "Тип": "работа"
+          "Тип": "работа",
+          "ОтображатьФормулу": true
         }
       ];
       addedCount++;
@@ -4989,7 +5830,8 @@ function addMissingCableWaysToRules(missingList) {
         "МаксВес": 1,
         "Единицы измерения": "м",
         "Формула": "ДЛИНА",
-        "Тип": "работа"
+        "Тип": "работа",
+        "ОтображатьФормулу": true
       }
     ],
     "2": [
@@ -4998,7 +5840,8 @@ function addMissingCableWaysToRules(missingList) {
         "МаксВес": 2,
         "Единицы измерения": "м",
         "Формула": "ДЛИНА",
-        "Тип": "работа"
+        "Тип": "работа",
+        "ОтображатьФормулу": true
       }
     ],
     "3": [
@@ -5007,7 +5850,8 @@ function addMissingCableWaysToRules(missingList) {
         "МаксВес": 3,
         "Единицы измерения": "м",
         "Формула": "ДЛИНА",
-        "Тип": "работа"
+        "Тип": "работа",
+        "ОтображатьФормулу": true
       }
     ],
     "оптический": [
@@ -5016,7 +5860,8 @@ function addMissingCableWaysToRules(missingList) {
         "Категория": "Оптический кабель",
         "Единицы измерения": "м",
         "Формула": "ДЛИНА",
-        "Тип": "работа"
+        "Тип": "работа",
+        "ОтображатьФормулу": true
       }
     ]
   });
@@ -5057,7 +5902,8 @@ function addMissingCableWaysToRules(missingList) {
               "Единицы измерения": "м",
               "Категория": "Оптический кабель",
               "Формула": "ДЛИНА",
-              "Тип": "работа"
+              "Тип": "работа",
+              "ОтображатьФормулу": true
             }
           ];
           addedCount++;
@@ -5089,7 +5935,8 @@ function addMissingCableWaysToRules(missingList) {
               "Единицы измерения": "м",
               "МаксВес": Number(tierKey) || m.tierMax || 1,
               "Формула": "ДЛИНА",
-              "Тип": "работа"
+              "Тип": "работа",
+              "ОтображатьФормулу": true
             }
           ];
           addedCount++;
