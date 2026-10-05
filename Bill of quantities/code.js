@@ -1545,6 +1545,25 @@ function renderProcessedData(data, fileName) {
     totalRoutingLength = data.routingTypeBlocks.reduce((acc, r) => acc + (Number(r.length) || 0), 0);
   }
 
+  const equipmentList = (data.TracksideEquipment && Array.isArray(data.TracksideEquipment))
+    ? data.TracksideEquipment
+    : (data.tracksideEquipment && Array.isArray(data.tracksideEquipment))
+    ? data.tracksideEquipment
+    : (data.equipment && Array.isArray(data.equipment))
+    ? data.equipment
+    : (data.Equipment && Array.isArray(data.Equipment))
+    ? data.Equipment
+    : (data['Оборудование'] && Array.isArray(data['Оборудование']))
+    ? data['Оборудование']
+    : (data['Напольное оборудование'] && Array.isArray(data['Напольное оборудование']))
+    ? data['Напольное оборудование']
+    : [];
+
+  let totalEquipmentCount = 0;
+  if (equipmentList.length > 0) {
+    totalEquipmentCount = equipmentList.reduce((acc, eq) => acc + (Number(eq.countEquipment || eq.count || eq.qty || (eq.handles ? eq.handles.length : 1)) || 1), 0);
+  }
+
   // Activate header controls toolbar and reset button
   const dataToolbar = document.getElementById('dataToolbarControls');
   if (dataToolbar) dataToolbar.classList.remove('d-none');
@@ -1569,8 +1588,14 @@ function renderProcessedData(data, fileName) {
     container.appendChild(routingAcc);
   }
 
-  // 3. Generic JSON arrays / objects
-  if (!data.cables && !data.routingTypeBlocks) {
+  // 3. Equipment section (after trenches)
+  if (equipmentList.length > 0) {
+    const equipmentAcc = createEquipmentAccordion(equipmentList, totalEquipmentCount);
+    container.appendChild(equipmentAcc);
+  }
+
+  // 4. Generic JSON arrays / objects
+  if (!data.cables && !data.routingTypeBlocks && equipmentList.length === 0) {
     if (Array.isArray(data)) {
       container.appendChild(createGenericTableAccordion('Данные', data));
     } else if (typeof data === 'object' && data !== null) {
@@ -1921,6 +1946,107 @@ function createRoutingAccordion(blocks, totalLength) {
             <span>Участки трассы / траншеи</span>
           </div>
           <span class="badge bg-info-subtle text-info-emphasis border">${blocks.length} шт. / ${Math.round(totalLength).toLocaleString('ru-RU')} м</span>
+        </div>
+      </button>
+    </h2>
+    <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
+      <div class="accordion-body p-0">
+        <!-- table appended here -->
+      </div>
+    </div>
+  `;
+
+  accItem.querySelector('.accordion-body').appendChild(tableWrapper);
+  return accItem;
+}
+
+function createEquipmentAccordion(equipmentList, totalCount) {
+  const accItem = document.createElement('div');
+  accItem.className = 'accordion-item border rounded-3 mb-3 shadow-none overflow-hidden';
+
+  const headerId = 'headingEquipment';
+  const collapseId = 'collapseEquipment';
+
+  const tableWrapper = document.createElement('div');
+  tableWrapper.className = 'table-responsive custom-table-scroll';
+
+  const table = document.createElement('table');
+  table.className = 'table table-sm table-hover table-striped mb-0 text-start align-middle';
+  table.id = 'tableEquipment';
+
+  table.innerHTML = `
+    <thead class="table-sticky-header">
+      <tr>
+        <th style="width: 35px;" class="text-center">№</th>
+        <th style="min-width: 140px;">Марка оборудования</th>
+        <th style="min-width: 140px;">Способ установки</th>
+        <th style="width: 90px;" class="text-center">Кол-во, шт</th>
+        <th style="min-width: 130px;">handle блоков</th>
+        <th class="action-col d-none text-center" style="width: 45px;">Действие</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+
+  const tbody = table.querySelector('tbody');
+
+  equipmentList.forEach((eq, idx) => {
+    const row = document.createElement('tr');
+    row.dataset.index = idx;
+    row._equipmentData = eq;
+
+    const mark = (eq.EquipmentType || eq.equipmentType || eq.mark || eq.marka || eq.type || eq['Марка'] || 'Без марки').trim();
+    const method = (eq.InstallationMethod || eq.installationMethod || eq.method || eq['Способ установки'] || 'Не указано').trim();
+    const count = Number(eq.countEquipment || eq.count || eq.qty || (eq.handles ? eq.handles.length : 1)) || 1;
+    const handles = Array.isArray(eq.handles) ? eq.handles : (eq.handles ? [eq.handles] : (eq.handle ? [eq.handle] : []));
+
+    let handlesHtml = '<span class="text-muted">-</span>';
+    if (handles.length > 0) {
+      handlesHtml = `
+        <div class="d-flex flex-wrap gap-1 align-items-center py-0_5 cell-wrap">
+          ${handles.map(h => `<span class="badge bg-body text-body border font-monospace" style="font-size: 0.72rem;">${escapeHtml(String(h))}</span>`).join('')}
+        </div>
+      `;
+    }
+
+    const methodBadge = method.toLowerCase() !== 'не указано'
+      ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace">${escapeHtml(method)}</span>`
+      : `<span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace">${escapeHtml(method)}</span>`;
+
+    row.innerHTML = `
+      <td class="text-muted small text-center">${idx + 1}</td>
+      <td class="canEdit fw-bold cell-wrap font-monospace" data-field="mark">${escapeHtml(mark)}</td>
+      <td class="canEdit cell-wrap" data-field="method">${methodBadge}</td>
+      <td class="canEdit text-center font-monospace fw-semibold" data-field="count">${count}</td>
+      <td class="cell-wrap">${handlesHtml}</td>
+      <td class="action-col d-none text-center">
+        <button type="button" class="btn btn-sm btn-outline-danger p-0 border-0 removeRowBtn" title="Удалить строку">
+          <i class='bx bx-trash fs-5'></i>
+        </button>
+      </td>
+    `;
+
+    const removeBtn = row.querySelector('.removeRowBtn');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        row.remove();
+      });
+    }
+
+    tbody.appendChild(row);
+  });
+
+  tableWrapper.appendChild(table);
+
+  accItem.innerHTML = `
+    <h2 class="accordion-header" id="${headerId}">
+      <button class="accordion-button collapsed py-2 px-3 fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+        <div class="d-flex align-items-center justify-content-between w-100 me-2">
+          <div class="d-flex align-items-center gap-2">
+            <i class='bx bx-cube text-warning fs-4'></i>
+            <span>Напольное оборудование</span>
+          </div>
+          <span class="badge bg-warning-subtle text-warning-emphasis border">${equipmentList.length} поз. / ${totalCount} шт.</span>
         </div>
       </button>
     </h2>
@@ -2359,12 +2485,85 @@ function getActiveCableSummary() {
   };
 }
 
-// Calculate Cable Volumes & Trench/Routing Volumes
+function getActiveEquipmentSummary() {
+  const eqTable = document.getElementById('tableEquipment');
+  const summary = {};
+  let totalCount = 0;
+  let totalPositions = 0;
+  const list = [];
+
+  if (eqTable) {
+    const rows = eqTable.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      const markCell = row.querySelector('[data-field="mark"]');
+      const methodCell = row.querySelector('[data-field="method"]');
+      const countCell = row.querySelector('[data-field="count"]');
+
+      if (markCell && countCell) {
+        const mark = (markCell.textContent || '').trim() || 'Без марки';
+        const method = methodCell ? (methodCell.textContent || '').trim() || 'Не указано' : 'Не указано';
+        const count = parseInt((countCell.textContent || '').replace(/\s+/g, ''), 10) || 0;
+        const eqData = row._equipmentData || {};
+        const handles = Array.isArray(eqData.handles) ? eqData.handles : (eqData.handles ? [eqData.handles] : []);
+
+        const key = `${mark}____${method}`;
+        if (!summary[key]) {
+          summary[key] = { mark, method, count: 0, handles: [] };
+          totalPositions++;
+        }
+        summary[key].count += count;
+        totalCount += count;
+        handles.forEach(h => {
+          if (!summary[key].handles.includes(h)) summary[key].handles.push(h);
+        });
+        list.push({ mark, method, count, handles });
+      }
+    });
+  } else if (currentData) {
+    const rawList = (currentData.TracksideEquipment && Array.isArray(currentData.TracksideEquipment))
+      ? currentData.TracksideEquipment
+      : (currentData.tracksideEquipment && Array.isArray(currentData.tracksideEquipment))
+      ? currentData.tracksideEquipment
+      : (currentData.equipment && Array.isArray(currentData.equipment))
+      ? currentData.equipment
+      : (currentData.Equipment && Array.isArray(currentData.Equipment))
+      ? currentData.Equipment
+      : (currentData['Оборудование'] && Array.isArray(currentData['Оборудование']))
+      ? currentData['Оборудование']
+      : (currentData['Напольное оборудование'] && Array.isArray(currentData['Напольное оборудование']))
+      ? currentData['Напольное оборудование']
+      : [];
+
+    rawList.forEach(eq => {
+      const mark = (eq.EquipmentType || eq.equipmentType || eq.mark || eq.marka || eq.type || eq['Марка'] || 'Без марки').trim();
+      const method = (eq.InstallationMethod || eq.installationMethod || eq.method || eq['Способ установки'] || 'Не указано').trim();
+      const count = Number(eq.countEquipment || eq.count || eq.qty || (eq.handles ? eq.handles.length : 1)) || 1;
+      const handles = Array.isArray(eq.handles) ? eq.handles : (eq.handles ? [eq.handles] : (eq.handle ? [eq.handle] : []));
+
+      const key = `${mark}____${method}`;
+      if (!summary[key]) {
+        summary[key] = { mark, method, count: 0, handles: [] };
+        totalPositions++;
+      }
+      summary[key].count += count;
+      totalCount += count;
+      handles.forEach(h => {
+        if (!summary[key].handles.includes(h)) summary[key].handles.push(h);
+      });
+      list.push({ mark, method, count, handles });
+    });
+  }
+
+  return { summary, totalPositions, totalCount, list };
+}
+
+// Calculate Cable Volumes & Trench/Routing Volumes & Equipment
 function calculateVolumes() {
   const cableTable = document.getElementById('tableCables');
   const routingTable = document.getElementById('tableRouting');
+  const equipmentTable = document.getElementById('tableEquipment');
 
-  if (!cableTable && !routingTable && !currentData) {
+  if (!cableTable && !routingTable && !equipmentTable && !currentData) {
     showToast('Сначала загрузите исходные данные для расчета', 'error', 'Внимание');
     return;
   }
@@ -2411,7 +2610,17 @@ function calculateVolumes() {
 
   const trenchWorksCalc = renderRoutingResult(routingSummary, grandTotalRoutingCount, grandTotalRoutingLength);
 
-  // 3. Re-distribute works into their target sections for Column 3 UI cards
+  // 3. Calculate and render Equipment summary in Column 2
+  const equipmentData = getActiveEquipmentSummary();
+  const equipmentWorksCalc = calculateWorksFromEquipment(equipmentData.summary, currentWorksRules);
+  window.lastEquipmentWorksCalc = equipmentWorksCalc;
+  renderEquipmentStatement(equipmentData, equipmentWorksCalc);
+
+  // 4. Calculate and render Couplings summary
+  const couplingsSummary = getActiveCouplingsSummary(currentWorksRules);
+  renderCouplingsResult(couplingsSummary);
+
+  // 5. Re-distribute works into their target sections for Column 3 UI cards
   // Any trench work with "Раздел": "Монтажные работы" goes to Installation Works
   // Any work with "Раздел": "Строительные работы" goes to Construction Works
   const allCalc = getAllCalculatedWorks();
@@ -2422,21 +2631,19 @@ function calculateVolumes() {
   renderInstallationWorks({
     works: allCalc.cableWorks,
     missingInRules: cableWorksCalc.missingInRules,
-    missingInCatalog: cableWorksCalc.missingInCatalog
+    missingInCatalog: cableWorksCalc.missingInCatalog,
+    missingEquipment: equipmentWorksCalc.missingInRules
   });
 
-  // 4. Calculate and render Couplings summary
-  const couplingsSummary = getActiveCouplingsSummary(currentWorksRules);
-  renderCouplingsResult(couplingsSummary);
-
-  // Check if any rules or data are missing in Cable works, Trench works, or Couplings
+  // Check if any rules or data are missing in Cable works, Trench works, Equipment, or Couplings
   const cableMissingCount = (cableWorksCalc && cableWorksCalc.missingInRules) ? cableWorksCalc.missingInRules.length : 0;
   const trenchMissingCount = (trenchWorksCalc && trenchWorksCalc.missingInRules) ? trenchWorksCalc.missingInRules.length : 0;
+  const equipmentMissingCount = (equipmentWorksCalc && equipmentWorksCalc.missingInRules) ? equipmentWorksCalc.missingInRules.length : 0;
   const couplingMissingCount = couplingsSummary.hasMissingInfo
     ? ((couplingsSummary.missingCouplings || []).length + (couplingsSummary.missingInCatalog || []).length)
     : 0;
 
-  if (cableMissingCount > 0 || trenchMissingCount > 0 || couplingMissingCount > 0) {
+  if (cableMissingCount > 0 || trenchMissingCount > 0 || equipmentMissingCount > 0 || couplingMissingCount > 0) {
     const missingItems = [];
     if (cableMissingCount > 0) {
       const names = cableWorksCalc.missingInRules.map(m => `«${m.type}»`).join(', ');
@@ -2445,6 +2652,10 @@ function calculateVolumes() {
     if (trenchMissingCount > 0) {
       const names = trenchWorksCalc.missingInRules.map(m => `«${m.type}»`).join(', ');
       missingItems.push(`по траншеям: ${names}`);
+    }
+    if (equipmentMissingCount > 0) {
+      const names = equipmentWorksCalc.missingInRules.map(m => `«${m.type}»`).join(', ');
+      missingItems.push(`по оборудованию: ${names}`);
     }
     if (couplingMissingCount > 0) {
       missingItems.push(`по муфтам: ${couplingMissingCount} неполных позиций`);
@@ -2557,18 +2768,163 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
   const cableWorksCalc = calculateWorksFromCables(summary, currentWorksRules);
   window.lastCableWorksCalc = cableWorksCalc;
 
-  // Render "Монтажные работы" into Column 3
-  renderInstallationWorks(cableWorksCalc);
-
   return cableWorksCalc;
+}
+
+function renderEquipmentStatement(equipmentData, equipmentWorksCalc) {
+  const container = document.getElementById('resultEquipmentStatement');
+  const card = document.getElementById('equipmentCard');
+  if (!container) return;
+
+  const totalPos = equipmentData.totalPositions || Object.keys(equipmentData.summary || {}).length;
+  const totalCount = equipmentData.totalCount || 0;
+
+  if (card) {
+    if (totalPos > 0 || totalCount > 0) {
+      card.classList.remove('d-none');
+    } else {
+      card.classList.add('d-none');
+    }
+  }
+
+  const badgeTotal = document.getElementById('equipmentBadgeTotal');
+  if (badgeTotal) {
+    badgeTotal.textContent = `${totalPos} поз. / ${totalCount} шт`;
+    badgeTotal.classList.remove('d-none');
+  }
+
+  const missingBadge = document.getElementById('equipmentMissingBadge');
+  const hasMissing = equipmentWorksCalc && equipmentWorksCalc.missingInRules && equipmentWorksCalc.missingInRules.length > 0;
+  if (missingBadge) {
+    if (hasMissing) {
+      missingBadge.classList.remove('d-none');
+      missingBadge.textContent = `Неполные правила (${equipmentWorksCalc.missingInRules.length})`;
+      missingBadge.onclick = () => openWorksRulesModal('editor');
+    } else {
+      missingBadge.classList.add('d-none');
+    }
+  }
+
+  let missingAlertHtml = '';
+  if (hasMissing) {
+    const missingBadges = equipmentWorksCalc.missingInRules
+      .map(m => `<span class="badge bg-body text-body border me-1 font-monospace" style="font-size: 0.75rem;">${escapeHtml(m.type || m.mark)} <span class="text-muted">(${m.count} шт)</span></span>`)
+      .join(' ');
+    missingAlertHtml = `
+      <div class="alert alert-warning py-2 px-3 small d-flex align-items-start justify-content-between gap-2 mb-3 flex-wrap border-warning shadow-sm">
+        <div class="d-flex align-items-start gap-2">
+          <i class="bx bx-error-circle fs-5 text-warning flex-shrink-0 mt-0_5"></i>
+          <div>
+            <div class="fw-bold text-dark mb-1">
+              Внимание: в разделе «Оборудование» отсутствуют сметные нормы для ${equipmentWorksCalc.missingInRules.length} позиций:
+            </div>
+            <div class="d-flex flex-wrap gap-1 align-items-center mb-1">
+              ${missingBadges}
+            </div>
+            <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
+              Для данного оборудования работы и материалы не определены в правилах и не вошли в итоговую ведомость (ВОР). Рекомендуется дополнить сметные нормы.
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" id="addMissingEquipmentRulesBtn" style="font-size: 0.75rem;" title="Добавить эти позиции в раздел «Оборудование» правил">
+          <i class="bx bx-plus-circle"></i> Добавить в правила JSON
+        </button>
+      </div>
+    `;
+  }
+
+  const entries = Object.entries(equipmentData.summary || {}).sort((a, b) => b[1].count - a[1].count);
+
+  let rowsHtml = '';
+  entries.forEach(([key, val], idx) => {
+    const isMissing = equipmentWorksCalc && equipmentWorksCalc.missingInRules && equipmentWorksCalc.missingInRules.some(m =>
+      (m.mark || '').toLowerCase() === (val.mark || '').toLowerCase() &&
+      (m.method || 'Не указано').toLowerCase() === (val.method || 'Не указано').toLowerCase()
+    );
+
+    const statusBadge = isMissing
+      ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" title="Отсутствуют сметные нормы в правилах JSON"><i class='bx bx-error-circle me-1'></i>нет в правилах</span>`
+      : `<span class="badge bg-success-subtle text-success border border-success-subtle"><i class='bx bx-check me-1'></i>в правилах</span>`;
+
+    const methodBadge = val.method.toLowerCase() !== 'не указано'
+      ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace">${escapeHtml(val.method)}</span>`
+      : `<span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace">${escapeHtml(val.method)}</span>`;
+
+    let handlesHtml = '<span class="text-muted small">-</span>';
+    if (val.handles && val.handles.length > 0) {
+      handlesHtml = `
+        <div class="d-flex flex-wrap gap-1 align-items-center py-0_5 cell-wrap">
+          ${val.handles.map(h => `<span class="badge bg-body text-body border font-monospace" style="font-size: 0.72rem;">${escapeHtml(String(h))}</span>`).join('')}
+        </div>
+      `;
+    }
+
+    rowsHtml += `
+      <tr class="${isMissing ? 'table-warning-subtle' : ''}">
+        <td class="text-muted small text-center">${idx + 1}</td>
+        <td class="fw-bold cell-wrap font-monospace">${escapeHtml(val.mark)}</td>
+        <td class="cell-wrap">${methodBadge}</td>
+        <td class="text-center font-monospace fw-semibold">${val.count}</td>
+        <td class="cell-wrap">${handlesHtml}</td>
+        <td class="text-center text-nowrap">${statusBadge}</td>
+      </tr>
+    `;
+  });
+
+  container.innerHTML = `
+    ${missingAlertHtml}
+    <div class="mb-2 d-flex flex-wrap gap-2">
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Всего оборудования</div>
+        <div class="fw-bold text-primary font-monospace" style="font-size: 0.9rem;">${totalCount} <span class="fw-normal text-muted" style="font-size: 0.7rem;">шт</span></div>
+      </div>
+      <div class="stat-summary-card flex-fill text-center py-1 px-2">
+        <div class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem;">Типоразмеров</div>
+        <div class="fw-bold font-monospace" style="font-size: 0.9rem;">${totalPos} <span class="fw-normal text-muted" style="font-size: 0.7rem;">поз</span></div>
+      </div>
+    </div>
+
+    <div class="table-responsive table-responsive-full rounded-2 border">
+      <table class="table table-sm table-hover text-start align-middle mb-0">
+        <thead class="table-sticky-header">
+          <tr>
+            <th style="width: 35px;" class="text-center">№</th>
+            <th style="min-width: 130px;">Марка оборудования</th>
+            <th style="min-width: 120px;">Способ установки</th>
+            <th class="text-center" style="width: 70px;">Кол-во</th>
+            <th style="min-width: 110px;">handle блоков</th>
+            <th class="text-center" style="width: 100px;">Нормы</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml || '<tr><td colspan="6" class="text-center py-3 text-muted">Нет данных об оборудовании</td></tr>'}
+        </tbody>
+        <tfoot class="table-sticky-footer fw-bold">
+          <tr>
+            <td colspan="3" class="ps-2">Итого:</td>
+            <td class="text-center font-monospace text-primary">${totalCount}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+
+  const addMissingBtn = document.getElementById('addMissingEquipmentRulesBtn');
+  if (addMissingBtn) {
+    addMissingBtn.addEventListener('click', () => {
+      addMissingEquipmentToRules(equipmentWorksCalc.missingInRules);
+    });
+  }
 }
 
 function renderInstallationWorks(cableWorksCalc) {
   const container = document.getElementById('resultInstallationWorks');
   if (!container) return;
 
-  const worksCount = cableWorksCalc.works.filter(w => w.type === 'работа').length;
-  const materialsCount = cableWorksCalc.works.filter(w => w.type === 'материал').length;
+  const worksList = cableWorksCalc.works || [];
+  const worksCount = worksList.filter(w => w.type === 'работа').length;
+  const materialsCount = worksList.filter(w => w.type === 'материал').length;
 
   const badgeTotal = document.getElementById('installationBadgeTotal');
   if (badgeTotal) {
@@ -2579,13 +2935,16 @@ function renderInstallationWorks(cableWorksCalc) {
   // Update header badges
   const cableMissingBadge = document.getElementById('cableMissingBadge');
   const installationMissingBadge = document.getElementById('installationMissingBadge');
-  const hasMissing = cableWorksCalc.missingInRules && cableWorksCalc.missingInRules.length > 0;
+  const hasMissingCable = cableWorksCalc.missingInRules && cableWorksCalc.missingInRules.length > 0;
+  const hasMissingEquipment = cableWorksCalc.missingEquipment && cableWorksCalc.missingEquipment.length > 0;
+  const hasMissing = hasMissingCable || hasMissingEquipment;
+  const totalMissingCount = (hasMissingCable ? cableWorksCalc.missingInRules.length : 0) + (hasMissingEquipment ? cableWorksCalc.missingEquipment.length : 0);
 
   [cableMissingBadge, installationMissingBadge].forEach(b => {
     if (!b) return;
     if (hasMissing) {
       b.classList.remove('d-none');
-      b.innerHTML = `Неполные правила (${cableWorksCalc.missingInRules.length})`;
+      b.innerHTML = `Неполные правила (${totalMissingCount})`;
       b.onclick = () => openWorksRulesModal('editor');
     } else {
       b.classList.add('d-none');
@@ -2593,7 +2952,7 @@ function renderInstallationWorks(cableWorksCalc) {
   });
 
   let missingCableAlertHtml = '';
-  if (hasMissing) {
+  if (hasMissingCable) {
     const missingBadges = cableWorksCalc.missingInRules
       .map(m => `<span class="badge bg-body text-body border me-1 font-monospace" style="font-size: 0.75rem;">${escapeHtml(m.type)} <span class="text-muted">(${Math.round(m.length)} м)</span></span>`)
       .join(' ');
@@ -2614,6 +2973,34 @@ function renderInstallationWorks(cableWorksCalc) {
           </div>
         </div>
         <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" id="addMissingCableRulesBtn" style="font-size: 0.75rem;" title="Добавить эти позиции в раздел «Монтажные работы»">
+          <i class="bx bx-plus-circle"></i> Добавить в правила JSON
+        </button>
+      </div>
+    `;
+  }
+
+  let missingEquipmentAlertHtml = '';
+  if (hasMissingEquipment) {
+    const missingBadges = cableWorksCalc.missingEquipment
+      .map(m => `<span class="badge bg-body text-body border me-1 font-monospace" style="font-size: 0.75rem;">${escapeHtml(m.type || m.mark)} <span class="text-muted">(${m.count} шт)</span></span>`)
+      .join(' ');
+    missingEquipmentAlertHtml = `
+      <div class="alert alert-warning py-2 px-3 small d-flex align-items-start justify-content-between gap-2 mb-3 flex-wrap border-warning shadow-sm">
+        <div class="d-flex align-items-start gap-2">
+          <i class="bx bx-error-circle fs-5 text-warning flex-shrink-0 mt-0_5"></i>
+          <div>
+            <div class="fw-bold text-dark mb-1">
+              Внимание: в разделе «Оборудование» отсутствуют сметные нормы для ${cableWorksCalc.missingEquipment.length} позиций:
+            </div>
+            <div class="d-flex flex-wrap gap-1 align-items-center mb-1">
+              ${missingBadges}
+            </div>
+            <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
+              Для данного оборудования работы и материалы не определены в правилах и не вошли в ведомость (ВОР).
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" id="addMissingEquipmentRulesBtnInstallation" style="font-size: 0.75rem;" title="Добавить эти позиции в раздел «Оборудование»">
           <i class="bx bx-plus-circle"></i> Добавить в правила JSON
         </button>
       </div>
@@ -2693,6 +3080,7 @@ function renderInstallationWorks(cableWorksCalc) {
   if (cableWorksCalc.works.length > 0) {
     container.innerHTML = `
       ${missingCableAlertHtml}
+      ${missingEquipmentAlertHtml}
       ${missingCatalogAlertHtml}
 
       <div class="table-responsive rounded-2 border mb-0 custom-table-scroll" style="max-height: 420px;">
@@ -2715,12 +3103,13 @@ function renderInstallationWorks(cableWorksCalc) {
   } else {
     container.innerHTML = `
       ${missingCableAlertHtml}
+      ${missingEquipmentAlertHtml}
       ${missingCatalogAlertHtml}
       <div class="text-center py-4 px-2 text-muted small bg-light rounded border">
         <i class="bx bx-info-circle fs-4 d-block mb-1 text-secondary"></i>
-        <div>Работы не определены для текущих способов прокладки кабелей.</div>
+        <div>Работы не определены для текущих способов прокладки кабелей и оборудования.</div>
         <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('editor')">
-          <i class="bx bx-edit"></i> Настроить раздел «Монтажные работы» в JSON
+          <i class="bx bx-edit"></i> Настроить раздел «Монтажные работы» и «Оборудование» в JSON
         </button>
       </div>
     `;
@@ -2730,6 +3119,13 @@ function renderInstallationWorks(cableWorksCalc) {
   if (addMissingCableRulesBtn) {
     addMissingCableRulesBtn.addEventListener('click', () => {
       addMissingCableWaysToRules(cableWorksCalc.missingInRules);
+    });
+  }
+
+  const addMissingEquipmentRulesBtnInst = document.getElementById('addMissingEquipmentRulesBtnInstallation');
+  if (addMissingEquipmentRulesBtnInst) {
+    addMissingEquipmentRulesBtnInst.addEventListener('click', () => {
+      addMissingEquipmentToRules(cableWorksCalc.missingEquipment);
     });
   }
 
@@ -3155,8 +3551,9 @@ function exportCurrentDataExcel() {
   }
   const cableTable = document.getElementById('tableCables');
   const routingTable = document.getElementById('tableRouting');
+  const equipmentTable = document.getElementById('tableEquipment');
 
-  if (!cableTable && !routingTable) {
+  if (!cableTable && !routingTable && !equipmentTable) {
     showToast('Нет таблиц для экспорта', 'error', 'Ошибка');
     return;
   }
@@ -3169,6 +3566,10 @@ function exportCurrentDataExcel() {
   if (routingTable) {
     const wsRouting = XLSX.utils.table_to_sheet(routingTable);
     XLSX.utils.book_append_sheet(wb, wsRouting, 'Трассы');
+  }
+  if (equipmentTable) {
+    const wsEquipment = XLSX.utils.table_to_sheet(equipmentTable);
+    XLSX.utils.book_append_sheet(wb, wsEquipment, 'Оборудование');
   }
   XLSX.writeFile(wb, 'Исходные_данные_ВОР.xlsx');
   showToast('Файл Excel успешно экспортирован', 'success', 'Экспорт');
@@ -3329,20 +3730,23 @@ function renderRulesModalContent() {
   let missingNoticeHtml = '';
   const missingCable = (window.lastCableWorksCalc && window.lastCableWorksCalc.missingInRules) ? window.lastCableWorksCalc.missingInRules : [];
   const missingTrench = (window.lastTrenchWorksCalc && window.lastTrenchWorksCalc.missingInRules) ? window.lastTrenchWorksCalc.missingInRules : [];
+  const missingEquipment = (window.lastEquipmentWorksCalc && window.lastEquipmentWorksCalc.missingInRules) ? window.lastEquipmentWorksCalc.missingInRules : [];
 
-  if (missingCable.length > 0 || missingTrench.length > 0) {
+  if (missingCable.length > 0 || missingTrench.length > 0 || missingEquipment.length > 0) {
     const cableNames = missingCable.map(m => `«${escapeHtml(m.type)}»`).join(', ');
     const trenchNames = missingTrench.map(m => `«${escapeHtml(m.type)}»`).join(', ');
+    const eqNames = missingEquipment.map(m => `«${escapeHtml(m.type || m.mark)}»`).join(', ');
     const parts = [];
     if (cableNames) parts.push(`Для кабелей (Монтажные работы): ${cableNames}`);
     if (trenchNames) parts.push(`Для траншей (Строительные работы): ${trenchNames}`);
+    if (eqNames) parts.push(`Для оборудования (Оборудование): ${eqNames}`);
 
     missingNoticeHtml = `
       <div class="alert alert-warning py-2_5 px-3 mb-3 border-warning shadow-sm small">
         <div class="d-flex align-items-start gap-2">
           <i class="bx bx-alarm-exclamation fs-4 text-warning flex-shrink-0 mt-0_5"></i>
           <div class="flex-grow-1">
-            <div class="fw-bold text-dark">В загруженном проекте есть способы прокладки без правил сметных норм!</div>
+            <div class="fw-bold text-dark">В загруженном проекте есть позиции без правил сметных норм!</div>
             <div class="text-body-secondary mt-1 mb-2">
               ${parts.join('<br>')}
             </div>
@@ -3355,6 +3759,11 @@ function renderRulesModalContent() {
               ${missingTrench.length > 0 ? `
                 <button type="button" class="btn btn-xs btn-outline-dark fw-semibold" id="modalAddMissingTrenchBtn">
                   <i class="bx bx-plus-circle me-1"></i>Добавить позиции по траншеям (${missingTrench.length})
+                </button>
+              ` : ''}
+              ${missingEquipment.length > 0 ? `
+                <button type="button" class="btn btn-xs btn-outline-dark fw-semibold" id="modalAddMissingEquipmentBtn">
+                  <i class="bx bx-plus-circle me-1"></i>Добавить позиции по оборудованию (${missingEquipment.length})
                 </button>
               ` : ''}
             </div>
@@ -3532,6 +3941,13 @@ function renderRulesModalContent() {
   if (modalAddMissingTrenchBtn && missingTrench.length > 0) {
     modalAddMissingTrenchBtn.addEventListener('click', () => {
       addMissingTrenchTypesToRules(missingTrench);
+    });
+  }
+
+  const modalAddMissingEquipmentBtn = document.getElementById('modalAddMissingEquipmentBtn');
+  if (modalAddMissingEquipmentBtn && missingEquipment.length > 0) {
+    modalAddMissingEquipmentBtn.addEventListener('click', () => {
+      addMissingEquipmentToRules(missingEquipment);
     });
   }
 }
@@ -4655,7 +5071,167 @@ function calculateWorksFromCables(cableSummary, rulesData) {
   };
 }
 
-// Get combined works and missing items from both Trenches ("Строительные работы") and Cables ("Монтажные работы")
+// --------------------------------------------------------------------------
+// EQUIPMENT RULES & CALCULATION FUNCTIONS
+// --------------------------------------------------------------------------
+
+function getEquipmentRules(rulesData) {
+  if (!rulesData || typeof rulesData !== 'object') return { sectionName: 'Оборудование', rules: [] };
+  if (Array.isArray(rulesData['Оборудование'])) {
+    return { sectionName: 'Оборудование', rules: rulesData['Оборудование'] };
+  }
+  if (Array.isArray(rulesData.equipment)) {
+    return { sectionName: 'Оборудование', rules: rulesData.equipment };
+  }
+  if (Array.isArray(rulesData['Напольное оборудование'])) {
+    return { sectionName: 'Напольное оборудование', rules: rulesData['Напольное оборудование'] };
+  }
+  if (Array.isArray(rulesData.Equipment)) {
+    return { sectionName: 'Оборудование', rules: rulesData.Equipment };
+  }
+  return { sectionName: 'Оборудование', rules: [] };
+}
+
+function evaluateEquipmentFormula(formula, count) {
+  if (!formula || typeof formula !== 'string') return count;
+  const expr = formula
+    .replace(/,/g, '.')
+    .replace(/\bКОЛИЧЕСТВО\b/gi, String(count))
+    .replace(/\bКОЛ-ВО\b/gi, String(count))
+    .replace(/\bКОЛ_ВО\b/gi, String(count))
+    .replace(/\bQTY\b/gi, String(count))
+    .replace(/\bCOUNT\b/gi, String(count))
+    .replace(/\bШТ\b/gi, String(count))
+    .replace(/\bДЛИНА\b/gi, String(count))
+    .replace(/\bLENGTH\b/gi, String(count));
+
+  try {
+    if (/^[0-9+\-*/().\s]+$/.test(expr)) {
+      const val = Function("'use strict'; return (" + expr + ");")();
+      if (typeof val === 'number' && !isNaN(val)) return val;
+    }
+  } catch (e) {}
+
+  return count;
+}
+
+function buildEquipmentFormulaDisplay(formula, count, unit) {
+  if (!formula || formula.trim() === 'КОЛИЧЕСТВО' || formula.trim() === 'КОЛ-ВО' || formula.trim() === '1') {
+    return `${count} ${unit || 'шт'}`;
+  }
+  return formula.replace(/\*/g, ' * ')
+    .replace(/\bКОЛИЧЕСТВО\b/gi, `${count} шт`)
+    .replace(/\bКОЛ-ВО\b/gi, `${count} шт`)
+    .replace(/\bКОЛ_ВО\b/gi, `${count} шт`)
+    .replace(/\bCOUNT\b/gi, `${count} шт`)
+    .replace(/\bQTY\b/gi, `${count} шт`);
+}
+
+// Calculate works based on equipment summary and rules JSON ("Оборудование")
+function calculateWorksFromEquipment(equipmentSummary, rulesData) {
+  const { sectionName, rules } = getEquipmentRules(rulesData);
+  const calculatedWorks = [];
+  const missingInRules = [];
+  const matchedEquipmentKeys = new Set();
+
+  const eqEntries = Object.entries(equipmentSummary || {});
+
+  eqEntries.forEach(([key, eqInfo]) => {
+    const itemMark = (eqInfo.mark || '').trim();
+    const itemMethod = (eqInfo.method || 'Не указано').trim();
+    const count = Number(eqInfo.count) || 0;
+    const handles = eqInfo.handles || [];
+
+    if (count <= 0) return;
+
+    // Exact match of Mark and InstallationMethod
+    let matchingRule = null;
+    for (const rule of rules) {
+      const ruleMark = (rule["Марка"] || rule.mark || rule["Название"] || rule.name || '').trim();
+      const ruleMethod = (rule["Способ установки"] || rule.method || rule.installationMethod || 'Не указано').trim();
+
+      const normItemMark = itemMark.toLowerCase();
+      const normRuleMark = ruleMark.toLowerCase();
+
+      const normItemMethod = itemMethod.toLowerCase();
+      const normRuleMethod = ruleMethod.toLowerCase();
+
+      if (normItemMark === normRuleMark) {
+        if (normRuleMethod === normItemMethod || ruleMethod === '*' || (!ruleMethod && normItemMethod === 'не указано')) {
+          matchingRule = rule;
+          break;
+        }
+      }
+    }
+
+    if (matchingRule) {
+      matchedEquipmentKeys.add(key);
+      const ruleWorks = matchingRule["Работы и материалы"] || matchingRule.works || [];
+
+      if (ruleWorks.length === 0) {
+        missingInRules.push({
+          mark: itemMark,
+          method: itemMethod,
+          type: `${itemMark} (${itemMethod})`,
+          count: count,
+          handles: handles,
+          missingType: 'empty_rule'
+        });
+        return;
+      }
+
+      const primaryWork = ruleWorks.find(w => (w["Тип"] || w.type) !== 'материал') || ruleWorks[0];
+      const primaryWorkTitle = (primaryWork["Наименование"] || primaryWork.name || `Монтаж оборудования ${itemMark}`).trim();
+
+      ruleWorks.forEach(work => {
+        const formula = (work["Формула"] || work.formula || "КОЛИЧЕСТВО").trim();
+        const rawVol = evaluateEquipmentFormula(formula, count);
+        const isMaterial = (work["Тип"] || work.type) === 'материал';
+        const vol = isMaterial ? Math.round(rawVol * 100) / 100 : Math.round(rawVol * 100) / 100;
+        const unit = work["Единицы измерения"] || work.unit || 'шт';
+        const itemName = (work["Наименование"] || work.name || primaryWorkTitle).trim();
+        const showFormula = shouldShowFormula(work);
+        const formulaDisplay = showFormula ? buildEquipmentFormulaDisplay(formula, count, unit) : '';
+        const targetSection = (work["Раздел"] || work.section || 'Монтажные работы').trim();
+
+        calculatedWorks.push({
+          name: itemName,
+          unit: unit,
+          volume: vol,
+          volumeFormatted: String(vol),
+          formula: formula,
+          formulaDisplay: formulaDisplay,
+          showFormula: showFormula,
+          mark: itemMark,
+          method: itemMethod,
+          equipmentType: itemMark,
+          section: targetSection,
+          type: isMaterial ? 'материал' : 'работа',
+          parentWorkName: isMaterial ? primaryWorkTitle : undefined,
+          count: count,
+          handles: handles,
+          comment: work["Комментарий"] || work.comment || (handles.length > 0 ? `handle: ${handles.join(', ')}` : '')
+        });
+      });
+    } else {
+      missingInRules.push({
+        mark: itemMark,
+        method: itemMethod,
+        type: `${itemMark} (${itemMethod})`,
+        count: count,
+        handles: handles,
+        missingType: 'no_rule'
+      });
+    }
+  });
+
+  return {
+    works: calculatedWorks,
+    missingInRules
+  };
+}
+
+// Get combined works and missing items from Trenches ("Строительные работы"), Cables ("Монтажные работы"), and Equipment ("Оборудование")
 function getAllCalculatedWorks() {
   const trenchSummary = getActiveTrenchSummary();
   const trenchCalc = calculateWorksFromTrenches(trenchSummary, currentWorksRules);
@@ -4663,7 +5239,10 @@ function getAllCalculatedWorks() {
   const cableData = getActiveCableSummary();
   const cableCalc = calculateWorksFromCables(cableData.summary, currentWorksRules);
 
-  const allWorks = [ ...trenchCalc.works, ...cableCalc.works ];
+  const equipmentData = getActiveEquipmentSummary();
+  const equipmentCalc = calculateWorksFromEquipment(equipmentData.summary, currentWorksRules);
+
+  const allWorks = [ ...trenchCalc.works, ...cableCalc.works, ...equipmentCalc.works ];
 
   // Group works by actual target section:
   // Items with section "Строительные работы" (or containing "строительн") go to trenchWorks (Section 1)
@@ -4678,9 +5257,10 @@ function getAllCalculatedWorks() {
     works: allWorks,
     trenchWorks: trenchWorks,
     cableWorks: cableWorks,
-    missingInRules: [ ...trenchCalc.missingInRules, ...cableCalc.missingInRules ],
+    missingInRules: [ ...trenchCalc.missingInRules, ...cableCalc.missingInRules, ...equipmentCalc.missingInRules ],
     trenchMissing: trenchCalc.missingInRules,
     cableMissing: cableCalc.missingInRules,
+    equipmentMissing: equipmentCalc.missingInRules,
     cableMissingInCatalog: cableCalc.missingInCatalog || [],
     couplingsSummary: cableCalc.couplingsSummary
   };
@@ -5095,6 +5675,35 @@ function syncTableToCurrentData() {
             const num = parseFloat(raw);
             if (!isNaN(num)) currentData.routingTypeBlocks[idx].lengthPipes = num;
           }
+        }
+      }
+    });
+  }
+
+  const equipmentTable = document.getElementById('tableEquipment');
+  const eqTargetList = (currentData.TracksideEquipment && Array.isArray(currentData.TracksideEquipment))
+    ? currentData.TracksideEquipment
+    : (currentData.tracksideEquipment && Array.isArray(currentData.tracksideEquipment))
+    ? currentData.tracksideEquipment
+    : (currentData.equipment && Array.isArray(currentData.equipment))
+    ? currentData.equipment
+    : (currentData.Equipment && Array.isArray(currentData.Equipment))
+    ? currentData.Equipment
+    : null;
+
+  if (equipmentTable && eqTargetList) {
+    const rows = equipmentTable.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      const idx = parseInt(row.dataset.index, 10);
+      if (!isNaN(idx) && eqTargetList[idx]) {
+        const markField = row.querySelector('[data-field="mark"]');
+        const methodField = row.querySelector('[data-field="method"]');
+        const countField = row.querySelector('[data-field="count"]');
+        if (markField) eqTargetList[idx].EquipmentType = markField.textContent.trim();
+        if (methodField) eqTargetList[idx].InstallationMethod = methodField.textContent.trim();
+        if (countField) {
+          const num = parseInt(countField.textContent.replace(/\s+/g, ''), 10);
+          if (!isNaN(num)) eqTargetList[idx].countEquipment = num;
         }
       }
     });
@@ -6181,6 +6790,71 @@ function addMissingCablesToCatalog(missingList) {
     `В раздел «Справочник кабелей» добавлены заготовки для ${addedCount} марок: ${addedTypes.join(', ')}. Укажите паспортные характеристики и нажмите «Применить и пересчитать».`,
     'info',
     'Справочник кабелей дополнен',
+    8000
+  );
+}
+
+// Add missing equipment items to "Оборудование" section in rules and open editor
+function addMissingEquipmentToRules(missingList) {
+  if (!missingList || missingList.length === 0) {
+    showToast('Нет недостающих позиций оборудования для добавления', 'info', 'Правила');
+    return;
+  }
+
+  if (!currentWorksRules) {
+    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": [], "Монтажные работы": [], "Оборудование": [] }));
+  }
+  if (!currentWorksRules["Оборудование"] || !Array.isArray(currentWorksRules["Оборудование"])) {
+    currentWorksRules["Оборудование"] = [];
+  }
+
+  let addedCount = 0;
+  const addedMarks = [];
+
+  missingList.forEach(m => {
+    const mark = (m.mark || m.type || 'Оборудование').trim();
+    const method = (m.method || 'Не указано').trim();
+
+    const exists = currentWorksRules["Оборудование"].some(r => {
+      const rMark = (r["Марка"] || r.mark || r["Название"] || r.name || '').trim().toLowerCase();
+      const rMethod = (r["Способ установки"] || r.method || r.installationMethod || 'Не указано').trim().toLowerCase();
+      return rMark === mark.toLowerCase() && rMethod === method.toLowerCase();
+    });
+
+    if (!exists) {
+      currentWorksRules["Оборудование"].push({
+        "Название": `${mark} (${method})`,
+        "Марка": mark,
+        "Способ установки": method,
+        "Работы и материалы": [
+          {
+            "Наименование": `Установка оборудования типа ${mark}`,
+            "Единицы измерения": "шт",
+            "Формула": "КОЛИЧЕСТВО",
+            "Тип": "работа",
+            "ОтображатьФормулу": true,
+            "Раздел": "Монтажные работы"
+          },
+          {
+            "Наименование": `${mark}`,
+            "Единицы измерения": "шт",
+            "Формула": "КОЛИЧЕСТВО",
+            "Тип": "материал",
+            "ОтображатьФормулу": true,
+            "Раздел": "Монтажные работы"
+          }
+        ]
+      });
+      addedCount++;
+      addedMarks.push(`${mark} (${method})`);
+    }
+  });
+
+  openWorksRulesModal('editor');
+  showToast(
+    `В раздел «Оборудование» добавлены заготовки для ${addedCount} позиций: ${addedMarks.join(', ')}. Скорректируйте наименования/формулы и сохраните JSON.`,
+    'info',
+    'Раздел оборудования дополнен',
     8000
   );
 }
