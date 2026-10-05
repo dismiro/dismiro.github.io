@@ -10,7 +10,20 @@
   <link href="../assets/theme.min.css" rel="stylesheet">
   <link href="../assets/bootstrap-icons.css" rel="stylesheet">
 
+  <!-- CodeMirror 5 (with Code Folding, Search, and Syntax Highlighting) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/matchesonscrollbar.min.css">
+
   <style>
+  /* -------------------------------------------------------------
+     THEME INTEGRATION & COMPONENT STYLES
+     Using native Silicon / Bootstrap CSS variables:
+     --si-body-bg, --si-body-color, --si-card-bg, --si-border-color,
+     --si-primary, --si-tertiary-bg, --si-secondary-bg, etc.
+     ------------------------------------------------------------- */
+
   .main-container { 
     max-width: 1750px;
     width: 100%;
@@ -20,27 +33,157 @@
   }
 
   .module-card {
-    border: 1px solid var(--si-border-color, #e2e8f0);
-    border-radius: 0.85rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-    background-color: var(--si-card-bg, #ffffff);
+    border: 1px solid var(--si-border-color);
+    border-radius: var(--si-border-radius-lg, 0.85rem);
+    background-color: var(--si-card-bg);
+    box-shadow: var(--si-box-shadow-sm, 0 4px 20px rgba(0, 0, 0, 0.04));
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
     overflow: hidden;
   }
 
-  [data-bs-theme="dark"] .module-card {
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
-    background-color: #1e293b;
-  }
-
   .card-header {
-    border-bottom: 1px solid var(--si-border-color, #e2e8f0);
+    border-bottom: 1px solid var(--si-border-color);
     background: transparent;
   }
 
-  [data-bs-theme="dark"] .card-header {
-    border-bottom-color: rgba(255, 255, 255, 0.08);
+  /* CodeMirror customizations & GitHub syntax theme */
+  .CodeMirror {
+    height: 52vh;
+    min-height: 420px;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    border: 1px solid var(--si-border-color);
+    border-radius: var(--si-border-radius, 0.5rem);
+    background: #ffffff;
+    color: #24292f;
+  }
+  .CodeMirror-gutters {
+    background: #f6f8fa;
+    border-right: 1px solid #d0d7de;
+  }
+  .CodeMirror-linenumber {
+    color: #8c959f;
+    padding: 0 6px 0 2px;
+  }
+  .CodeMirror-foldmarker {
+    color: #0969da;
+    background-color: #ddf4ff;
+    border: 1px solid #54aeff;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0 5px;
+    border-radius: 4px;
+    margin: 0 3px;
+  }
+  .CodeMirror-foldgutter {
+    width: 1.2em;
+    cursor: pointer;
+  }
+  .CodeMirror-foldgutter-open:after {
+    content: "▼";
+    font-size: 0.62rem;
+    color: #8c959f;
+  }
+  .CodeMirror-foldgutter-folded:after {
+    content: "▶";
+    font-size: 0.62rem;
+    color: #0969da;
+    font-weight: bold;
+  }
+
+  /* CodeMirror Caret & Selection (GitHub style) */
+  .CodeMirror-cursor {
+    border-left: 2px solid #0969da !important;
+    width: 0;
+  }
+  .CodeMirror-selected {
+    background: #b6e3ff !important;
+  }
+  .CodeMirror-focused .CodeMirror-selected {
+    background: #b6e3ff !important;
+  }
+  .CodeMirror-matchingbracket {
+    background-color: #ddf4ff !important;
+    outline: 1px solid #0969da;
+    border-radius: 2px;
+  }
+
+  /* GitHub Light JSON Syntax */
+  .cm-s-default .cm-property { color: #0550ae !important; font-weight: 600; }  /* Keys */
+  .cm-s-default .cm-string { color: #0a3069 !important; }                       /* Values */
+  .cm-s-default .cm-number { color: #0550ae !important; }                       /* Numbers */
+  .cm-s-default .cm-atom { color: #cf222e !important; font-weight: 600; }       /* Booleans/null */
+  .cm-s-default .cm-variable { color: #24292f !important; }
+  .cm-s-default .cm-operator, .cm-s-default .cm-punctuation { color: #24292f !important; }
+
+  /* GitHub Dark JSON Syntax */
+  [data-bs-theme="dark"] .CodeMirror {
+    background: #0d1117;
+    color: #e6edf3;
+    border-color: #30363d;
+  }
+  [data-bs-theme="dark"] .CodeMirror-gutters {
+    background: #161b22;
+    border-right-color: #30363d;
+  }
+  [data-bs-theme="dark"] .CodeMirror-linenumber {
+    color: #6e7681;
+  }
+  [data-bs-theme="dark"] .CodeMirror-cursor {
+    border-left: 2px solid #58a6ff !important;
+  }
+  [data-bs-theme="dark"] .CodeMirror-selected {
+    background: rgba(56, 139, 253, 0.3) !important;
+  }
+  [data-bs-theme="dark"] .CodeMirror-focused .CodeMirror-selected {
+    background: rgba(56, 139, 253, 0.35) !important;
+  }
+  [data-bs-theme="dark"] .CodeMirror-line::selection, 
+  [data-bs-theme="dark"] .CodeMirror-line > span::selection, 
+  [data-bs-theme="dark"] .CodeMirror-line > span > span::selection {
+    background: rgba(56, 139, 253, 0.35) !important;
+  }
+  [data-bs-theme="dark"] .CodeMirror-foldgutter-open:after {
+    color: #6e7681;
+  }
+  [data-bs-theme="dark"] .CodeMirror-foldgutter-folded:after {
+    color: #58a6ff;
+  }
+  [data-bs-theme="dark"] .CodeMirror-foldmarker {
+    color: #58a6ff;
+    background-color: rgba(56, 139, 253, 0.15);
+    border-color: rgba(56, 139, 253, 0.4);
+  }
+  [data-bs-theme="dark"] .CodeMirror-matchingbracket {
+    background-color: rgba(56, 139, 253, 0.25) !important;
+    outline: 1px solid #58a6ff;
+  }
+
+  [data-bs-theme="dark"] .cm-s-default .cm-property { color: #7ee787 !important; font-weight: 600; } /* Keys (GitHub green) */
+  [data-bs-theme="dark"] .cm-s-default .cm-string { color: #a5d6ff !important; }                     /* Values (GitHub ice blue) */
+  [data-bs-theme="dark"] .cm-s-default .cm-number { color: #79c0ff !important; }                     /* Numbers (GitHub blue) */
+  [data-bs-theme="dark"] .cm-s-default .cm-atom { color: #ff7b72 !important; font-weight: 600; }     /* Booleans/null (GitHub coral) */
+  [data-bs-theme="dark"] .cm-s-default .cm-variable { color: #e6edf3 !important; }
+  [data-bs-theme="dark"] .cm-s-default .cm-operator, [data-bs-theme="dark"] .cm-s-default .cm-punctuation { color: #e6edf3 !important; }
+
+  /* Animated glow for newly added JSON nodes in CodeMirror */
+  @keyframes cmNodePulse {
+    0% { background-color: rgba(13, 110, 253, 0.38); }
+    50% { background-color: rgba(13, 110, 253, 0.18); }
+    100% { background-color: transparent; }
+  }
+  @keyframes cmNodePulseDark {
+    0% { background-color: rgba(56, 189, 248, 0.45); }
+    50% { background-color: rgba(56, 189, 248, 0.2); }
+    100% { background-color: transparent; }
+  }
+  .cm-new-node-glow {
+    animation: cmNodePulse 3.5s ease-out forwards !important;
+  }
+  [data-bs-theme="dark"] .cm-new-node-glow {
+    animation: cmNodePulseDark 3.5s ease-out forwards !important;
   }
 
   /* Text wrap utility - NEVER TRUNCATE */
@@ -59,7 +202,6 @@
     scrollbar-width: thin;
   }
 
-  /* Ведомость кабелей и ведомость траншей отображаются на полную высоту без вертикальной прокрутки */
   .table-responsive-full,
   #result .custom-table-scroll,
   #resultCouplings .custom-table-scroll {
@@ -72,50 +214,41 @@
     width: 6px;
     height: 6px;
   }
-
   .custom-table-scroll::-webkit-scrollbar-thumb {
-    background-color: rgba(148, 163, 184, 0.4);
+    background-color: rgba(var(--si-secondary-color-rgb, 148, 163, 184), 0.4);
     border-radius: 4px;
   }
 
-  /* Unified table typography and padding across all 3 columns */
   #mainContentRow table {
     font-size: 0.85rem;
+  }
+  #mainContentRow table td {
+    padding-top: 0.38rem;
+    padding-bottom: 0.38rem;
   }
 
   .table-sticky-header th {
     position: sticky;
     top: 0;
     z-index: 5;
-    background-color: #f8fafc !important;
-    box-shadow: inset 0 -1px 0 var(--si-border-color, #e2e8f0);
+    background-color: var(--si-tertiary-bg) !important;
+    box-shadow: inset 0 -1px 0 var(--si-border-color);
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.02em;
-    color: #475569;
+    color: var(--si-body-color);
     padding-top: 0.48rem;
     padding-bottom: 0.48rem;
     vertical-align: middle !important;
     line-height: 1.3;
   }
 
-  [data-bs-theme="dark"] .table-sticky-header th {
-    background-color: #1e293b !important;
-    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
-    color: #cbd5e1;
-  }
-
   .table-sticky-footer td {
     position: sticky;
     bottom: 0;
     z-index: 4;
-    background-color: #f1f5f9 !important;
-    box-shadow: inset 0 1px 0 var(--si-border-color, #cbd5e1);
-  }
-
-  [data-bs-theme="dark"] .table-sticky-footer td {
-    background-color: #0f172a !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    background-color: var(--si-secondary-bg) !important;
+    box-shadow: inset 0 1px 0 var(--si-border-color);
   }
 
   .cable-pill {
@@ -123,10 +256,10 @@
     padding: 0.2rem 0.5rem;
     font-size: 0.77rem;
     font-weight: 500;
-    border-radius: 0.35rem;
-    background-color: rgba(15, 23, 42, 0.05);
-    color: #1e293b;
-    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: var(--si-border-radius-sm, 0.35rem);
+    background-color: var(--si-tertiary-bg);
+    color: var(--si-body-color);
+    border: 1px solid var(--si-border-color);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     white-space: normal !important;
     word-break: break-word !important;
@@ -135,110 +268,55 @@
     transition: all 0.15s ease;
   }
 
-  [data-bs-theme="dark"] .cable-pill {
-    background-color: rgba(255, 255, 255, 0.06);
-    color: #e2e8f0;
-    border-color: rgba(255, 255, 255, 0.12);
-  }
-
-  #mainContentRow table td {
-    padding-top: 0.38rem;
-    padding-bottom: 0.38rem;
-  }
-
   .routing-tag {
     display: inline-block;
     padding: 0.15rem 0.42rem;
     font-size: 0.75rem;
-    border-radius: 0.25rem;
-    background-color: rgba(99, 102, 241, 0.07);
-    color: #4338ca;
-    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: var(--si-border-radius-sm, 0.25rem);
+    background-color: rgba(var(--si-primary-rgb, 99, 102, 241), 0.08);
+    color: var(--si-primary);
+    border: 1px solid rgba(var(--si-primary-rgb, 99, 102, 241), 0.22);
     white-space: normal !important;
     word-break: break-word !important;
     line-height: 1.3;
   }
 
-  /* Work rows vs Material rows in Works tables (Строительные and Монтажные работы) */
-  .table-row-work {
-    background-color: #eef2f6 !important;
-  }
+  /* Work rows vs Material rows in Works tables */
+  .table-row-work,
   .table-row-work > td {
-    background-color: #eef2f6 !important;
+    background-color: var(--si-tertiary-bg) !important;
+    color: var(--si-heading-color, var(--si-body-color));
   }
   .table-row-work > td:first-child {
-    border-left: 3px solid var(--si-primary, #448c74);
-  }
-  .table-row-work:hover > td {
-    background-color: #e2e8f0 !important;
+    border-left: 3px solid var(--si-primary);
   }
 
-  [data-bs-theme="dark"] .table-row-work,
-  [data-bs-theme="dark"] .table-row-work > td {
-    background-color: rgba(255, 255, 255, 0.07) !important;
-  }
-  [data-bs-theme="dark"] .table-row-work > td:first-child {
-    border-left: 3px solid #38bdf8;
-  }
-  [data-bs-theme="dark"] .table-row-work:hover > td {
-    background-color: rgba(255, 255, 255, 0.11) !important;
-  }
-
-  .table-row-material {
-    background-color: #ffffff !important;
-  }
+  .table-row-material,
   .table-row-material > td {
-    background-color: #ffffff !important;
+    background-color: var(--si-card-bg) !important;
   }
   .table-row-material > td:first-child {
     border-left: 3px solid transparent;
   }
-  .table-row-material:hover > td {
-    background-color: #f8fafc !important;
-  }
-
-  [data-bs-theme="dark"] .table-row-material,
-  [data-bs-theme="dark"] .table-row-material > td {
-    background-color: transparent !important;
-  }
-  [data-bs-theme="dark"] .table-row-material:hover > td {
-    background-color: rgba(255, 255, 255, 0.03) !important;
-  }
 
   /* Subtitle for cable works items */
   .work-item-meta {
-    color: #475569;
+    color: var(--si-secondary-color);
   }
   .work-item-meta .meta-label {
-    color: #334155;
+    color: var(--si-body-color);
   }
   .work-item-meta .meta-method {
-    color: #0b0f19 !important;
+    color: var(--si-heading-color, var(--si-body-color)) !important;
     font-weight: 700;
   }
   .work-item-meta .meta-cable {
-    color: var(--si-primary, #448c74);
+    color: var(--si-primary);
     font-weight: 600;
   }
-  [data-bs-theme="dark"] .work-item-meta {
-    color: #94a3b8;
-  }
-  [data-bs-theme="dark"] .work-item-meta .meta-label {
-    color: #cbd5e1;
-  }
-  [data-bs-theme="dark"] .work-item-meta .meta-method {
-    color: #f8fafc !important;
-  }
-  [data-bs-theme="dark"] .work-item-meta .meta-cable {
-    color: #60a5fa;
-  }
 
-  /* Material badge, row and full description in VOR table */
   .work-material-row {
-    background-color: rgba(0, 0, 0, 0.015);
-  }
-  [data-bs-theme="dark"] .work-material-row {
-    background-color: rgba(255, 255, 255, 0.02);
+    background-color: rgba(var(--si-body-color-rgb, 0, 0, 0), 0.02);
   }
 
   .badge-material {
@@ -247,28 +325,20 @@
     font-size: 0.68rem;
     font-weight: 600;
     line-height: 1;
-    border-radius: 0.25rem;
-    background-color: #e2e8f0;
-    color: #1e293b !important;
-    border: 1px solid #cbd5e1;
-  }
-  [data-bs-theme="dark"] .badge-material {
-    background-color: rgba(255, 255, 255, 0.12);
-    color: #e2e8f0 !important;
-    border-color: rgba(255, 255, 255, 0.2);
+    border-radius: var(--si-border-radius-sm, 0.25rem);
+    background-color: var(--si-secondary-bg);
+    color: var(--si-body-color) !important;
+    border: 1px solid var(--si-border-color);
   }
 
   .material-description {
-    color: #0f172a !important;
+    color: var(--si-heading-color, var(--si-body-color)) !important;
     font-size: 0.81rem;
     line-height: 1.4;
     font-weight: 500;
   }
-  [data-bs-theme="dark"] .material-description {
-    color: #f8fafc !important;
-  }
 
-  /* Ensure icon dropdown-toggle in btn-icon centers cleanly without default caret displacing the icon */
+  /* Ensure icon dropdown-toggle in btn-icon centers cleanly */
   .btn-icon.dropdown-toggle::after {
     display: none !important;
   }
@@ -896,9 +966,6 @@
           <span id="worksJsonValidationBadge" class="badge bg-success-subtle text-success border border-success-subtle ms-2">
             <i class='bx bx-check me-1'></i>Корректный JSON
           </span>
-          <span id="worksRulesCountBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle">
-            3 способа прокладки
-          </span>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
       </div>
@@ -919,13 +986,11 @@
           <li class="nav-item" role="presentation">
             <button class="nav-link py-1_5 px-3 fw-semibold small d-inline-flex align-items-center gap-1" id="tabWorksCablesBtn" data-bs-toggle="tab" data-bs-target="#tabWorksCablesPane" type="button" role="tab" aria-selected="false">
               <i class='bx bx-cable fs-5 text-success'></i> Справочник кабелей
-              <span id="tabWorksCablesCountBadge" class="badge bg-success-subtle text-success border border-success-subtle ms-1" style="font-size: 0.72rem;">0</span>
             </button>
           </li>
           <li class="nav-item" role="presentation">
             <button class="nav-link py-1_5 px-3 fw-semibold small d-inline-flex align-items-center gap-1" id="tabWorksCouplingsBtn" data-bs-toggle="tab" data-bs-target="#tabWorksCouplingsPane" type="button" role="tab" aria-selected="false">
               <i class='bx bx-git-merge fs-5 text-warning'></i> Справочник муфт
-              <span id="tabWorksCouplingsCountBadge" class="badge bg-warning-subtle text-warning border border-warning-subtle ms-1" style="font-size: 0.72rem;">0</span>
             </button>
           </li>
         </ul>
@@ -936,20 +1001,16 @@
           </label>
           <input type="file" id="rulesFileInput" class="d-none" accept=".json,application/json">
 
+          <button type="button" id="foldAllWorksJsonBtn" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Свернуть все узлы JSON">
+            <i class='bx bx-collapse-vertical'></i> Свернуть всё
+          </button>
+
+          <button type="button" id="unfoldAllWorksJsonBtn" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Развернуть все узлы JSON">
+            <i class='bx bx-expand-vertical'></i> Развернуть всё
+          </button>
+
           <button type="button" id="formatWorksJsonBtn" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Отформатировать JSON с аккуратными отступами">
             <i class='bx bx-align-left'></i> Форматировать
-          </button>
-
-          <button type="button" id="addRuleTemplateBtn" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Вставить шаблон нового способа прокладки в JSON">
-            <i class='bx bx-plus-circle'></i> + Способ
-          </button>
-
-          <button type="button" id="addCableTemplateBtn" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Вставить шаблон новой марки кабеля в справочник JSON">
-            <i class='bx bx-cable'></i> + Кабель
-          </button>
-
-          <button type="button" id="addCouplingTemplateBtn" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Вставить шаблон новой муфты в справочник JSON">
-            <i class='bx bx-git-merge'></i> + Муфта
           </button>
 
           <button type="button" id="resetRulesBtn" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Сбросить правила к стандартному шаблону">
@@ -966,14 +1027,6 @@
         <div class="tab-content" id="worksRulesTabContent">
           <!-- Tab 1: JSON Editor -->
           <div class="tab-pane fade show active" id="tabWorksJsonPane" role="tabpanel" tabindex="0">
-            <div class="alert alert-info py-2 px-3 mb-2 small d-flex align-items-start gap-2">
-              <i class='bx bx-info-circle fs-5 flex-shrink-0 mt-0'></i>
-              <div>
-                Редактируйте способы прокладки, наименования работ, единицы измерения и формулы расчета (например, <code>0,36*ДЛИНА</code> или <code>ДЛИНА</code>).
-                После нажатия кнопки <strong>«Применить и пересчитать»</strong> ведомость объемов работ автоматически пересчитается.
-              </div>
-            </div>
-
             <div id="worksJsonErrorAlert" class="alert alert-danger py-2 px-3 mb-2 small d-flex align-items-start gap-2 d-none">
               <i class='bx bx-error-circle fs-5 flex-shrink-0 mt-0'></i>
               <div class="font-monospace fs-xs" id="worksJsonErrorMessage">Синтаксическая ошибка в JSON</div>
@@ -986,6 +1039,24 @@
 
           <!-- Tab 2: Visual Cards (Сметные нормы) -->
           <div class="tab-pane fade" id="tabWorksCardsPane" role="tabpanel" tabindex="0">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 bg-body-tertiary p-2 rounded border">
+              <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 240px; max-width: 460px;">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text bg-body-secondary text-body-secondary border-end-0"><i class='bx bx-search fs-6'></i></span>
+                  <input type="text" id="rulesCardsSearchInput" class="form-control border-start-0" placeholder="Поиск способа, наименования работы...">
+                  <button class="btn btn-outline-secondary d-none" type="button" id="rulesCardsClearSearchBtn" title="Сбросить поиск">
+                    <i class='bx bx-x'></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+                <button type="button" id="quickAddRuleInTabBtn" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1">
+                  <i class='bx bx-plus-circle'></i> Добавить способ
+                </button>
+              </div>
+            </div>
+
             <div id="rulesListContainer" class="d-flex flex-column gap-3 pt-1">
               <!-- Dynamically populated -->
             </div>
@@ -993,10 +1064,10 @@
 
           <!-- Tab 3: Cable Catalog Viewer (Справочник кабелей) -->
           <div class="tab-pane fade" id="tabWorksCablesPane" role="tabpanel" tabindex="0">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 bg-light p-2 rounded border">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 bg-body-tertiary p-2 rounded border">
               <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 240px; max-width: 460px;">
                 <div class="input-group input-group-sm">
-                  <span class="input-group-text bg-white border-end-0"><i class='bx bx-search text-muted'></i></span>
+                  <span class="input-group-text bg-body-secondary text-body-secondary border-end-0"><i class='bx bx-search fs-6'></i></span>
                   <input type="text" id="cableCatalogSearchInput" class="form-control border-start-0" placeholder="Поиск марки, описания, муфты, веса...">
                   <button class="btn btn-outline-secondary d-none" type="button" id="cableCatalogClearSearchBtn" title="Сбросить поиск">
                     <i class='bx bx-x'></i>
@@ -1025,10 +1096,10 @@
 
           <!-- Tab 4: Coupling Catalog Viewer (Справочник муфт) -->
           <div class="tab-pane fade" id="tabWorksCouplingsPane" role="tabpanel" tabindex="0">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 bg-light p-2 rounded border">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 bg-body-tertiary p-2 rounded border">
               <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 240px; max-width: 460px;">
                 <div class="input-group input-group-sm">
-                  <span class="input-group-text bg-white border-end-0"><i class='bx bx-search text-muted'></i></span>
+                  <span class="input-group-text bg-body-secondary text-body-secondary border-end-0"><i class='bx bx-search fs-6'></i></span>
                   <input type="text" id="couplingCatalogSearchInput" class="form-control border-start-0" placeholder="Поиск муфты, описания, жил...">
                   <button class="btn btn-outline-secondary d-none" type="button" id="couplingCatalogClearSearchBtn" title="Сбросить поиск">
                     <i class='bx bx-x'></i>
@@ -1037,7 +1108,7 @@
               </div>
 
               <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
-                <button type="button" id="quickAddCouplingInTabBtn" class="btn btn-sm btn-outline-warning text-dark d-inline-flex align-items-center gap-1">
+                <button type="button" id="quickAddCouplingInTabBtn" class="btn btn-sm btn-outline-warning text-warning-emphasis d-inline-flex align-items-center gap-1">
                   <i class='bx bx-plus-circle'></i> Добавить муфту
                 </button>
               </div>
@@ -1054,10 +1125,6 @@
         <div class="text-muted small d-flex align-items-center gap-3" id="worksRulesStats" style="font-size: 0.8rem;">
           <span>Строк: <strong id="worksStatLines">0</strong></span>
           <span>Символов: <strong id="worksStatChars">0</strong></span>
-          <span>Способов прокладки: <strong id="worksStatTrenches" class="text-primary">0</strong></span>
-          <span>Марок кабелей: <strong id="worksStatCables" class="text-info">0</strong></span>
-          <span>Муфт в справочнике: <strong id="worksStatCouplings" class="text-warning">0</strong></span>
-          <span>Всего работ: <strong id="worksStatWorks" class="text-success">0</strong></span>
         </div>
         <div class="d-flex align-items-center gap-2">
           <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
@@ -1088,6 +1155,20 @@
 <script src="../assets/js/jquery-1.11.0.min.js"></script>
 <script src="../assets/theme.min.js"></script>
 <script src="../assets/theme-switcher.js"></script>
+
+<!-- CodeMirror 5 with Fold & Search addons -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/jump-to-line.min.js"></script>
+
 <script src="./code.js"></script>
 <script src="../assets/js/xlsx.full.min.js"></script>
 </body>

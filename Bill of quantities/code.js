@@ -411,6 +411,38 @@ function normalizeCableLookupKey(s) {
     .trim();
 }
 
+// Parse cable pair type and trailing symbol (specification/code.js logic)
+// 1. Symbol is strictly at the end of the type
+// 2. Supports both "х2" and "х2х0,9" / "х2х0.9" formats
+function parseCableTypeAndSymbol(str) {
+  if (!str) return { pairKey: '', symbol: '' };
+  const s = String(str).trim().replace(/\s+/g, '').replace(/x/g, 'х');
+
+  // Match pattern: digits + "х2" + optional "х0,9"/"х0.9" + trailing symbol
+  const match = s.match(/^(\d+х2)(?:х0[,\.]9)?(.*)$/i);
+  if (match) {
+    let sym = match[2] || '';
+    if (sym === 'Δ' || sym === 'U+0394') sym = '\\U+0394';
+    return {
+      pairKey: match[1],
+      symbol: sym
+    };
+  }
+
+  // Generic match if string has prefixes
+  const genericMatch = s.match(/(\d+х2)(?:х0[,\.]9)?(.*)$/i);
+  if (genericMatch) {
+    let sym = genericMatch[2] || '';
+    if (sym === 'Δ' || sym === 'U+0394') sym = '\\U+0394';
+    return {
+      pairKey: genericMatch[1],
+      symbol: sym
+    };
+  }
+
+  return { pairKey: '', symbol: s };
+}
+
 // Lookup cable weight, category and full description from catalog
 function lookupCableInfo(rawType, catalog) {
   const cat = catalog || getCableCatalog(currentWorksRules) || {};
@@ -450,7 +482,7 @@ function lookupCableInfo(rawType, catalog) {
         if (!isOpticalItem) continue;
 
         const normKey = normalizeCableLookupKey(sKey);
-        if (normStr === normKey || rawNormStr === normKey || normStr.includes(normKey) || normKey.includes(normStr) || rawNormStr.includes(normKey) || normKey.includes(rawNormStr)) {
+        if (normStr === normKey || rawNormStr === normKey) {
           return {
             brand: secVal["Название"] || 'Оптический кабель',
             key: sKey,
@@ -492,30 +524,19 @@ function lookupCableInfo(rawType, catalog) {
     }
   }
 
-  // 3. Identify brand symbol
-  let symbol = '';
-  if (str.includes('**')) symbol = '**';
-  else if (str.includes('*')) symbol = '*';
-  else if (str.includes('&')) symbol = '&';
-  else if (str.includes('#')) symbol = '#';
-  else if (str.includes('Δ') || str.includes('\\U+0394') || str.includes('U+0394')) symbol = '\\U+0394';
-  else symbol = '';
-
-  // Extract pair count (e.g. 3х2, 7х2, 21х2, 30х2)
-  const pairMatch = str.match(/(\d+)\s*[хx]\s*2/i);
-  const pairKey = pairMatch ? `${pairMatch[1]}х2` : null;
+  // 3. Paired cable type and trailing symbol analysis (specification/code.js architecture)
+  const parsed = parseCableTypeAndSymbol(str);
+  const pairKey = parsed.pairKey;
+  const symbol = parsed.symbol;
 
   let entry = null;
   let brandName = '';
-  if (symbol && cat[symbol] && cat[symbol]["Тип"]) {
+
+  if (cat[symbol] && typeof cat[symbol] === 'object' && cat[symbol]["Тип"]) {
     brandName = cat[symbol]["Название"] || '';
     if (pairKey && cat[symbol]["Тип"][pairKey]) {
       entry = cat[symbol]["Тип"][pairKey];
     }
-  }
-  if (!entry && cat[''] && cat['']["Тип"] && pairKey && cat['']["Тип"][pairKey]) {
-    brandName = cat['']["Название"] || 'СБВБПу';
-    entry = cat['']["Тип"][pairKey];
   }
 
   if (entry) {
@@ -534,11 +555,12 @@ function lookupCableInfo(rawType, catalog) {
     };
   }
 
-  // Fallback for cables not found in catalog
-  const fallbackWeight = pairMatch ? Math.min(3.0, Math.max(0.15, Number(pairMatch[1]) * 0.035)) : 0.35;
+  // Fallback for cables not found in catalog (does not block calculations, clearly alerts the user)
+  const pairNum = pairKey ? parseInt(pairKey, 10) : 0;
+  const fallbackWeight = pairNum > 0 ? Math.min(3.0, Math.max(0.15, pairNum * 0.035)) : 0.35;
   const fallbackDesc = str.toLowerCase().startsWith('кабель') ? str : `Кабель ${str}`;
   return {
-    brand: 'Кабель',
+    brand: symbol ? `Кабель (${symbol})` : 'Кабель',
     key: str,
     weight: Math.round(fallbackWeight * 100) / 100,
     category: 'Электрический кабель',
@@ -597,7 +619,7 @@ function lookupCouplingInfo(rawType, couplingCatalog) {
     return {
       type: '',
       fullName: 'Соединительная муфта',
-      maxCores: 27,
+      maxCores: 0,
       unit: 'шт',
       foundInCatalog: false
     };
@@ -610,7 +632,7 @@ function lookupCouplingInfo(rawType, couplingCatalog) {
     return {
       type: str,
       fullName: entry["Полное наименование"] || entry["Наименование"] || entry.name || str,
-      maxCores: maxCores || 27,
+      maxCores: maxCores || 0,
       unit: entry["Единицы измерения"] || entry.unit || 'шт',
       showFormula: shouldShowFormula(entry),
       foundInCatalog: true
@@ -622,12 +644,12 @@ function lookupCouplingInfo(rawType, couplingCatalog) {
   for (const [k, v] of Object.entries(cat)) {
     if (!v || typeof v !== 'object') continue;
     const normK = k.toLowerCase().replace(/[\s\-_]+/g, '');
-    if (normStr === normK || normStr.includes(normK) || normK.includes(normStr)) {
+    if (normStr === normK) {
       const maxCores = Number(v["МаксЖил"] || v["Максимальное количество жил"] || v["Количество жил"] || v.maxCores) || parseMaxCoresFromString(k);
       return {
         type: k,
         fullName: v["Полное наименование"] || v["Наименование"] || v.name || k,
-        maxCores: maxCores || 27,
+        maxCores: maxCores || 0,
         unit: v["Единицы измерения"] || v.unit || 'шт',
         showFormula: shouldShowFormula(v),
         foundInCatalog: true
@@ -636,24 +658,56 @@ function lookupCouplingInfo(rawType, couplingCatalog) {
   }
 
   // Fallback if not found in coupling catalog
-  const parsedCores = parseMaxCoresFromString(str) || 27;
+  const parsedCores = parseMaxCoresFromString(str);
   return {
     type: str,
     fullName: str.startsWith('Муфта') ? str : `Муфта кабельная соединительная ${str}`,
-    maxCores: parsedCores,
+    maxCores: parsedCores || 0,
     unit: 'шт',
     showFormula: true,
     foundInCatalog: false
   };
 }
 
-// Determine coupling installation tier: 12, 27, 48, 61
-function getCouplingInstallationTier(maxCores) {
+// Extract all numeric coupling installation tiers dynamically from works_rules.json (e.g. [12, 27, 48, 61, 78...])
+function getCouplingRuleTiers(rulesData) {
+  const rules = rulesData || currentWorksRules || cachedDefaultRules;
+  const cableRules = getCableRules(rules);
+  const tiersSet = new Set();
+
+  for (const r of (cableRules && cableRules.rules ? cableRules.rules : [])) {
+    const rName = (r["Название"] || r.name || '').toLowerCase();
+    if (rName.includes('муфт')) {
+      const wm = r["Работы и материалы"] || r["Работы"] || {};
+      if (Array.isArray(wm)) {
+        wm.forEach(it => {
+          const c = Number(it["МаксЖил"] || it["Количество жил"] || it.maxCores);
+          if (!isNaN(c) && c > 0) tiersSet.add(c);
+        });
+      } else if (wm && typeof wm === 'object') {
+        Object.keys(wm).forEach(k => {
+          const num = parseFloat(k.trim().replace(',', '.'));
+          if (!isNaN(num) && num > 0) {
+            tiersSet.add(num);
+          }
+        });
+      }
+    }
+  }
+
+  const sortedTiers = Array.from(tiersSet).sort((a, b) => a - b);
+  return sortedTiers.length > 0 ? sortedTiers : [12, 27, 48, 61];
+}
+
+// Determine coupling installation tier dynamically from rules (e.g. 12, 27, 48, 61, 78...)
+function getCouplingInstallationTier(maxCores, rulesData) {
   const cores = Number(maxCores) || 0;
-  if (cores <= 12) return 12;
-  if (cores <= 27) return 27;
-  if (cores <= 48) return 48;
-  return 61;
+  const availableTiers = getCouplingRuleTiers(rulesData);
+  
+  for (const t of availableTiers) {
+    if (cores <= t) return t;
+  }
+  return availableTiers[availableTiers.length - 1];
 }
 
 // Get coupling installation works array from rules or fallback
@@ -783,12 +837,16 @@ function getActiveCouplingsSummary(rulesData) {
     }
   });
 
-  const tiers = {
-    12: { tier: 12, titleTier: 'до 12 жил', count: 0, couplings: [] },
-    27: { tier: 27, titleTier: 'до 27 жил', count: 0, couplings: [] },
-    48: { tier: 48, titleTier: 'до 48 жил', count: 0, couplings: [] },
-    61: { tier: 61, titleTier: 'до 61 жил', count: 0, couplings: [] }
-  };
+  const availableTiers = getCouplingRuleTiers(rules);
+  const tiers = {};
+  availableTiers.forEach(t => {
+    tiers[t] = {
+      tier: t,
+      titleTier: `до ${t} жил`,
+      count: 0,
+      couplings: []
+    };
+  });
 
   couplingsMap.forEach((cData, cTypeKey) => {
     const cInfo = lookupCouplingInfo(cTypeKey, couplingCatalog);
@@ -799,7 +857,15 @@ function getActiveCouplingsSummary(rulesData) {
         usedInCables: Array.from(cData.cableTypes)
       });
     }
-    const tier = getCouplingInstallationTier(cInfo.maxCores);
+    const tier = getCouplingInstallationTier(cInfo.maxCores, rules);
+    if (!tiers[tier]) {
+      tiers[tier] = {
+        tier: tier,
+        titleTier: `до ${tier} жил`,
+        count: 0,
+        couplings: []
+      };
+    }
     tiers[tier].count += cData.count;
     tiers[tier].couplings.push({
       couplingType: cTypeKey,
@@ -2939,7 +3005,7 @@ function renderCouplingsResult(couplingsSummary) {
   let rowIdx = 1;
 
   const allCouplings = [];
-  [12, 27, 48, 61].forEach(tier => {
+  Object.keys(couplingsSummary.tiers || {}).map(Number).sort((a, b) => a - b).forEach(tier => {
     const tierData = couplingsSummary.tiers[tier];
     if (!tierData || tierData.count <= 0) return;
     tierData.couplings.forEach(c => allCouplings.push(c));
@@ -3111,12 +3177,9 @@ async function handleRulesFileInput(e) {
       currentWorksRules = parsed;
     }
 
-    // Synchronize editor textarea if modal exists
-    const textarea = document.getElementById('worksJsonEditorTextarea');
-    if (textarea) {
-      textarea.value = JSON.stringify(currentWorksRules, null, 2);
-      validateWorksJsonInput();
-    }
+    // Synchronize editor textarea and CodeMirror if modal exists
+    setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+    validateWorksJsonInput();
 
     renderRulesModalContent();
     const sections = getRulesSections(currentWorksRules);
@@ -3152,11 +3215,8 @@ async function resetWorksRules() {
     }
   }
 
-  const textarea = document.getElementById('worksJsonEditorTextarea');
-  if (textarea) {
-    textarea.value = JSON.stringify(currentWorksRules, null, 2);
-    validateWorksJsonInput();
-  }
+  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+  validateWorksJsonInput();
   renderRulesModalContent();
   showToast('Сметные нормы сброшены к стандартному файлу works_rules.json. Выполнен перерасчет работ.', 'info', 'Сброс правил');
   if (currentData) {
@@ -3166,13 +3226,7 @@ async function resetWorksRules() {
 
 // Download active rules as JSON
 function downloadWorksRules() {
-  const textarea = document.getElementById('worksJsonEditorTextarea');
-  let jsonStr = '';
-  if (textarea && textarea.value) {
-    jsonStr = textarea.value;
-  } else {
-    jsonStr = JSON.stringify(currentWorksRules, null, 2);
-  }
+  const jsonStr = getWorksJsonEditorValue() || JSON.stringify(currentWorksRules, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -3210,6 +3264,15 @@ function renderRulesModalContent() {
 
   if (countBadge) {
     countBadge.textContent = `${totalRulesCount} способов в ${sections.length} разд. (${totalWorksCount} поз.)`;
+  }
+
+  // Search filter query for Rules Cards
+  const searchInput = document.getElementById('rulesCardsSearchInput');
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const clearBtn = document.getElementById('rulesCardsClearSearchBtn');
+  if (clearBtn) {
+    if (query) clearBtn.classList.remove('d-none');
+    else clearBtn.classList.add('d-none');
   }
 
   if (sections.length === 0 || totalRulesCount === 0) {
@@ -3261,19 +3324,35 @@ function renderRulesModalContent() {
   }
 
   let html = '';
+  let matchedRulesTotal = 0;
+
   sections.forEach((sec) => {
     const isCableSec = sec.name.toLowerCase().includes('монтаж') || sec.name.toLowerCase().includes('кабел');
+    
+    // Filter rules inside section if search query is provided
+    const matchingRules = sec.rules.filter(rule => {
+      if (!query) return true;
+      const rName = rule["Название"] || rule.name || '';
+      const works = getRuleWorks(rule);
+      const worksNames = works.map(w => w["Наименование"] || '').join(' ');
+      const haystack = `${sec.name} ${rName} ${worksNames}`.toLowerCase();
+      return haystack.includes(query);
+    });
+
+    if (matchingRules.length === 0) return;
+    matchedRulesTotal += matchingRules.length;
+
     html += `
       <div class="mb-3">
         <div class="d-flex align-items-center gap-2 mb-2 pb-1 border-bottom">
           <i class="bx bx-folder text-warning fs-5"></i>
-          <span class="fw-bold text-dark fs-6">Раздел: ${escapeHtml(sec.name)}</span>
-          <span class="badge bg-secondary-subtle text-secondary-emphasis border ms-auto">${sec.rules.length} способов</span>
+          <span class="fw-bold text-body fs-6">Раздел: ${escapeHtml(sec.name)}</span>
+          <span class="badge bg-secondary-subtle text-secondary-emphasis border ms-auto">${matchingRules.length} способов</span>
         </div>
         <div class="d-flex flex-column gap-2">
     `;
 
-    sec.rules.forEach((rule, rIdx) => {
+    matchingRules.forEach((rule, rIdx) => {
       const rName = rule["Название"] || rule.name || 'Без названия';
       const rawWm = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] :
                    (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
@@ -3315,14 +3394,14 @@ function renderRulesModalContent() {
               : `<span class="badge bg-secondary-subtle text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы отключено («ОтображатьФормулу»: false)"><i class="bx bx-hide me-0_5"></i>без формулы</span>`;
 
             groupItemsHtml += `
-              <div class="p-2 rounded bg-white border mb-1 small">
+              <div class="p-2 rounded bg-body border mb-1 small">
                 <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                  <div class="fw-semibold text-dark">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')} ${tierBadge}${condBadge}</div>
+                  <div class="fw-semibold text-body">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')} ${tierBadge}${condBadge}</div>
                   <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap">${escapeHtml(w["Единицы измерения"] || '')}</span>
                 </div>
                 <div class="d-flex align-items-center gap-1 text-muted fs-xs">
                   <span class="fw-medium">Формула:</span>
-                  <code class="px-1 py-0 bg-light border rounded text-primary">${escapeHtml(w["Формула"] || 'ДЛИНА')}</code>
+                  <code class="px-1 py-0 bg-body-tertiary border rounded text-primary">${escapeHtml(w["Формула"] || 'ДЛИНА')}</code>
                   ${formulaDispBadge}
                   ${w["Тип"] ? `<span class="badge badge-material ms-auto">${escapeHtml(w["Тип"])}</span>` : ''}
                 </div>
@@ -3331,7 +3410,7 @@ function renderRulesModalContent() {
           });
 
           worksHtml += `
-            <div class="mb-2 p-2 rounded bg-light border">
+            <div class="mb-2 p-2 rounded bg-body-tertiary border">
               <div class="d-flex align-items-center justify-content-between mb-1">
                 <span class="fw-bold text-primary small d-flex align-items-center gap-1">
                   <i class="bx bx-category-alt"></i> ${groupTitle}
@@ -3361,14 +3440,14 @@ function renderRulesModalContent() {
             : `<span class="badge bg-secondary-subtle text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы отключено («ОтображатьФормулу»: false)"><i class="bx bx-hide me-0_5"></i>без формулы</span>`;
 
           worksHtml += `
-            <div class="p-2 rounded bg-light border mb-2 small">
+            <div class="p-2 rounded bg-body-tertiary border mb-2 small">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                <div class="fw-semibold text-dark">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')} ${tierBadge}${condBadge}</div>
+                <div class="fw-semibold text-body">${wIdx + 1}. ${escapeHtml(w["Наименование"] || '')} ${tierBadge}${condBadge}</div>
                 <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap">${escapeHtml(w["Единицы измерения"] || '')}</span>
               </div>
               <div class="d-flex align-items-center gap-1 text-muted fs-xs">
                 <span class="fw-medium">Формула:</span>
-                <code class="px-1 py-0 bg-white border rounded text-primary">${escapeHtml(w["Формула"] || 'ДЛИНА')}</code>
+                <code class="px-1 py-0 bg-body border rounded text-primary">${escapeHtml(w["Формула"] || 'ДЛИНА')}</code>
                 ${formulaDispBadge}
                 ${w["Тип"] ? `<span class="badge badge-material ms-auto">${escapeHtml(w["Тип"])}</span>` : ''}
               </div>
@@ -3671,7 +3750,7 @@ function renderCouplingCatalogModalContent() {
     <div class="small text-muted mb-2 d-flex justify-content-between align-items-center">
       <div>Показано: <strong>${filtered.length}</strong> из ${totalCouplingsCount} позиций муфт в справочнике</div>
       <div class="fs-xs text-muted">
-        <i class='bx bx-info-circle me-1'></i>Монтажные работы распределяются по группам жил: <strong>до 12, 27, 48, 61</strong>
+        <i class='bx bx-info-circle me-1'></i>Для добавления или корректировки параметров откройте вкладку <strong>«Редактор JSON»</strong>
       </div>
     </div>
     <div class="card border shadow-sm">
@@ -4137,7 +4216,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 
   // Calculate and prepend coupling installation works and materials
   const couplingsSummary = getActiveCouplingsSummary(rulesData);
-  const activeCouplingTiers = [12, 27, 48, 61];
+  const activeCouplingTiers = Object.keys(couplingsSummary.tiers).map(Number).sort((a, b) => a - b);
   activeCouplingTiers.forEach(tier => {
     const tierData = couplingsSummary.tiers[tier];
     if (tierData && tierData.count > 0) {
@@ -4590,28 +4669,10 @@ function generateVorGgeXml(worksData, currentFileName) {
 
   const objectName = currentFileName ? currentFileName.replace(/\.[^/.]+$/, '') : '';
 
-  // Group works by Section
+  // Group works strictly by Section from rules structure
   const sectionsMap = new Map();
   worksData.forEach(w => {
-    let secName = (w.section || '').trim();
-    if (!secName) {
-      const lowerName = (w.name || '').toLowerCase();
-      if (
-        lowerName.includes('разработ') ||
-        lowerName.includes('засып') ||
-        lowerName.includes('грунт') ||
-        lowerName.includes('транше') ||
-        lowerName.includes('котлован') ||
-        lowerName.includes('землян') ||
-        lowerName.includes('планировк') ||
-        lowerName.includes('бульдозер') ||
-        lowerName.includes('экскаватор')
-      ) {
-        secName = 'Строительные работы';
-      } else {
-        secName = 'Монтажные работы';
-      }
-    }
+    const secName = (w.section || '').trim() || 'Без раздела';
     if (!sectionsMap.has(secName)) {
       sectionsMap.set(secName, []);
     }
@@ -4987,16 +5048,125 @@ function syncTableToCurrentData() {
 // WORKS RULES & NORMS JSON EDITOR
 // --------------------------------------------------------------------------
 
+// --------------------------------------------------------------------------
+// WORKS RULES & NORMS JSON EDITOR (WITH CODEMIRROR & CODE FOLDING)
+// --------------------------------------------------------------------------
+
+let worksJsonCodeMirror = null;
+
+// Get current JSON string from CodeMirror or fallback textarea
+function getWorksJsonEditorValue() {
+  if (worksJsonCodeMirror) {
+    return worksJsonCodeMirror.getValue();
+  }
+  const textarea = document.getElementById('worksJsonEditorTextarea');
+  return textarea ? textarea.value : '';
+}
+
+// Set JSON string in CodeMirror and fallback textarea
+function setWorksJsonEditorValue(val) {
+  const textarea = document.getElementById('worksJsonEditorTextarea');
+  if (textarea) textarea.value = val;
+  if (worksJsonCodeMirror) {
+    const cursor = worksJsonCodeMirror.getCursor();
+    worksJsonCodeMirror.setValue(val);
+    try {
+      worksJsonCodeMirror.setCursor(cursor);
+    } catch {
+      // ignore cursor reset if length changed
+    }
+  }
+}
+
+// Fold all collapsible blocks in JSON editor
+function foldAllWorksJson() {
+  if (worksJsonCodeMirror) {
+    worksJsonCodeMirror.operation(() => {
+      for (let l = worksJsonCodeMirror.firstLine(); l <= worksJsonCodeMirror.lastLine(); ++l) {
+        worksJsonCodeMirror.foldCode({ line: l, ch: 0 }, null, "fold");
+      }
+    });
+    showToast('Все узлы JSON свернуты', 'info', 'Сворачивание');
+  }
+}
+
+// Unfold all collapsible blocks in JSON editor
+function unfoldAllWorksJson() {
+  if (worksJsonCodeMirror) {
+    worksJsonCodeMirror.operation(() => {
+      for (let l = worksJsonCodeMirror.firstLine(); l <= worksJsonCodeMirror.lastLine(); ++l) {
+        worksJsonCodeMirror.foldCode({ line: l, ch: 0 }, null, "unfold");
+      }
+    });
+    showToast('Все узлы JSON развернуты', 'info', 'Разворачивание');
+  }
+}
+
+// Initialize CodeMirror instance on textarea if available
+function initWorksJsonCodeMirror() {
+  const textarea = document.getElementById('worksJsonEditorTextarea');
+  if (!textarea) return null;
+
+  if (worksJsonCodeMirror) {
+    worksJsonCodeMirror.refresh();
+    return worksJsonCodeMirror;
+  }
+
+  if (typeof CodeMirror !== 'undefined') {
+    worksJsonCodeMirror = CodeMirror.fromTextArea(textarea, {
+      lineNumbers: true,
+      mode: { name: "javascript", json: true },
+      lineWrapping: false,
+      foldGutter: true,
+      gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+      matchBrackets: true,
+      autoCloseBrackets: true,
+      tabSize: 2,
+      indentUnit: 2,
+      extraKeys: {
+        "Ctrl-Q": function(cm) { cm.foldCode(cm.getCursor()); },
+        "Cmd-Q": function(cm) { cm.foldCode(cm.getCursor()); },
+        "Ctrl-F": "findPersistent",
+        "Cmd-F": "findPersistent"
+      }
+    });
+
+    worksJsonCodeMirror.on('change', () => {
+      textarea.value = worksJsonCodeMirror.getValue();
+      validateWorksJsonInput();
+    });
+
+    // Refresh layout when modal or tab is shown
+    const modalEl = document.getElementById('worksRulesModal');
+    if (modalEl) {
+      modalEl.addEventListener('shown.bs.modal', () => {
+        setTimeout(() => {
+          if (worksJsonCodeMirror) worksJsonCodeMirror.refresh();
+        }, 50);
+      });
+    }
+
+    const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
+    if (jsonTabBtn) {
+      jsonTabBtn.addEventListener('shown.bs.tab', () => {
+        setTimeout(() => {
+          if (worksJsonCodeMirror) worksJsonCodeMirror.refresh();
+        }, 50);
+      });
+    }
+  }
+
+  return worksJsonCodeMirror;
+}
+
 // Open Works Rules Modal with specific tab active ('editor', 'cards', 'cables', or 'couplings')
 function openWorksRulesModal(activeTab = 'editor') {
   const modalEl = document.getElementById('worksRulesModal');
   if (!modalEl) return;
 
-  const textarea = document.getElementById('worksJsonEditorTextarea');
-  if (textarea) {
-    textarea.value = JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }, null, 2);
-    validateWorksJsonInput();
-  }
+  initWorksJsonCodeMirror();
+  setWorksJsonEditorValue(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }, null, 2));
+  validateWorksJsonInput();
 
   renderRulesModalContent();
 
@@ -5025,25 +5195,21 @@ function openWorksRulesModal(activeTab = 'editor') {
   if (window.bootstrap && bootstrap.Modal) {
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
   }
+
+  setTimeout(() => {
+    if (worksJsonCodeMirror) worksJsonCodeMirror.refresh();
+  }, 100);
 }
 
-// Validate Works Rules JSON in textarea, update stats, status badge and error display
+// Validate Works Rules JSON in textarea/CodeMirror, update stats, status badge and error display
 function validateWorksJsonInput() {
-  const textarea = document.getElementById('worksJsonEditorTextarea');
+  const val = getWorksJsonEditorValue();
   const badge = document.getElementById('worksJsonValidationBadge');
-  const countBadge = document.getElementById('worksRulesCountBadge');
   const errorAlert = document.getElementById('worksJsonErrorAlert');
   const errorMessage = document.getElementById('worksJsonErrorMessage');
   const applyBtn = document.getElementById('applyWorksRulesBtn');
   const statLines = document.getElementById('worksStatLines');
   const statChars = document.getElementById('worksStatChars');
-  const statTrenches = document.getElementById('worksStatTrenches');
-  const statCables = document.getElementById('worksStatCables');
-  const statCouplings = document.getElementById('worksStatCouplings');
-  const statWorks = document.getElementById('worksStatWorks');
-
-  if (!textarea) return false;
-  const val = textarea.value;
 
   const lines = val ? val.split('\n').length : 0;
   if (statLines) statLines.textContent = lines.toLocaleString('ru-RU');
@@ -5079,11 +5245,6 @@ function validateWorksJsonInput() {
     const couplingCatalog = getCouplingCatalog(parsed) || {};
     const totalCouplingsCount = (couplingCatalog && typeof couplingCatalog === 'object') ? Object.keys(couplingCatalog).length : 0;
 
-    if (statTrenches) statTrenches.textContent = totalWaysCount.toLocaleString('ru-RU');
-    if (statCables) statCables.textContent = totalCablesCount.toLocaleString('ru-RU');
-    if (statCouplings) statCouplings.textContent = totalCouplingsCount.toLocaleString('ru-RU');
-    if (statWorks) statWorks.textContent = totalWorksCount.toLocaleString('ru-RU');
-
     const tabCouplingsBadge = document.getElementById('tabWorksCouplingsCountBadge');
     if (tabCouplingsBadge) tabCouplingsBadge.textContent = totalCouplingsCount;
 
@@ -5091,18 +5252,10 @@ function validateWorksJsonInput() {
       badge.className = 'badge bg-success-subtle text-success border border-success-subtle ms-2';
       badge.innerHTML = "<i class='bx bx-check me-1'></i>Корректный JSON";
     }
-    if (countBadge) {
-      countBadge.textContent = `${totalWaysCount} способов в ${sections.length} разд. (${totalWorksCount} поз.)`;
-    }
     if (errorAlert) errorAlert.classList.add('d-none');
     if (applyBtn) applyBtn.disabled = false;
     return true;
   } catch (err) {
-    if (statTrenches) statTrenches.textContent = '—';
-    if (statCables) statCables.textContent = '—';
-    if (statCouplings) statCouplings.textContent = '—';
-    if (statWorks) statWorks.textContent = '—';
-
     if (badge) {
       badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle ms-2';
       badge.innerHTML = "<i class='bx bx-x me-1'></i>Ошибка синтаксиса";
@@ -5120,11 +5273,13 @@ function validateWorksJsonInput() {
 
 // Setup Works Rules modal controls & JSON editor listeners
 function setupWorksRulesListeners() {
+  initWorksJsonCodeMirror();
+
   const textarea = document.getElementById('worksJsonEditorTextarea');
   if (textarea) {
     textarea.addEventListener('input', validateWorksJsonInput);
 
-    // Support Tab key indentation inside textarea (inserts 2 spaces)
+    // Support Tab key indentation inside fallback textarea
     textarea.addEventListener('keydown', function(e) {
       if (e.key === 'Tab') {
         e.preventDefault();
@@ -5137,13 +5292,26 @@ function setupWorksRulesListeners() {
     });
   }
 
+  // Fold all JSON nodes button
+  const foldAllBtn = document.getElementById('foldAllWorksJsonBtn');
+  if (foldAllBtn) {
+    foldAllBtn.addEventListener('click', foldAllWorksJson);
+  }
+
+  // Unfold all JSON nodes button
+  const unfoldAllBtn = document.getElementById('unfoldAllWorksJsonBtn');
+  if (unfoldAllBtn) {
+    unfoldAllBtn.addEventListener('click', unfoldAllWorksJson);
+  }
+
   // Format JSON button
   const formatBtn = document.getElementById('formatWorksJsonBtn');
-  if (formatBtn && textarea) {
+  if (formatBtn) {
     formatBtn.addEventListener('click', () => {
       try {
-        const parsed = JSON.parse(textarea.value);
-        textarea.value = JSON.stringify(parsed, null, 2);
+        const val = getWorksJsonEditorValue();
+        const parsed = JSON.parse(val);
+        setWorksJsonEditorValue(JSON.stringify(parsed, null, 2));
         validateWorksJsonInput();
         showToast('JSON сметных норм отформатирован', 'info', 'Форматирование');
       } catch (err) {
@@ -5152,105 +5320,278 @@ function setupWorksRulesListeners() {
     });
   }
 
-  // Add rule template button (+ Способ)
-  const addTemplateBtn = document.getElementById('addRuleTemplateBtn');
-  if (addTemplateBtn && textarea) {
-    addTemplateBtn.addEventListener('click', () => {
-      try {
-        let currentObj;
-        try {
-          currentObj = JSON.parse(textarea.value);
-        } catch {
-          currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }));
+  // Helper to safely parse and synchronize currentWorksRules from the editor if valid
+  const syncCurrentRulesFromEditorIfValid = () => {
+    try {
+      const val = getWorksJsonEditorValue();
+      if (!val) return;
+      const parsed = JSON.parse(val);
+      if (parsed && typeof parsed === 'object') {
+        if (Array.isArray(parsed)) {
+          currentWorksRules = { "Строительные работы": parsed };
+        } else {
+          currentWorksRules = parsed;
+        }
+      }
+    } catch {
+      // ignore syntax error while user is actively typing in JSON
+    }
+  };
+
+  // Helper to focus, center-scroll, select and visually highlight newly added JSON node in CodeMirror
+  const highlightAndScrollToJsonNode = (targetString, isKey = true) => {
+    // 1. Switch to JSON editor tab
+    const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
+    if (jsonTabBtn && window.bootstrap && bootstrap.Tab) {
+      bootstrap.Tab.getOrCreateInstance(jsonTabBtn).show();
+    }
+
+    // 2. Perform CodeMirror scroll, selection, fold expansion and animated line highlight
+    setTimeout(() => {
+      if (!worksJsonCodeMirror) {
+        const textarea = document.getElementById('worksJsonEditorTextarea');
+        if (textarea) {
+          const searchPattern = isKey ? `"${targetString}":` : `"${targetString}"`;
+          let idx = textarea.value.lastIndexOf(searchPattern);
+          if (idx === -1) idx = textarea.value.lastIndexOf(targetString);
+          if (idx !== -1) {
+            const startIdx = idx + (isKey ? 1 : (textarea.value.charAt(idx) === '"' ? 1 : 0));
+            textarea.focus();
+            textarea.setSelectionRange(startIdx, startIdx + targetString.length);
+          }
+        }
+        return;
+      }
+
+      worksJsonCodeMirror.refresh();
+
+      const doc = worksJsonCodeMirror.getDoc();
+      const fullText = doc.getValue();
+
+      // Look specifically for the KEY declaration first, to avoid matching substrings in "Полное описание"
+      let searchStr = isKey ? `"${targetString}":` : `"${targetString}"`;
+      let foundIndex = fullText.lastIndexOf(searchStr);
+      if (foundIndex === -1) {
+        searchStr = targetString;
+        foundIndex = fullText.lastIndexOf(searchStr);
+      }
+
+      if (foundIndex !== -1) {
+        // Find position of the exact target string inside the match for clean cursor selection
+        const nameIndex = fullText.indexOf(targetString, foundIndex);
+        const actualPos = nameIndex !== -1 ? nameIndex : foundIndex;
+        const posFrom = doc.posFromIndex(actualPos);
+        const posTo = doc.posFromIndex(actualPos + targetString.length);
+
+        let startLine = posFrom.line;
+
+        // If rule item starts with '{' on line above
+        if (!isKey && startLine > 0) {
+          const prevLine = doc.getLine(startLine - 1).trim();
+          if (prevLine === '{') {
+            startLine = startLine - 1;
+          }
         }
 
-        const targetKey = (currentObj && typeof currentObj === 'object' && !Array.isArray(currentObj))
-          ? (Array.isArray(currentObj["Монтажные работы"]) ? "Монтажные работы" : (Array.isArray(currentObj["Строительные работы"]) ? "Строительные работы" : (Object.keys(currentObj).find(k => Array.isArray(currentObj[k])) || "Монтажные работы")))
-          : "Монтажные работы";
-
-        const isMr = targetKey.toLowerCase().includes('монтаж');
-        const sample = isMr ? {
-          "Название": "Новый способ прокладки (например, ГНБ)",
-          "Работы и материалы": {
-            "1": [
-              {
-                "Наименование": "Прокладка кабеля массой 1 м, кг, до: 1 (ГНБ)",
-                "МаксВес": 1,
-                "Единицы измерения": "м",
-                "Формула": "ДЛИНА",
-                "Тип": "работа",
-                "ОтображатьФормулу": true
-              }
-            ],
-            "2": [
-              {
-                "Наименование": "Прокладка кабеля массой 1 м, кг, до: 2 (ГНБ)",
-                "МаксВес": 2,
-                "Единицы измерения": "м",
-                "Формула": "ДЛИНА",
-                "Тип": "работа",
-                "ОтображатьФормулу": true
-              }
-            ],
-            "3": [
-              {
-                "Наименование": "Прокладка кабеля массой 1 м, кг, до: 3 (ГНБ)",
-                "МаксВес": 3,
-                "Единицы измерения": "м",
-                "Формула": "ДЛИНА",
-                "Тип": "работа",
-                "ОтображатьФормулу": true
-              }
-            ],
-            "оптический": [
-              {
-                "Наименование": "Прокладка оптического кабеля (ГНБ)",
-                "Категория": "Оптический кабель",
-                "Единицы измерения": "м",
-                "Формула": "ДЛИНА",
-                "Тип": "работа",
-                "ОтображатьФормулу": true
-              }
-            ]
+        // Unfold code around this line
+        if (typeof worksJsonCodeMirror.foldCode === 'function') {
+          for (let l = Math.max(0, startLine - 15); l <= Math.min(doc.lineCount() - 1, startLine + 50); l++) {
+            worksJsonCodeMirror.foldCode({ line: l, ch: 0 }, null, "unfold");
           }
-        } : {
-          "Название": "Новый способ разработки грунта",
-          "Работы и материалы": [
+        }
+
+        // Determine exact end line of this JSON object by tracking bracket/brace depth
+        let endLine = startLine;
+        let openBraces = 0;
+        let startedCounting = false;
+        
+        for (let l = startLine; l < doc.lineCount(); l++) {
+          const lineText = doc.getLine(l);
+          for (let ch = 0; ch < lineText.length; ch++) {
+            const c = lineText[ch];
+            if (c === '{' || c === '[') {
+              openBraces++;
+              startedCounting = true;
+            } else if (c === '}' || c === ']') {
+              openBraces--;
+            }
+          }
+          if (startedCounting && openBraces <= 0) {
+            endLine = l;
+            break;
+          }
+        }
+
+        if (endLine < startLine) {
+          endLine = Math.min(doc.lineCount() - 1, startLine + (isKey ? 6 : 14));
+        }
+
+        // Center the inserted block in the viewport
+        const lineCoords = worksJsonCodeMirror.charCoords(posFrom, "local");
+        const editorHeight = worksJsonCodeMirror.getWrapperElement().clientHeight || 420;
+        const targetScrollTop = Math.max(0, lineCoords.top - Math.floor(editorHeight / 3));
+        worksJsonCodeMirror.scrollTo(null, targetScrollTop);
+
+        // Select the key/name so user can immediately type a replacement
+        doc.setSelection(posFrom, posTo);
+        worksJsonCodeMirror.focus();
+
+        // Add animated glow pulse highlight to the EXACT lines of the added block
+        const highlightedLines = [];
+        for (let l = startLine; l <= endLine; l++) {
+          worksJsonCodeMirror.addLineClass(l, 'background', 'cm-new-node-glow');
+          highlightedLines.push(l);
+        }
+
+        setTimeout(() => {
+          highlightedLines.forEach(l => {
+            worksJsonCodeMirror.removeLineClass(l, 'background', 'cm-new-node-glow');
+          });
+        }, 3600);
+      }
+    }, 160);
+  };
+
+  // Add rule template button (+ Способ) and Quick Add in cards tab
+  const insertRuleSample = () => {
+    try {
+      const val = getWorksJsonEditorValue();
+      let currentObj;
+      try {
+        currentObj = JSON.parse(val);
+      } catch {
+        currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }));
+      }
+
+      const targetKey = (currentObj && typeof currentObj === 'object' && !Array.isArray(currentObj))
+        ? (Array.isArray(currentObj["Монтажные работы"]) ? "Монтажные работы" : (Array.isArray(currentObj["Строительные работы"]) ? "Строительные работы" : (Object.keys(currentObj).find(k => Array.isArray(currentObj[k])) || "Монтажные работы")))
+        : "Монтажные работы";
+
+      const isMr = targetKey.toLowerCase().includes('монтаж');
+      let baseRuleName = isMr ? "Новый способ прокладки (например, ГНБ)" : "Новый способ разработки грунта";
+      
+      // Determine unique rule name if already exists
+      let sampleRuleName = baseRuleName;
+      if (currentObj && typeof currentObj === 'object') {
+        const rulesList = Array.isArray(currentObj[targetKey]) ? currentObj[targetKey] : (Array.isArray(currentObj) ? currentObj : []);
+        let count = 1;
+        while (rulesList.some(r => (r["Название"] || r.name) === sampleRuleName)) {
+          count++;
+          sampleRuleName = `${baseRuleName} (${count})`;
+        }
+      }
+
+      const sample = isMr ? {
+        "Название": sampleRuleName,
+        "Работы и материалы": {
+          "1": [
             {
-              "Наименование": "Разработка грунта механизированным способом",
-              "Единицы измерения": "м3",
+              "Наименование": "Прокладка кабеля массой 1 м, кг, до: 1 (ГНБ)",
+              "МаксВес": 1,
+              "Единицы измерения": "м",
+              "Формула": "ДЛИНА",
+              "Тип": "работа",
+              "ОтображатьФормулу": true
+            }
+          ],
+          "2": [
+            {
+              "Наименование": "Прокладка кабеля массой 1 м, кг, до: 2 (ГНБ)",
+              "МаксВес": 2,
+              "Единицы измерения": "м",
+              "Формула": "ДЛИНА",
+              "Тип": "работа",
+              "ОтображатьФормулу": true
+            }
+          ],
+          "3": [
+            {
+              "Наименование": "Прокладка кабеля массой 1 м, кг, до: 3 (ГНБ)",
+              "МаксВес": 3,
+              "Единицы измерения": "м",
+              "Формула": "ДЛИНА",
+              "Тип": "работа",
+              "ОтображатьФормулу": true
+            }
+          ],
+          "оптический": [
+            {
+              "Наименование": "Прокладка оптического кабеля (ГНБ)",
+              "Категория": "Оптический кабель",
+              "Единицы измерения": "м",
               "Формула": "ДЛИНА",
               "Тип": "работа",
               "ОтображатьФормулу": true
             }
           ]
-        };
-
-        if (Array.isArray(currentObj)) {
-          currentObj.push(sample);
-        } else if (currentObj && typeof currentObj === 'object') {
-          if (!Array.isArray(currentObj[targetKey])) {
-            currentObj[targetKey] = [];
-          }
-          currentObj[targetKey].push(sample);
         }
+      } : {
+        "Название": sampleRuleName,
+        "Работы и материалы": [
+          {
+            "Наименование": "Разработка грунта механизированным способом",
+            "Единицы измерения": "м3",
+            "Формула": "ДЛИНА",
+            "Тип": "работа",
+            "ОтображатьФормулу": true
+          }
+        ]
+      };
 
-        textarea.value = JSON.stringify(currentObj, null, 2);
-        validateWorksJsonInput();
-        textarea.scrollTop = textarea.scrollHeight;
-        showToast(`Шаблон нового способа прокладки добавлен в раздел «${targetKey}»`, 'success', 'Добавлено');
-      } catch (err) {
-        showToast('Ошибка при добавлении шаблона: ' + err.message, 'error', 'Ошибка');
+      if (Array.isArray(currentObj)) {
+        currentObj.push(sample);
+      } else if (currentObj && typeof currentObj === 'object') {
+        if (!Array.isArray(currentObj[targetKey])) {
+          currentObj[targetKey] = [];
+        }
+        currentObj[targetKey].push(sample);
       }
+
+      currentWorksRules = currentObj;
+
+      setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
+      validateWorksJsonInput();
+
+      highlightAndScrollToJsonNode(sampleRuleName, false);
+
+      showToast(`Шаблон нового способа «${sampleRuleName}» добавлен в раздел «${targetKey}». Отредактируйте параметры и примените.`, 'success', 'Способ добавлен', 6000);
+    } catch (err) {
+      showToast('Ошибка при добавлении шаблона: ' + err.message, 'error', 'Ошибка');
+    }
+  };
+
+  const addTemplateBtn = document.getElementById('addRuleTemplateBtn');
+  if (addTemplateBtn) {
+    addTemplateBtn.addEventListener('click', insertRuleSample);
+  }
+
+  const quickAddRuleInTabBtn = document.getElementById('quickAddRuleInTabBtn');
+  if (quickAddRuleInTabBtn) {
+    quickAddRuleInTabBtn.addEventListener('click', insertRuleSample);
+  }
+
+  // Rules cards search listeners
+  const rulesCardsSearchInput = document.getElementById('rulesCardsSearchInput');
+  if (rulesCardsSearchInput) {
+    rulesCardsSearchInput.addEventListener('input', renderRulesModalContent);
+  }
+
+  const rulesCardsClearSearchBtn = document.getElementById('rulesCardsClearSearchBtn');
+  if (rulesCardsClearSearchBtn && rulesCardsSearchInput) {
+    rulesCardsClearSearchBtn.addEventListener('click', () => {
+      rulesCardsSearchInput.value = '';
+      renderRulesModalContent();
+      rulesCardsSearchInput.focus();
     });
   }
 
   // Add cable template button (+ Кабель) in toolbar and in cables tab
   const insertCableSample = () => {
     try {
+      const val = getWorksJsonEditorValue();
       let currentObj;
       try {
-        currentObj = JSON.parse(textarea.value);
+        currentObj = JSON.parse(val);
       } catch {
         currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }));
       }
@@ -5264,41 +5605,78 @@ function setupWorksRulesListeners() {
         currentObj["Справочник кабелей"] = JSON.parse(JSON.stringify(existingCat));
       }
 
-      if (!currentObj["Справочник кабелей"]["Особый кабель"]) {
-        currentObj["Справочник кабелей"]["Особый кабель"] = { "Название": "Особый кабель", "Тип": {} };
+      // Check current category filter in UI to insert into relevant section
+      const catFilter = document.getElementById('cableCatalogCategoryFilter');
+      const catVal = catFilter ? catFilter.value : 'all';
+
+      let targetCategoryName = "Особый кабель";
+      let isOptical = false;
+      let defaultCoupling = "МСХз40-9-24х0,9";
+      let defaultWeight = 0.45;
+      let defaultLength = 600;
+      let defaultDesc = "Кабель для сигнализации и блокировки";
+
+      if (catVal === 'optical') {
+        targetCategoryName = "Оптический кабель";
+        isOptical = true;
+        defaultCoupling = "МТОК-А1/216-1Т3-44";
+        defaultWeight = 0.28;
+        defaultLength = 2000;
+        defaultDesc = "Кабель связи оптический бронированный";
       }
 
-      const sampleMark = "Новая-Марка-Кабеля 5х2х0,9";
-      currentObj["Справочник кабелей"]["Особый кабель"]["Тип"][sampleMark] = {
-        "Строительная длина": 600,
-        "Муфта": "МСХз60-27",
-        "Вес": 0.45,
-        "Полное описание": "Кабель сигнализации и блокировки Новая-Марка-Кабеля 5х2х0,9"
+      if (!currentObj["Справочник кабелей"][targetCategoryName] || typeof currentObj["Справочник кабелей"][targetCategoryName] !== 'object') {
+        currentObj["Справочник кабелей"][targetCategoryName] = {
+          "Название": targetCategoryName,
+          ...(isOptical ? { "Категория": "Оптический кабель" } : {}),
+          "Тип": {}
+        };
+      }
+
+      if (!currentObj["Справочник кабелей"][targetCategoryName]["Тип"] || typeof currentObj["Справочник кабелей"][targetCategoryName]["Тип"] !== 'object') {
+        currentObj["Справочник кабелей"][targetCategoryName]["Тип"] = {};
+      }
+
+      const typesMap = currentObj["Справочник кабелей"][targetCategoryName]["Тип"];
+
+      // Generate a unique mark name so multiple clicks add distinct entries
+      let sampleMark = isOptical ? "ОКБ-Новый-Кабель-16(2)" : "Новая-Марка-Кабеля 5х2х0,9";
+      let counter = 1;
+      while (typesMap[sampleMark]) {
+        counter++;
+        sampleMark = isOptical 
+          ? `ОКБ-Новый-Кабель-16(2)-${counter}` 
+          : `Новая-Марка-Кабеля-${counter} 5х2х0,9`;
+      }
+
+      typesMap[sampleMark] = {
+        "Строительная длина": defaultLength,
+        "Муфта": defaultCoupling,
+        "Вес": defaultWeight,
+        ...(isOptical ? { "Категория": "Оптический кабель" } : {}),
+        "Полное описание": `${defaultDesc} ${sampleMark}`
       };
 
-      textarea.value = JSON.stringify(currentObj, null, 2);
+      currentWorksRules = currentObj;
+
+      setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
       validateWorksJsonInput();
-      textarea.scrollTop = textarea.scrollHeight;
 
-      // Switch to editor tab if not there
-      const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
-      if (jsonTabBtn && window.bootstrap && bootstrap.Tab) {
-        bootstrap.Tab.getOrCreateInstance(jsonTabBtn).show();
-      }
+      highlightAndScrollToJsonNode(sampleMark, true);
 
-      showToast(`Шаблон кабеля «${sampleMark}» добавлен в «Справочник кабелей» в редакторе JSON. Отредактируйте параметры и примените.`, 'success', 'Шаблон кабеля добавлен', 6000);
+      showToast(`Шаблон кабеля «${sampleMark}» добавлен в «Справочник кабелей» (категория: «${targetCategoryName}»). Отредактируйте параметры и примените.`, 'success', 'Шаблон кабеля добавлен', 6000);
     } catch (err) {
       showToast('Ошибка при добавлении шаблона кабеля: ' + err.message, 'error', 'Ошибка');
     }
   };
 
   const addCableTemplateBtn = document.getElementById('addCableTemplateBtn');
-  if (addCableTemplateBtn && textarea) {
+  if (addCableTemplateBtn) {
     addCableTemplateBtn.addEventListener('click', insertCableSample);
   }
 
   const quickAddCableInTabBtn = document.getElementById('quickAddCableInTabBtn');
-  if (quickAddCableInTabBtn && textarea) {
+  if (quickAddCableInTabBtn) {
     quickAddCableInTabBtn.addEventListener('click', insertCableSample);
   }
 
@@ -5325,9 +5703,10 @@ function setupWorksRulesListeners() {
   // Add coupling template sample (+ Муфта)
   const insertCouplingSample = () => {
     try {
+      const val = getWorksJsonEditorValue();
       let currentObj;
       try {
-        currentObj = JSON.parse(textarea.value);
+        currentObj = JSON.parse(val);
       } catch {
         currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || {}));
       }
@@ -5336,36 +5715,64 @@ function setupWorksRulesListeners() {
         currentObj["Справочник муфт"] = {};
       }
 
-      const sampleMark = "МСХз-Новая-48";
+      let sampleMark = "МСХз-Новая-48";
+      let counter = 1;
+      while (currentObj["Справочник муфт"][sampleMark]) {
+        counter++;
+        sampleMark = `МСХз-Новая-48-${counter}`;
+      }
+
       currentObj["Справочник муфт"][sampleMark] = {
-        "Полное наименование": "Муфта соединительная холодноусаживаемая МСХз-Новая до 48 жил",
+        "Полное наименование": `Муфта кабельная соединительная подземная холодноусаживаемая ${sampleMark}`,
         "МаксЖил": 48,
         "Единицы измерения": "шт"
       };
 
-      textarea.value = JSON.stringify(currentObj, null, 2);
+      currentWorksRules = currentObj;
+
+      setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
       validateWorksJsonInput();
-      textarea.scrollTop = textarea.scrollHeight;
 
-      // Switch to editor tab if not there
-      const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
-      if (jsonTabBtn && window.bootstrap && bootstrap.Tab) {
-        bootstrap.Tab.getOrCreateInstance(jsonTabBtn).show();
-      }
+      highlightAndScrollToJsonNode(sampleMark, true);
 
-      showToast(`Шаблон муфты «${sampleMark}» добавлен в «Справочник муфт» в редакторе JSON. Отредактируйте параметры и примените.`, 'success', 'Шаблон муфты добавлен', 6000);
+      showToast(`Шаблон муфты «${sampleMark}» добавлен в «Справочник муфт». Отредактируйте параметры и примените.`, 'success', 'Шаблон муфты добавлен', 6000);
     } catch (err) {
       showToast('Ошибка при добавлении шаблона муфты: ' + err.message, 'error', 'Ошибка');
     }
   };
 
+  // Tab show listeners to auto-refresh visual tabs with latest JSON data
+  const cardsTabBtn = document.getElementById('tabWorksCardsBtn');
+  if (cardsTabBtn) {
+    cardsTabBtn.addEventListener('shown.bs.tab', () => {
+      syncCurrentRulesFromEditorIfValid();
+      renderRulesModalContent();
+    });
+  }
+
+  const cablesTabBtn = document.getElementById('tabWorksCablesBtn');
+  if (cablesTabBtn) {
+    cablesTabBtn.addEventListener('shown.bs.tab', () => {
+      syncCurrentRulesFromEditorIfValid();
+      renderCableCatalogModalContent();
+    });
+  }
+
+  const couplingsTabBtn = document.getElementById('tabWorksCouplingsBtn');
+  if (couplingsTabBtn) {
+    couplingsTabBtn.addEventListener('shown.bs.tab', () => {
+      syncCurrentRulesFromEditorIfValid();
+      renderCouplingCatalogModalContent();
+    });
+  }
+
   const addCouplingTemplateBtn = document.getElementById('addCouplingTemplateBtn');
-  if (addCouplingTemplateBtn && textarea) {
+  if (addCouplingTemplateBtn) {
     addCouplingTemplateBtn.addEventListener('click', insertCouplingSample);
   }
 
   const quickAddCouplingInTabBtn = document.getElementById('quickAddCouplingInTabBtn');
-  if (quickAddCouplingInTabBtn && textarea) {
+  if (quickAddCouplingInTabBtn) {
     quickAddCouplingInTabBtn.addEventListener('click', insertCouplingSample);
   }
 
@@ -5404,10 +5811,11 @@ function setupWorksRulesListeners() {
 
   // Apply Works Rules & Recalculate button
   const applyBtn = document.getElementById('applyWorksRulesBtn');
-  if (applyBtn && textarea) {
+  if (applyBtn) {
     applyBtn.addEventListener('click', () => {
       try {
-        const parsed = JSON.parse(textarea.value);
+        const val = getWorksJsonEditorValue();
+        const parsed = JSON.parse(val);
         if (!parsed || typeof parsed !== 'object') {
           showToast('JSON должен быть объектом со структурой разделов или массивом', 'error', 'Неверный формат');
           return;
