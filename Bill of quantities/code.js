@@ -2287,9 +2287,11 @@ function getActiveCableSummary() {
           if (sum === 0 && rtEntries.length === 1 && length > 0) {
             sum = length;
           }
-          hasRouting = true;
-          cableSummary[type].routingTypes[trimmedName] = (cableSummary[type].routingTypes[trimmedName] || 0) + sum;
-          grandRoutingSummary[trimmedName] = (grandRoutingSummary[trimmedName] || 0) + sum;
+          if (sum > 0) {
+            hasRouting = true;
+            cableSummary[type].routingTypes[trimmedName] = (cableSummary[type].routingTypes[trimmedName] || 0) + sum;
+            grandRoutingSummary[trimmedName] = (grandRoutingSummary[trimmedName] || 0) + sum;
+          }
         }
 
         if (!hasRouting && length > 0) {
@@ -2334,9 +2336,11 @@ function getActiveCableSummary() {
         if (sum === 0 && rtEntries.length === 1 && length > 0) {
           sum = length;
         }
-        hasRouting = true;
-        cableSummary[type].routingTypes[trimmedName] = (cableSummary[type].routingTypes[trimmedName] || 0) + sum;
-        grandRoutingSummary[trimmedName] = (grandRoutingSummary[trimmedName] || 0) + sum;
+        if (sum > 0) {
+          hasRouting = true;
+          cableSummary[type].routingTypes[trimmedName] = (cableSummary[type].routingTypes[trimmedName] || 0) + sum;
+          grandRoutingSummary[trimmedName] = (grandRoutingSummary[trimmedName] || 0) + sum;
+        }
       }
 
       if (!hasRouting && length > 0) {
@@ -4244,9 +4248,9 @@ function calculateWorksFromCables(cableSummary, rulesData) {
   // Collect all routing types used across all cables
   cableEntries.forEach(([cType, cInfo]) => {
     const routingMap = cInfo.routingTypes || {};
-    for (const [rName] of Object.entries(routingMap)) {
+    for (const [rName, rLen] of Object.entries(routingMap)) {
       const trimmed = (rName || '').trim();
-      if (trimmed) {
+      if (trimmed && Number(rLen) > 0) {
         allUsedRoutingTypes.add(trimmed);
       }
     }
@@ -4323,14 +4327,16 @@ function calculateWorksFromCables(cableSummary, rulesData) {
       cableEntries.forEach(([cType, cInfo]) => {
         const routingMap = cInfo.routingTypes || {};
         for (const [rName, rLen] of Object.entries(routingMap)) {
+          const lVal = Number(rLen) || 0;
+          if (lVal <= 0) continue;
           if (matchesRule(rName, ruleName, rules)) {
             matchedRoutingTypes.add((rName || '').trim());
-            totLen += (rLen || cInfo.length || 0);
+            totLen += lVal;
             count++;
           }
         }
       });
-      if (count > 0) {
+      if (count > 0 && totLen > 0) {
         missingInRules.push({
           type: `${ruleName} (в правиле нет сметных норм)`,
           length: totLen,
@@ -4350,7 +4356,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
       for (const [rName, rLen] of Object.entries(routingMap)) {
         const trimmedRName = (rName || '').trim();
         if (!trimmedRName) continue;
-        const effectiveLen = (rLen && rLen > 0) ? rLen : (cInfo.length || 0);
+        const effectiveLen = Number(rLen) || 0;
         if (effectiveLen <= 0) continue;
 
         if (matchesRule(trimmedRName, ruleName, rules)) {
@@ -4606,19 +4612,21 @@ function calculateWorksFromCables(cableSummary, rulesData) {
       let count = 0;
       for (const [, cInfo] of cableEntries) {
         const routingMap = cInfo.routingTypes || {};
-        if (routingMap[rName] !== undefined) {
-          const lVal = routingMap[rName];
-          totLen += (lVal > 0 ? lVal : (cInfo.length || 0));
+        const lVal = Number(routingMap[rName]) || 0;
+        if (lVal > 0) {
+          totLen += lVal;
           count += 1;
         }
       }
-      missingInRules.push({
-        type: rName,
-        length: totLen,
-        count: count,
-        ruleName: rName,
-        missingType: 'rule'
-      });
+      if (totLen > 0) {
+        missingInRules.push({
+          type: rName,
+          length: totLen,
+          count: count,
+          ruleName: rName,
+          missingType: 'rule'
+        });
+      }
     }
   }
 
