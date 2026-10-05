@@ -6082,5 +6082,25 @@
       "cablesCount": 1,
       "contained": ["80-19х2(6) #(3529D)"]
     }
+  ],
+  "TracksideEquipment": [
+    {
+      "EquipmentType": "РМГ8П-128ШК",
+      "InstallationMethod": "Не указано",
+      "countEquipment": 1,
+      "handles": ["376CA"]
+    },
+    {
+      "EquipmentType": "КС-24",
+      "InstallationMethod": "Не указано",
+      "countEquipment": 2,
+      "handles": ["39415", "39465"]
+    },
+    {
+      "EquipmentType": "КС-24",
+      "InstallationMethod": "Боковые пути",
+      "countEquipment": 1,
+      "handles": ["397D8"]
+    }
   ]
 }

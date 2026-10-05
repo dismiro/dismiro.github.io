@@ -4,12 +4,10 @@ let currentFileName = '';
 let isEditable = false;
 let isRawColCollapsed = false;
 
-// Helper to extract works/materials array from a rule object,
-// supporting both "Работы и материалы" (array or object with tier keys) and legacy "Работы" / "works"
+// Helper to extract works/materials array from a rule object
 function getRuleWorks(rule) {
   if (!rule || typeof rule !== 'object') return [];
-  const wm = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] :
-             (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
+  const wm = rule["Работы и материалы"];
   if (Array.isArray(wm)) return wm;
   if (wm && typeof wm === 'object') {
     const list = [];
@@ -20,8 +18,6 @@ function getRuleWorks(rule) {
             list.push({ ...item, _tierKey: tierKey });
           }
         });
-      } else if (arr && typeof arr === 'object') {
-        list.push({ ...arr, _tierKey: tierKey });
       }
     });
     return list;
@@ -3686,9 +3682,10 @@ function renderRulesModalContent() {
   const container = document.getElementById('rulesListContainer');
   const countBadge = document.getElementById('worksRulesCountBadge');
   
-  // Render cables tab content as well
+  // Render cables, couplings and equipment tabs content as well
   renderCableCatalogModalContent();
   renderCouplingCatalogModalContent();
+  renderEquipmentCatalogModalContent();
 
   if (!container) return;
 
@@ -3782,7 +3779,7 @@ function renderRulesModalContent() {
     // Filter rules inside section if search query is provided
     const matchingRules = sec.rules.filter(rule => {
       if (!query) return true;
-      const rName = rule["Название"] || rule.name || '';
+      const rName = rule["Марка"] || rule["Название"] || rule.mark || rule.name || '';
       const works = getRuleWorks(rule);
       const worksNames = works.map(w => w["Наименование"] || '').join(' ');
       const haystack = `${sec.name} ${rName} ${worksNames}`.toLowerCase();
@@ -3803,20 +3800,22 @@ function renderRulesModalContent() {
     `;
 
     matchingRules.forEach((rule, rIdx) => {
-      const rName = rule["Название"] || rule.name || 'Без названия';
-      const rawWm = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] :
-                   (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
+      const rName = rule["Марка"] || rule["Название"] || 'Без названия';
+      const rawWm = rule["Работы и материалы"];
       const works = getRuleWorks(rule);
       const isObjectStructure = rawWm && typeof rawWm === 'object' && !Array.isArray(rawWm);
 
       let worksHtml = '';
 
       if (isObjectStructure) {
+        const isEquipSec = sec.name.toLowerCase().includes('оборудован');
         Object.entries(rawWm).forEach(([key, itemsVal]) => {
           const items = Array.isArray(itemsVal) ? itemsVal : (itemsVal ? [itemsVal] : []);
           const isOptKey = key.toLowerCase().includes('оптич') || key.toLowerCase().includes('волс');
           let groupTitle = `Ключ: "${escapeHtml(key)}"`;
-          if (isOptKey) {
+          if (isEquipSec) {
+            groupTitle = `Способ установки: «${escapeHtml(key)}»`;
+          } else if (isOptKey) {
             groupTitle = `Оптический кабель (ключ "${escapeHtml(key)}")`;
           } else {
             const numK = parseFloat(String(key).replace(',', '.'));
@@ -4127,6 +4126,160 @@ function renderCableCatalogModalContent() {
       </div>
     </div>
     ${html}
+  `;
+}
+
+// --------------------------------------------------------------------------
+// RENDER EQUIPMENT CATALOG TAB IN WORKS RULES MODAL
+// --------------------------------------------------------------------------
+
+function renderEquipmentCatalogModalContent() {
+  const container = document.getElementById('equipmentCatalogContainer');
+  const tabBadge = document.getElementById('tabWorksEquipmentCountBadge');
+  if (!container) return;
+
+  const equipmentList = (currentWorksRules && Array.isArray(currentWorksRules["Оборудование"]))
+    ? currentWorksRules["Оборудование"]
+    : [];
+  const totalEquipmentCount = equipmentList.length;
+
+  if (tabBadge) {
+    tabBadge.textContent = totalEquipmentCount;
+  }
+
+  // Search filter query
+  const searchInput = document.getElementById('equipmentCatalogSearchInput');
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const clearBtn = document.getElementById('equipmentCatalogClearSearchBtn');
+  if (clearBtn) {
+    if (query) clearBtn.classList.remove('d-none');
+    else clearBtn.classList.add('d-none');
+  }
+
+  const filtered = equipmentList.filter(item => {
+    if (!query) return true;
+    const mark = (item["Марка"] || '').toLowerCase();
+    const wm = (item["Работы и материалы"] && typeof item["Работы и материалы"] === 'object')
+      ? item["Работы и материалы"]
+      : {};
+    const methods = Object.keys(wm).join(' ').toLowerCase();
+    let worksNames = '';
+    Object.values(wm).forEach(wList => {
+      if (Array.isArray(wList)) {
+        worksNames += ' ' + wList.map(w => w["Наименование"] || '').join(' ');
+      }
+    });
+    const haystack = `${mark} ${methods} ${worksNames}`.toLowerCase();
+    return haystack.includes(query);
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-5 text-muted bg-light rounded border">
+        <i class="bx bx-search-alt fs-1 text-muted opacity-50 mb-2 d-block"></i>
+        <div class="fw-semibold">Оборудование не найдено</div>
+        <div class="small text-muted mt-1">
+          ${totalEquipmentCount === 0
+            ? 'В разделе «Оборудование» файла JSON сметных норм пока нет позиций. Нажмите «Добавить оборудование».'
+            : 'Попробуйте изменить поисковый запрос или добавьте новую марку оборудования.'}
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let totalMethodsAcrossAll = 0;
+  let totalWorksAcrossAll = 0;
+  equipmentList.forEach(item => {
+    const wm = (item["Работы и материалы"] && typeof item["Работы и материалы"] === 'object')
+      ? item["Работы и материалы"]
+      : {};
+    const mKeys = Object.keys(wm);
+    totalMethodsAcrossAll += mKeys.length;
+    mKeys.forEach(mk => {
+      if (Array.isArray(wm[mk])) totalWorksAcrossAll += wm[mk].length;
+    });
+  });
+
+  let cardsHtml = '';
+  filtered.forEach((item, idx) => {
+    const mark = (item["Марка"] || 'Без марки').trim();
+    const wm = (item["Работы и материалы"] && typeof item["Работы и материалы"] === 'object')
+      ? item["Работы и материалы"]
+      : {};
+    const methodEntries = Object.entries(wm);
+
+    let methodsHtml = '';
+    methodEntries.forEach(([methodName, worksArr]) => {
+      const worksList = Array.isArray(worksArr) ? worksArr : [];
+      let worksItemsHtml = '';
+
+      worksList.forEach((work, wIdx) => {
+        const isMaterial = work["Тип"] === 'материал';
+        const formula = work["Формула"] || 'КОЛИЧЕСТВО';
+        const unit = work["Единицы измерения"] || 'шт';
+        const section = work["Раздел"] || 'Монтажные работы';
+        const showFormula = shouldShowFormula(work);
+
+        worksItemsHtml += `
+          <div class="p-2 rounded bg-body border mb-1 small">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+              <div class="fw-semibold text-body">
+                ${wIdx + 1}. ${escapeHtml(work["Наименование"] || '')}
+              </div>
+              <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap">${escapeHtml(unit)}</span>
+            </div>
+            <div class="d-flex align-items-center gap-1 text-muted fs-xs flex-wrap">
+              <span class="fw-medium">Формула:</span>
+              <code class="px-1 py-0 bg-body-tertiary border rounded text-primary">${escapeHtml(formula)}</code>
+              ${showFormula ? '<span class="badge bg-light text-muted border ms-1" style="font-size: 0.68rem;"><i class="bx bx-show me-0_5"></i>в формулах</span>' : ''}
+              <span class="badge bg-light text-secondary border ms-1" style="font-size: 0.68rem;">Раздел: ${escapeHtml(section)}</span>
+              <span class="badge ${isMaterial ? 'badge-material' : 'bg-primary-subtle text-primary border'} ms-auto">${escapeHtml(work["Тип"] || 'работа')}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      methodsHtml += `
+        <div class="mb-3 p-2_5 rounded bg-body-tertiary border">
+          <div class="d-flex align-items-center justify-content-between mb-2 pb-1 border-bottom">
+            <span class="fw-bold text-primary small d-flex align-items-center gap-1">
+              <i class="bx bx-wrench"></i> Способ установки: «${escapeHtml(methodName)}»
+            </span>
+            <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs">${worksList.length} поз.</span>
+          </div>
+          ${worksItemsHtml || '<div class="text-muted small ps-2">Работы и материалы не определены</div>'}
+        </div>
+      `;
+    });
+
+    cardsHtml += `
+      <div class="card border shadow-sm mb-3">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div class="fw-bold d-flex align-items-center gap-2">
+            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-monospace">${idx + 1}</span>
+            <i class="bx bx-cube text-warning fs-5"></i>
+            <span class="fs-6 font-monospace">${escapeHtml(mark)}</span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary-subtle text-primary border">${methodEntries.length} способов установки</span>
+          </div>
+        </div>
+        <div class="card-body p-3">
+          ${methodsHtml || '<div class="text-muted small">Способы установки не заданы</div>'}
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = `
+    <div class="small text-muted mb-2 d-flex justify-content-between align-items-center flex-wrap gap-1">
+      <div>Показано: <strong>${filtered.length}</strong> из ${totalEquipmentCount} позиций оборудования (${totalMethodsAcrossAll} способов установки, ${totalWorksAcrossAll} норм в JSON)</div>
+      <div class="fs-xs text-muted">
+        <i class='bx bx-info-circle me-1'></i>Для добавления или корректировки параметров перейдите во вкладку <strong>«Редактор JSON»</strong>
+      </div>
+    </div>
+    ${cardsHtml}
   `;
 }
 
@@ -5076,20 +5229,10 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 // --------------------------------------------------------------------------
 
 function getEquipmentRules(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object') return { sectionName: 'Оборудование', rules: [] };
-  if (Array.isArray(rulesData['Оборудование'])) {
-    return { sectionName: 'Оборудование', rules: rulesData['Оборудование'] };
+  if (!rulesData || typeof rulesData !== 'object' || !Array.isArray(rulesData['Оборудование'])) {
+    return { sectionName: 'Оборудование', rules: [] };
   }
-  if (Array.isArray(rulesData.equipment)) {
-    return { sectionName: 'Оборудование', rules: rulesData.equipment };
-  }
-  if (Array.isArray(rulesData['Напольное оборудование'])) {
-    return { sectionName: 'Напольное оборудование', rules: rulesData['Напольное оборудование'] };
-  }
-  if (Array.isArray(rulesData.Equipment)) {
-    return { sectionName: 'Оборудование', rules: rulesData.Equipment };
-  }
-  return { sectionName: 'Оборудование', rules: [] };
+  return { sectionName: 'Оборудование', rules: rulesData['Оборудование'] };
 }
 
 function evaluateEquipmentFormula(formula, count) {
@@ -5144,55 +5287,27 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
 
     if (count <= 0) return;
 
-    // Exact match of Mark and InstallationMethod
-    let matchingRule = null;
-    for (const rule of rules) {
-      const ruleMark = (rule["Марка"] || rule.mark || rule["Название"] || rule.name || '').trim();
-      const ruleMethod = (rule["Способ установки"] || rule.method || rule.installationMethod || 'Не указано').trim();
+    // Search rules directly by "Марка"
+    const matchingRule = rules.find(rule => (rule["Марка"] || '').trim().toLowerCase() === itemMark.toLowerCase());
+    const wm = matchingRule ? matchingRule["Работы и материалы"] : null;
+    const ruleWorks = (wm && typeof wm === 'object') ? wm[itemMethod] : null;
 
-      const normItemMark = itemMark.toLowerCase();
-      const normRuleMark = ruleMark.toLowerCase();
-
-      const normItemMethod = itemMethod.toLowerCase();
-      const normRuleMethod = ruleMethod.toLowerCase();
-
-      if (normItemMark === normRuleMark) {
-        if (normRuleMethod === normItemMethod || ruleMethod === '*' || (!ruleMethod && normItemMethod === 'не указано')) {
-          matchingRule = rule;
-          break;
-        }
-      }
-    }
-
-    if (matchingRule) {
+    if (Array.isArray(ruleWorks) && ruleWorks.length > 0) {
       matchedEquipmentKeys.add(key);
-      const ruleWorks = matchingRule["Работы и материалы"] || matchingRule.works || [];
 
-      if (ruleWorks.length === 0) {
-        missingInRules.push({
-          mark: itemMark,
-          method: itemMethod,
-          type: `${itemMark} (${itemMethod})`,
-          count: count,
-          handles: handles,
-          missingType: 'empty_rule'
-        });
-        return;
-      }
-
-      const primaryWork = ruleWorks.find(w => (w["Тип"] || w.type) !== 'материал') || ruleWorks[0];
-      const primaryWorkTitle = (primaryWork["Наименование"] || primaryWork.name || `Монтаж оборудования ${itemMark}`).trim();
+      const primaryWork = ruleWorks.find(w => w["Тип"] !== 'материал') || ruleWorks[0];
+      const primaryWorkTitle = (primaryWork["Наименование"] || `Монтаж оборудования ${itemMark}`).trim();
 
       ruleWorks.forEach(work => {
-        const formula = (work["Формула"] || work.formula || "КОЛИЧЕСТВО").trim();
+        const formula = (work["Формула"] || "КОЛИЧЕСТВО").trim();
         const rawVol = evaluateEquipmentFormula(formula, count);
-        const isMaterial = (work["Тип"] || work.type) === 'материал';
-        const vol = isMaterial ? Math.round(rawVol * 100) / 100 : Math.round(rawVol * 100) / 100;
-        const unit = work["Единицы измерения"] || work.unit || 'шт';
-        const itemName = (work["Наименование"] || work.name || primaryWorkTitle).trim();
+        const isMaterial = work["Тип"] === 'материал';
+        const vol = Math.round(rawVol * 100) / 100;
+        const unit = work["Единицы измерения"] || 'шт';
+        const itemName = (work["Наименование"] || primaryWorkTitle).trim();
         const showFormula = shouldShowFormula(work);
         const formulaDisplay = showFormula ? buildEquipmentFormulaDisplay(formula, count, unit) : '';
-        const targetSection = (work["Раздел"] || work.section || 'Монтажные работы').trim();
+        const targetSection = (work["Раздел"] || 'Монтажные работы').trim();
 
         calculatedWorks.push({
           name: itemName,
@@ -5210,7 +5325,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           parentWorkName: isMaterial ? primaryWorkTitle : undefined,
           count: count,
           handles: handles,
-          comment: work["Комментарий"] || work.comment || (handles.length > 0 ? `handle: ${handles.join(', ')}` : '')
+          comment: work["Комментарий"] || (handles.length > 0 ? `handle: ${handles.join(', ')}` : '')
         });
       });
     } else {
@@ -5220,7 +5335,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
         type: `${itemMark} (${itemMethod})`,
         count: count,
         handles: handles,
-        missingType: 'no_rule'
+        missingType: matchingRule ? 'no_method_rule' : 'no_rule'
       });
     }
   });
@@ -5851,6 +5966,11 @@ function openWorksRulesModal(activeTab = 'editor') {
     if (couplingsTabBtn && window.bootstrap && bootstrap.Tab) {
       bootstrap.Tab.getOrCreateInstance(couplingsTabBtn).show();
     }
+  } else if (activeTab === 'equipment') {
+    const equipmentTabBtn = document.getElementById('tabWorksEquipmentBtn');
+    if (equipmentTabBtn && window.bootstrap && bootstrap.Tab) {
+      bootstrap.Tab.getOrCreateInstance(equipmentTabBtn).show();
+    }
   } else {
     const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
     if (jsonTabBtn && window.bootstrap && bootstrap.Tab) {
@@ -5913,6 +6033,11 @@ function validateWorksJsonInput() {
 
     const tabCouplingsBadge = document.getElementById('tabWorksCouplingsCountBadge');
     if (tabCouplingsBadge) tabCouplingsBadge.textContent = totalCouplingsCount;
+
+    // Count equipment in rules
+    const eqList = (parsed && Array.isArray(parsed["Оборудование"])) ? parsed["Оборудование"] : [];
+    const tabEquipmentBadge = document.getElementById('tabWorksEquipmentCountBadge');
+    if (tabEquipmentBadge) tabEquipmentBadge.textContent = eqList.length;
 
     if (badge) {
       badge.className = 'badge bg-success-subtle text-success border border-success-subtle ms-2';
@@ -6432,6 +6557,93 @@ function setupWorksRulesListeners() {
     });
   }
 
+  const equipmentTabBtn = document.getElementById('tabWorksEquipmentBtn');
+  if (equipmentTabBtn) {
+    equipmentTabBtn.addEventListener('shown.bs.tab', () => {
+      syncCurrentRulesFromEditorIfValid();
+      renderEquipmentCatalogModalContent();
+    });
+  }
+
+  // Add equipment sample (+ Оборудование)
+  const insertEquipmentSample = () => {
+    try {
+      const val = getWorksJsonEditorValue();
+      let currentObj;
+      try {
+        currentObj = JSON.parse(val);
+      } catch {
+        currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || {}));
+      }
+
+      if (!Array.isArray(currentObj["Оборудование"])) {
+        currentObj["Оборудование"] = [];
+      }
+
+      let sampleMark = "Шкаф-ШРУ-М";
+      let counter = 1;
+      while (currentObj["Оборудование"].some(e => (e["Марка"] || '').toLowerCase() === sampleMark.toLowerCase())) {
+        counter++;
+        sampleMark = `Шкаф-ШРУ-М-${counter}`;
+      }
+
+      currentObj["Оборудование"].push({
+        "Марка": sampleMark,
+        "Работы и материалы": {
+          "Не указано": [
+            {
+              "Наименование": `Установка оборудования типа ${sampleMark}`,
+              "Единицы измерения": "шт",
+              "Формула": "КОЛИЧЕСТВО",
+              "Тип": "работа",
+              "ОтображатьФормулу": true,
+              "Раздел": "Монтажные работы"
+            },
+            {
+              "Наименование": sampleMark,
+              "Единицы измерения": "шт",
+              "Формула": "КОЛИЧЕСТВО",
+              "Тип": "материал",
+              "ОтображатьФормулу": true,
+              "Раздел": "Монтажные работы"
+            }
+          ]
+        }
+      });
+
+      currentWorksRules = currentObj;
+
+      setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
+      validateWorksJsonInput();
+
+      highlightAndScrollToJsonNode(sampleMark, true);
+
+      showToast(`Шаблон оборудования «${sampleMark}» добавлен в раздел «Оборудование». Отредактируйте параметры и примените.`, 'success', 'Оборудование добавлено', 6000);
+    } catch (err) {
+      showToast('Ошибка при добавлении оборудования: ' + err.message, 'error', 'Ошибка');
+    }
+  };
+
+  const quickAddEquipmentInTabBtn = document.getElementById('quickAddEquipmentInTabBtn');
+  if (quickAddEquipmentInTabBtn) {
+    quickAddEquipmentInTabBtn.addEventListener('click', insertEquipmentSample);
+  }
+
+  // Equipment tab search listeners
+  const equipmentSearchInput = document.getElementById('equipmentCatalogSearchInput');
+  if (equipmentSearchInput) {
+    equipmentSearchInput.addEventListener('input', renderEquipmentCatalogModalContent);
+  }
+
+  const equipmentClearSearchBtn = document.getElementById('equipmentCatalogClearSearchBtn');
+  if (equipmentClearSearchBtn && equipmentSearchInput) {
+    equipmentClearSearchBtn.addEventListener('click', () => {
+      equipmentSearchInput.value = '';
+      renderEquipmentCatalogModalContent();
+      equipmentSearchInput.focus();
+    });
+  }
+
   const addCouplingTemplateBtn = document.getElementById('addCouplingTemplateBtn');
   if (addCouplingTemplateBtn) {
     addCouplingTemplateBtn.addEventListener('click', insertCouplingSample);
@@ -6815,38 +7027,42 @@ function addMissingEquipmentToRules(missingList) {
     const mark = (m.mark || m.type || 'Оборудование').trim();
     const method = (m.method || 'Не указано').trim();
 
-    const exists = currentWorksRules["Оборудование"].some(r => {
-      const rMark = (r["Марка"] || r.mark || r["Название"] || r.name || '').trim().toLowerCase();
-      const rMethod = (r["Способ установки"] || r.method || r.installationMethod || 'Не указано').trim().toLowerCase();
-      return rMark === mark.toLowerCase() && rMethod === method.toLowerCase();
-    });
+    const newWorksForMethod = [
+      {
+        "Наименование": `Установка оборудования типа ${mark}${method.toLowerCase() !== 'не указано' ? ` (${method})` : ''}`,
+        "Единицы измерения": "шт",
+        "Формула": "КОЛИЧЕСТВО",
+        "Тип": "работа",
+        "ОтображатьФормулу": true,
+        "Раздел": "Монтажные работы"
+      },
+      {
+        "Наименование": `${mark}`,
+        "Единицы измерения": "шт",
+        "Формула": "КОЛИЧЕСТВО",
+        "Тип": "материал",
+        "ОтображатьФормулу": true,
+        "Раздел": "Монтажные работы"
+      }
+    ];
 
-    if (!exists) {
+    let existingRule = currentWorksRules["Оборудование"].find(r => (r["Марка"] || '').trim().toLowerCase() === mark.toLowerCase());
+
+    if (existingRule) {
+      if (!existingRule["Работы и материалы"][method]) {
+        existingRule["Работы и материалы"][method] = newWorksForMethod;
+        addedCount++;
+        addedMarks.push(`${mark} [${method}]`);
+      }
+    } else {
       currentWorksRules["Оборудование"].push({
-        "Название": `${mark} (${method})`,
         "Марка": mark,
-        "Способ установки": method,
-        "Работы и материалы": [
-          {
-            "Наименование": `Установка оборудования типа ${mark}`,
-            "Единицы измерения": "шт",
-            "Формула": "КОЛИЧЕСТВО",
-            "Тип": "работа",
-            "ОтображатьФормулу": true,
-            "Раздел": "Монтажные работы"
-          },
-          {
-            "Наименование": `${mark}`,
-            "Единицы измерения": "шт",
-            "Формула": "КОЛИЧЕСТВО",
-            "Тип": "материал",
-            "ОтображатьФормулу": true,
-            "Раздел": "Монтажные работы"
-          }
-        ]
+        "Работы и материалы": {
+          [method]: newWorksForMethod
+        }
       });
       addedCount++;
-      addedMarks.push(`${mark} (${method})`);
+      addedMarks.push(`${mark} [${method}]`);
     }
   });
 
