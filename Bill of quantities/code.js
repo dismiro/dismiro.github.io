@@ -414,12 +414,16 @@ function normalizeCableLookupKey(s) {
 // Parse cable pair type and trailing symbol (specification/code.js logic)
 // 1. Symbol is strictly at the end of the type
 // 2. Supports both "х2" and "х2х0,9" / "х2х0.9" formats
+// 3. Properly handles parenthesized reserve/dedicated cores like (6) in "16х2(6)**" -> pairKey: "16х2", symbol: "**"
 function parseCableTypeAndSymbol(str) {
   if (!str) return { pairKey: '', symbol: '' };
-  const s = String(str).trim().replace(/\s+/g, '').replace(/x/g, 'х');
+  let s = String(str).trim().replace(/\s+/g, '').replace(/x/g, 'х');
 
-  // Match pattern: digits + "х2" + optional "х0,9"/"х0.9" + trailing symbol
-  const match = s.match(/^(\d+х2)(?:х0[,\.]9)?(.*)$/i);
+  // Strip parenthesized reserve/dedicated cores like (6), (2), (4) before trailing symbols or at end of string
+  s = s.replace(/\(\d+\)(?=(?:\s*(?:[*#&^~!Δ§†‡№]|\\U\+[0-9a-fA-F]+))*$)/gi, '');
+
+  // Match pattern: digits + "х2" + optional conductor diameter "х0,9" / "х1,0" / "х0.9" + trailing symbol
+  const match = s.match(/^(\d+х2)(?:\(\d+\))?(?:х\d+(?:[,\.]\d+)?)?(.*)$/i);
   if (match) {
     let sym = match[2] || '';
     if (sym === 'Δ' || sym === 'U+0394') sym = '\\U+0394';
@@ -429,8 +433,8 @@ function parseCableTypeAndSymbol(str) {
     };
   }
 
-  // Generic match if string has prefixes
-  const genericMatch = s.match(/(\d+х2)(?:х0[,\.]9)?(.*)$/i);
+  // Generic match if string has prefixes (e.g. cable tag or number like "490-16х2(6)**")
+  const genericMatch = s.match(/(\d+х2)(?:\(\d+\))?(?:х\d+(?:[,\.]\d+)?)?(.*)$/i);
   if (genericMatch) {
     let sym = genericMatch[2] || '';
     if (sym === 'Δ' || sym === 'U+0394') sym = '\\U+0394';
@@ -525,9 +529,10 @@ function lookupCableInfo(rawType, catalog) {
   }
 
   // 3. Paired cable type and trailing symbol analysis (specification/code.js architecture)
-  const parsed = parseCableTypeAndSymbol(str);
-  const pairKey = parsed.pairKey;
-  const symbol = parsed.symbol;
+  // Try lookup with normalized string first (removes reserve core notes like (6)), then fallback to raw str
+  let parsed = parseCableTypeAndSymbol(cleanStr);
+  let pairKey = parsed.pairKey;
+  let symbol = parsed.symbol;
 
   let entry = null;
   let brandName = '';
@@ -536,6 +541,19 @@ function lookupCableInfo(rawType, catalog) {
     brandName = cat[symbol]["Название"] || '';
     if (pairKey && cat[symbol]["Тип"][pairKey]) {
       entry = cat[symbol]["Тип"][pairKey];
+    }
+  }
+
+  // Fallback to raw str if not found
+  if (!entry && cleanStr !== str) {
+    parsed = parseCableTypeAndSymbol(str);
+    pairKey = parsed.pairKey;
+    symbol = parsed.symbol;
+    if (cat[symbol] && typeof cat[symbol] === 'object' && cat[symbol]["Тип"]) {
+      brandName = cat[symbol]["Название"] || '';
+      if (pairKey && cat[symbol]["Тип"][pairKey]) {
+        entry = cat[symbol]["Тип"][pairKey];
+      }
     }
   }
 
@@ -802,7 +820,8 @@ function getActiveCouplingsSummary(rulesData) {
     if (!c.type || c.length <= 0) return;
     const cMeta = lookupCableInfo(c.type, cableCatalog);
     const buildLen = Number(cMeta.buildingLength) || 0;
-    const count = buildLen > 0 ? Math.floor(c.length / buildLen) : 0;
+    // Couplings needed: 0 if length <= buildingLength; otherwise div(length - 1, buildingLength)
+    const count = (buildLen > 0 && c.length > buildLen) ? Math.floor((c.length - 1) / buildLen) : 0;
     if (count > 0) {
       totalCouplingsCount += count;
       const cTypeKey = cMeta.coupling ? cMeta.coupling.trim() : '';
@@ -1657,13 +1676,14 @@ function createCablesAccordion(cables, totalLength) {
     const info = lookupCableInfo(effectiveType);
     const cableLen = Number(c.length) || 0;
     const buildLen = Number(info.buildingLength) || 0;
-    const couplingCount = buildLen > 0 ? Math.floor(cableLen / buildLen) : 0;
+    // Couplings needed: 0 if length <= buildingLength; otherwise div(length - 1, buildingLength)
+    const couplingCount = (buildLen > 0 && cableLen > buildLen) ? Math.floor((cableLen - 1) / buildLen) : 0;
     totalCouplingsCount += couplingCount;
 
     const couplingName = (info.coupling || '').trim();
     const hasCouplingInfo = Boolean(couplingName && couplingName.toLowerCase() !== 'уточнить' && couplingName.toLowerCase() !== '-');
 
-    if (!hasCouplingInfo && effectiveType.trim()) {
+    if (!hasCouplingInfo && effectiveType.trim() && couplingCount > 0) {
       missingCouplingTypesSet.add(effectiveType.trim());
     }
 
@@ -2387,7 +2407,21 @@ function calculateVolumes() {
 
   const trenchWorksCalc = renderRoutingResult(routingSummary, grandTotalRoutingCount, grandTotalRoutingLength);
 
-  // 3. Calculate and render Couplings summary
+  // 3. Re-distribute works into their target sections for Column 3 UI cards
+  // Any trench work with "Раздел": "Монтажные работы" goes to Installation Works
+  // Any work with "Раздел": "Строительные работы" goes to Construction Works
+  const allCalc = getAllCalculatedWorks();
+  renderConstructionWorks({
+    works: allCalc.trenchWorks,
+    missingInRules: trenchWorksCalc.missingInRules
+  });
+  renderInstallationWorks({
+    works: allCalc.cableWorks,
+    missingInRules: cableWorksCalc.missingInRules,
+    missingInCatalog: cableWorksCalc.missingInCatalog
+  });
+
+  // 4. Calculate and render Couplings summary
   const couplingsSummary = getActiveCouplingsSummary(currentWorksRules);
   renderCouplingsResult(couplingsSummary);
 
@@ -2617,13 +2651,16 @@ function renderInstallationWorks(cableWorksCalc) {
     const rowClass = isWork ? 'table-row-work' : 'table-row-material';
 
     const tagBadge = isMaterial
-      ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">материал</span>`
+      ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal; color: #495057 !important;">материал</span>`
       : '';
     const opticalBadge = w.isOptical
       ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">ВОЛС</span>`
       : '';
     const catalogBadge = (w.foundInCatalog === false)
       ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;" title="Марка не найдена в справочнике кабелей"><i class="bx bx-error me-0_5"></i>нет в справочнике</span>`
+      : '';
+    const trenchBadge = w.trenchType
+      ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.7rem; font-weight: normal; color: #495057 !important;" title="Рассчитано по ведомости траншей (${escapeHtml(w.trenchType)})"><i class='bx bx-git-commit me-0_5'></i>${escapeHtml(w.trenchType)}</span>`
       : '';
 
     const volumeStr = w.volume.toLocaleString('ru-RU', {
@@ -2639,7 +2676,7 @@ function renderInstallationWorks(cableWorksCalc) {
       <tr class="${rowClass}">
         <td class="text-muted small text-center">${idx + 1}</td>
         <td class="cell-wrap ${isWork ? 'fw-semibold' : 'fw-medium ps-3'}">
-          ${escapeHtml(w.name)}${tagBadge}${opticalBadge}${catalogBadge}
+          ${escapeHtml(w.name)}${tagBadge}${opticalBadge}${catalogBadge}${trenchBadge}
           ${commentHtml}
         </td>
         <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
@@ -2838,7 +2875,7 @@ function renderConstructionWorks(worksCalc) {
     const isWork = !isMaterial;
     const rowClass = isWork ? 'table-row-work' : 'table-row-material';
     const tagBadge = isMaterial
-      ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">материал</span>`
+      ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal; color: #495057 !important;">материал</span>`
       : '';
 
     worksRowsHtml += `
@@ -4092,6 +4129,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
         }
 
         const showFormula = shouldShowFormula(work);
+        const targetSection = (work["Раздел"] || work.section || sectionName).trim();
         calculatedWorks.push({
           name: work["Наименование"] || work.name || '',
           unit: work["Единицы измерения"] || work.unit || '',
@@ -4105,7 +4143,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           totalTrenchLength: tInfo.totalLength,
           matchedSegmentsCount: matchingSegments.length,
           condition: conditionNote,
-          section: sectionName,
+          section: targetSection,
           type: work["Тип"] || work.type || '',
           comment: work["Комментарий"] || work.comment || ''
         });
@@ -4377,7 +4415,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             tierKey: parsedWM.optical.key,
             isOptical: true,
             category: 'Оптический кабель',
-            section: sectionName,
+            section: (item["Раздел"] || item.section || sectionName).trim(),
             type: isMaterial ? 'материал' : 'работа',
             parentWorkName: isMaterial ? opticalPrimaryTitle : undefined,
             cablesCount: opticalCables.length,
@@ -4526,7 +4564,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               routingType: ruleName,
               tierMax: tier.threshold,
               tierKey: tier.key,
-              section: sectionName,
+              section: (item["Раздел"] || item.section || sectionName).trim(),
               type: isMaterial ? 'материал' : 'работа',
               parentWorkName: isMaterial ? primaryWorkTitle : undefined,
               cablesCount: tier.cables.length,
@@ -4617,10 +4655,21 @@ function getAllCalculatedWorks() {
   const cableData = getActiveCableSummary();
   const cableCalc = calculateWorksFromCables(cableData.summary, currentWorksRules);
 
+  const allWorks = [ ...trenchCalc.works, ...cableCalc.works ];
+
+  // Group works by actual target section:
+  // Items with section "Строительные работы" (or containing "строительн") go to trenchWorks (Section 1)
+  // Items with other sections (such as "Монтажные работы") go to cableWorks (Section 2)
+  const trenchWorks = allWorks.filter(w => {
+    const s = (w.section || '').trim().toLowerCase();
+    return s === 'строительные работы' || s.includes('строительн');
+  });
+  const cableWorks = allWorks.filter(w => !trenchWorks.includes(w));
+
   return {
-    works: [ ...trenchCalc.works, ...cableCalc.works ],
-    trenchWorks: trenchCalc.works,
-    cableWorks: cableCalc.works,
+    works: allWorks,
+    trenchWorks: trenchWorks,
+    cableWorks: cableWorks,
     missingInRules: [ ...trenchCalc.missingInRules, ...cableCalc.missingInRules ],
     trenchMissing: trenchCalc.missingInRules,
     cableMissing: cableCalc.missingInRules,
