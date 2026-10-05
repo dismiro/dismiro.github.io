@@ -1129,15 +1129,6 @@ function setupEventListeners() {
     calculateBtn.addEventListener('click', calculateVolumes);
   }
 
-  // Data upload buttons
-  const uploadDataBtn = document.getElementById('uploadDataBtn');
-  if (uploadDataBtn) {
-    uploadDataBtn.addEventListener('click', () => {
-      const fileInput = document.getElementById('input');
-      if (fileInput) fileInput.click();
-    });
-  }
-
   const menuUploadData = document.getElementById('menuUploadData');
   if (menuUploadData) {
     menuUploadData.addEventListener('click', (e) => {
@@ -2619,13 +2610,19 @@ function calculateVolumes() {
   // 5. Re-distribute works into their target sections for Column 3 UI cards
   // Any trench work with "Раздел": "Монтажные работы" goes to Installation Works
   // Any work with "Раздел": "Строительные работы" goes to Construction Works
-  const allCalc = getAllCalculatedWorks();
+  const allWorks = [ ...(trenchWorksCalc.works || []), ...(cableWorksCalc.works || []), ...(equipmentWorksCalc.works || []) ];
+  const trenchWorks = allWorks.filter(w => {
+    const s = (w.section || '').trim().toLowerCase();
+    return s === 'строительные работы' || s.includes('строительн');
+  });
+  const cableWorks = allWorks.filter(w => !trenchWorks.includes(w));
+
   renderConstructionWorks({
-    works: allCalc.trenchWorks,
+    works: trenchWorks,
     missingInRules: trenchWorksCalc.missingInRules
   });
   renderInstallationWorks({
-    works: allCalc.cableWorks,
+    works: cableWorks,
     missingInRules: cableWorksCalc.missingInRules,
     missingInCatalog: cableWorksCalc.missingInCatalog,
     missingEquipment: equipmentWorksCalc.missingInRules
@@ -3049,6 +3046,9 @@ function renderInstallationWorks(cableWorksCalc) {
     const trenchBadge = w.trenchType
       ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.7rem; font-weight: normal; color: #495057 !important;" title="Рассчитано по ведомости траншей (${escapeHtml(w.trenchType)})"><i class='bx bx-git-commit me-0_5'></i>${escapeHtml(w.trenchType)}</span>`
       : '';
+    const equipmentBadge = (w.equipmentType || w.mark)
+      ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1 font-monospace" style="font-size: 0.7rem;" title="Оборудование: ${escapeHtml(w.equipmentType || w.mark)}${w.method ? ` (${escapeHtml(w.method)})` : ''}"><i class='bx bx-cube me-0_5'></i>${escapeHtml(w.equipmentType || w.mark)}</span>`
+      : '';
 
     const volumeStr = w.volume.toLocaleString('ru-RU', {
       minimumFractionDigits: 2,
@@ -3063,7 +3063,7 @@ function renderInstallationWorks(cableWorksCalc) {
       <tr class="${rowClass}">
         <td class="text-muted small text-center">${idx + 1}</td>
         <td class="cell-wrap ${isWork ? 'fw-semibold' : 'fw-medium ps-3'}">
-          ${escapeHtml(w.name)}${tagBadge}${opticalBadge}${catalogBadge}${trenchBadge}
+          ${escapeHtml(w.name)}${tagBadge}${opticalBadge}${catalogBadge}${trenchBadge}${equipmentBadge}
           ${commentHtml}
         </td>
         <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
@@ -5645,7 +5645,7 @@ function exportCalculationResults() {
   // If any types had missing works in the rules, notify user
   if (missingInRules.length > 0) {
     const missingStr = missingInRules
-      .map(m => `«${m.type}» (${Math.round(m.length)} м)`)
+      .map(m => `«${m.type}» (${m.length !== undefined ? Math.round(m.length) + ' м' : (m.count || 0) + ' шт'})`)
       .join(', ');
     showToast(
       `Внимание: для способов ${missingStr} в файле правил сметных норм отсутствуют работы. Экспорт продолжен для остальных позиций.`,
@@ -5697,7 +5697,7 @@ function exportVorExcel() {
   }
   if (missingInRules.length > 0) {
     const missingStr = missingInRules
-      .map(m => `«${m.type}» (${Math.round(m.length)} м)`)
+      .map(m => `«${m.type}» (${m.length !== undefined ? Math.round(m.length) + ' м' : (m.count || 0) + ' шт'})`)
       .join(', ');
     showToast(
       `Внимание: для способов ${missingStr} в файле сметных норм отсутствуют работы.`,
@@ -6351,11 +6351,6 @@ function setupWorksRulesListeners() {
     }
   };
 
-  const addTemplateBtn = document.getElementById('addRuleTemplateBtn');
-  if (addTemplateBtn) {
-    addTemplateBtn.addEventListener('click', insertRuleSample);
-  }
-
   const quickAddRuleInTabBtn = document.getElementById('quickAddRuleInTabBtn');
   if (quickAddRuleInTabBtn) {
     quickAddRuleInTabBtn.addEventListener('click', insertRuleSample);
@@ -6460,11 +6455,6 @@ function setupWorksRulesListeners() {
       showToast('Ошибка при добавлении шаблона кабеля: ' + err.message, 'error', 'Ошибка');
     }
   };
-
-  const addCableTemplateBtn = document.getElementById('addCableTemplateBtn');
-  if (addCableTemplateBtn) {
-    addCableTemplateBtn.addEventListener('click', insertCableSample);
-  }
 
   const quickAddCableInTabBtn = document.getElementById('quickAddCableInTabBtn');
   if (quickAddCableInTabBtn) {
@@ -6642,11 +6632,6 @@ function setupWorksRulesListeners() {
       renderEquipmentCatalogModalContent();
       equipmentSearchInput.focus();
     });
-  }
-
-  const addCouplingTemplateBtn = document.getElementById('addCouplingTemplateBtn');
-  if (addCouplingTemplateBtn) {
-    addCouplingTemplateBtn.addEventListener('click', insertCouplingSample);
   }
 
   const quickAddCouplingInTabBtn = document.getElementById('quickAddCouplingInTabBtn');
