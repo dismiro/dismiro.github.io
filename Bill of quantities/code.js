@@ -293,18 +293,15 @@ function parseCableCountCondition(work) {
   };
 }
 
-// Parse and normalize rule's "Работы и материалы" supporting both the new object structure:
-// "Работы и материалы": { "1": [...], "2": [...], "3": [...], "оптический": [...] }
-// and legacy flat array format: [ { ... }, ... ]
+// Parse and normalize rule's "Работы" object structure:
+// "Работы": { "1": [...], "2": [...], "3": [...], "оптический": [...] }
 function parseRuleWorksAndMaterials(rule) {
   if (!rule || typeof rule !== 'object') {
     return { optical: null, tiers: [], allItems: [], isObjectStructure: false, rawObj: {} };
   }
 
-  const wm = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] :
-             (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
-
-  if (!wm || typeof wm !== 'object') {
+  const wmObj = rule["Работы"] || rule["Работы и материалы"] || {};
+  if (!wmObj || typeof wmObj !== 'object' || Array.isArray(wmObj)) {
     return { optical: null, tiers: [], allItems: [], isObjectStructure: false, rawObj: {} };
   }
 
@@ -319,28 +316,6 @@ function parseRuleWorksAndMaterials(rule) {
     const s = String(k || '').toLowerCase();
     return s.includes('оптич') || s.includes('волс') || s.includes('optic');
   };
-
-  // Convert legacy array to object representation if needed
-  let wmObj = {};
-  let isObjectStructure = true;
-
-  if (Array.isArray(wm)) {
-    isObjectStructure = false;
-    wm.forEach(item => {
-      if (!item || typeof item !== 'object') return;
-      if (isOpticalItem(item)) {
-        if (!wmObj["оптический"]) wmObj["оптический"] = [];
-        wmObj["оптический"].push(item);
-      } else {
-        const th = extractWeightThreshold(item);
-        const k = th !== null ? String(th) : (item["МаксВес"] !== undefined ? String(item["МаксВес"]) : "1");
-        if (!wmObj[k]) wmObj[k] = [];
-        wmObj[k].push(item);
-      }
-    });
-  } else {
-    wmObj = wm;
-  }
 
   let optical = null;
   const tiers = [];
@@ -414,77 +389,54 @@ function parseRuleWorksAndMaterials(rule) {
     return (a.threshold || 0) - (b.threshold || 0);
   });
 
-  return { optical, tiers, allItems, isObjectStructure, rawObj: wmObj };
+  return { optical, tiers, allItems, isObjectStructure: true, rawObj: wmObj };
 }
 
 // Helper to extract all sections from rules object (where top-level keys are section names)
 function getRulesSections(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object') return [];
-  if (Array.isArray(rulesData)) {
-    return [{ name: "Строительные работы", rawKey: "Строительные работы", rules: rulesData }];
-  }
+  if (!rulesData || typeof rulesData !== 'object' || Array.isArray(rulesData)) return [];
   const sections = [];
   for (const [key, val] of Object.entries(rulesData)) {
-    if (Array.isArray(val)) {
-      const displaySectionName = (key === "Способы прокладки") ? "Строительные работы" : key;
-      sections.push({ name: displaySectionName, rawKey: key, rules: val });
+    if (key === "Настройки" || key === "Оборудование" || key === "Справочник кабелей" || key === "Справочник муфт") continue;
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const rulesList = Object.entries(val).map(([ruleName, ruleVal]) => ({
+        "Название": ruleName,
+        ...(ruleVal && typeof ruleVal === 'object' ? ruleVal : {})
+      }));
+      sections.push({ name: key, rawKey: key, rules: rulesList });
     }
   }
   return sections;
 }
 
-// Trench calculation rules - trenches are always calculated from the "Строительные работы" section
+// Trench calculation rules - trenches are calculated from the "Строительные работы" section
 function getTrenchRules(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object') {
+  if (!rulesData || typeof rulesData !== 'object' || Array.isArray(rulesData)) {
     return { sectionName: 'Строительные работы', rules: [] };
   }
-  if (Array.isArray(rulesData)) {
-    return { sectionName: 'Строительные работы', rules: rulesData };
-  }
-  // 1. Exact or case-insensitive match for "Строительные работы"
-  for (const key of Object.keys(rulesData)) {
-    if (key.trim().toLowerCase() === 'строительные работы') {
-      return { sectionName: key, rules: Array.isArray(rulesData[key]) ? rulesData[key] : [] };
-    }
-  }
-  // 2. Contains "строительн"
-  for (const key of Object.keys(rulesData)) {
-    if (key.toLowerCase().includes('строительн') && Array.isArray(rulesData[key])) {
-      return { sectionName: key, rules: rulesData[key] };
-    }
-  }
-  // 3. Fallback for legacy "Способы прокладки"
-  if (Array.isArray(rulesData["Способы прокладки"])) {
-    return { sectionName: 'Строительные работы', rules: rulesData["Способы прокладки"] };
-  }
-  // 4. Any first array
-  for (const key of Object.keys(rulesData)) {
-    if (Array.isArray(rulesData[key])) {
-      return { sectionName: key, rules: rulesData[key] };
-    }
+  const val = rulesData["Строительные работы"];
+  if (val && typeof val === 'object' && !Array.isArray(val)) {
+    const rulesList = Object.entries(val).map(([ruleName, ruleVal]) => ({
+      "Название": ruleName,
+      ...(ruleVal && typeof ruleVal === 'object' ? ruleVal : {})
+    }));
+    return { sectionName: 'Строительные работы', rules: rulesList };
   }
   return { sectionName: 'Строительные работы', rules: [] };
 }
 
-// Cable calculation rules - cables are always calculated from the "Монтажные работы" section
+// Cable calculation rules - cables are calculated from the "Монтажные работы" section
 function getCableRules(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object') {
+  if (!rulesData || typeof rulesData !== 'object' || Array.isArray(rulesData)) {
     return { sectionName: 'Монтажные работы', rules: [] };
   }
-  if (Array.isArray(rulesData)) {
-    return { sectionName: 'Монтажные работы', rules: [] };
-  }
-  // 1. Exact or case-insensitive match for "Монтажные работы"
-  for (const key of Object.keys(rulesData)) {
-    if (key.trim().toLowerCase() === 'монтажные работы') {
-      return { sectionName: key, rules: Array.isArray(rulesData[key]) ? rulesData[key] : [] };
-    }
-  }
-  // 2. Contains "монтаж"
-  for (const key of Object.keys(rulesData)) {
-    if (key.toLowerCase().includes('монтаж') && Array.isArray(rulesData[key])) {
-      return { sectionName: key, rules: rulesData[key] };
-    }
+  const val = rulesData["Монтажные работы"];
+  if (val && typeof val === 'object' && !Array.isArray(val)) {
+    const rulesList = Object.entries(val).map(([ruleName, ruleVal]) => ({
+      "Название": ruleName,
+      ...(ruleVal && typeof ruleVal === 'object' ? ruleVal : {})
+    }));
+    return { sectionName: 'Монтажные работы', rules: rulesList };
   }
   return { sectionName: 'Монтажные работы', rules: [] };
 }
@@ -799,13 +751,8 @@ function getCouplingRuleTiers(rulesData) {
   for (const r of (cableRules && cableRules.rules ? cableRules.rules : [])) {
     const rName = (r["Название"] || r.name || '').toLowerCase();
     if (rName.includes('муфт')) {
-      const wm = r["Работы и материалы"] || r["Работы"] || {};
-      if (Array.isArray(wm)) {
-        wm.forEach(it => {
-          const c = Number(it["МаксЖил"] || it["Количество жил"] || it.maxCores);
-          if (!isNaN(c) && c > 0) tiersSet.add(c);
-        });
-      } else if (wm && typeof wm === 'object') {
+      const wm = r["Работы"] || r["Работы и материалы"] || {};
+      if (wm && typeof wm === 'object' && !Array.isArray(wm)) {
         Object.keys(wm).forEach(k => {
           const num = parseFloat(k.trim().replace(',', '.'));
           if (!isNaN(num) && num > 0) {
@@ -838,16 +785,11 @@ function getCouplingInstallationWorkItems(tier, rulesData) {
   for (const r of cableRules.rules) {
     const rName = (r["Название"] || r.name || '').toLowerCase();
     if (rName.includes('муфт')) {
-      const wm = r["Работы и материалы"] || r["Работы"] || {};
+      const wm = r["Работы"] || r["Работы и материалы"] || {};
       const tierKey = String(tier);
       let tierItems = null;
-      if (wm[tierKey] !== undefined) {
+      if (wm && typeof wm === 'object' && wm[tierKey] !== undefined) {
         tierItems = Array.isArray(wm[tierKey]) ? wm[tierKey] : [wm[tierKey]];
-      } else if (Array.isArray(wm)) {
-        tierItems = wm.filter(it => {
-          const maxCores = Number(it["МаксЖил"] || it["Количество жил"] || it.maxCores);
-          return maxCores === Number(tier);
-        });
       }
 
       if (tierItems && tierItems.length > 0) {
@@ -1122,7 +1064,7 @@ function getCableWeightTier(weight, rule) {
 
 // Active rules state and cached standard rules loaded dynamically from works_rules.json
 let cachedDefaultRules = null;
-let currentWorksRules = { "Строительные работы": [], "Монтажные работы": [] };
+let currentWorksRules = { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} };
 
 // Initialize tooltips and event listeners
 document.addEventListener('DOMContentLoaded', () => {
@@ -2315,17 +2257,14 @@ function resetDataToEmpty() {
         <div class="d-inline-flex p-3 rounded-circle bg-primary-subtle text-primary mb-3">
           <i class='bx bx-cloud-upload' style="font-size: 2.75rem;"></i>
         </div>
-        <h4 class="mb-1 fw-bold fs-5">Загрузите свой файл или введите JSON</h4>
+        <h4 class="mb-1 fw-bold fs-5">Загрузите файл с исходными данными проекта</h4>
         <p class="text-muted fs-sm mb-4 mx-auto" style="max-width: 480px;">
-          Перетащите файл <code>.json</code> сюда, выберите файл на устройстве либо откройте редактор для ручной корректировки исходных данных.
+          Перетащите файл <code>.json</code> сюда либо нажмите кнопку для выбора на устройстве.
         </p>
         <div class="d-flex justify-content-center gap-2 flex-wrap">
           <label for="input" class="btn btn-primary px-3 mb-0 d-inline-flex align-items-center gap-2 shadow-sm" style="cursor: pointer;">
             <i class='bx bx-upload fs-5'></i>Загрузить свой файл (.json)
           </label>
-          <button type="button" id="dropZoneEditJsonBtn" class="btn btn-outline-primary px-3 d-inline-flex align-items-center gap-2">
-            <i class='bx bx-code-curly fs-5'></i>Редактировать JSON
-          </button>
           <button type="button" id="loadSampleBtn" class="btn btn-outline-secondary px-3 d-inline-flex align-items-center gap-2">
             <i class='bx bx-file fs-5'></i>Загрузить пример
           </button>
@@ -2334,8 +2273,6 @@ function resetDataToEmpty() {
     `;
     const btn = container.querySelector('#loadSampleBtn');
     if (btn) btn.addEventListener('click', loadSampleData);
-    const editBtn = container.querySelector('#dropZoneEditJsonBtn');
-    if (editBtn) editBtn.addEventListener('click', openJsonEditorModal);
   }
 
   // Clear results with polished empty states
@@ -2393,6 +2330,43 @@ function resetDataToEmpty() {
         <p class="small text-muted mb-0 px-2">Нажмите «Расчет», чтобы рассчитать объемы монтажных работ и кабельной продукции</p>
       </div>
     `;
+  }
+
+  // Hide equipment card and reset equipment badges and empty state
+  const equipmentCard = document.getElementById('equipmentCard');
+  if (equipmentCard) equipmentCard.classList.add('d-none');
+  const equipmentBadgeTotal = document.getElementById('equipmentBadgeTotal');
+  if (equipmentBadgeTotal) equipmentBadgeTotal.classList.add('d-none');
+  const equipmentMissingBadge = document.getElementById('equipmentMissingBadge');
+  if (equipmentMissingBadge) equipmentMissingBadge.classList.add('d-none');
+  const resultEquipmentStatement = document.getElementById('resultEquipmentStatement');
+  if (resultEquipmentStatement) {
+    resultEquipmentStatement.innerHTML = `
+      <div class="text-center py-4 py-md-5 text-muted">
+        <i class='bx bx-cube fs-1 mb-2 text-secondary opacity-50 d-block'></i>
+        <div class="fw-medium mb-1">Сводка по оборудованию</div>
+        <p class="small text-muted mb-0 px-2">Нажмите «Расчет», чтобы сгруппировать оборудование по маркам и способам установки</p>
+      </div>
+    `;
+  }
+
+  // Clear cached calculation states
+  window.lastCableWorksCalc = null;
+  window.lastTrenchWorksCalc = null;
+  window.lastEquipmentWorksCalc = null;
+
+  // Reset file input element to allow re-selecting the same file
+  const fileInput = document.getElementById('input');
+  if (fileInput) fileInput.value = '';
+
+  // Reset editable mode if active
+  if (isEditable) {
+    isEditable = false;
+    const canEditBtn = document.getElementById('canEdit');
+    if (canEditBtn) {
+      canEditBtn.classList.remove('btn-primary', 'text-white');
+      canEditBtn.classList.add('btn-outline-secondary');
+    }
   }
 
   showToast('Исходные данные сброшены', 'info', 'Сброс');
@@ -3768,12 +3742,8 @@ function syncCurrentRulesFromEditorIfValid() {
     const val = getWorksJsonEditorValue();
     if (!val) return;
     const parsed = JSON.parse(val);
-    if (parsed && typeof parsed === 'object') {
-      if (Array.isArray(parsed)) {
-        currentWorksRules = { "Строительные работы": parsed };
-      } else {
-        currentWorksRules = parsed;
-      }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      currentWorksRules = parsed;
     }
   } catch {
     // ignore syntax error while user is actively typing in JSON
@@ -3809,16 +3779,12 @@ async function handleRulesFileInput(e) {
   try {
     const fileText = await readFileAsTextWithEncoding(file);
     const parsed = JSON.parse(fileText);
-    if (!parsed || typeof parsed !== 'object') {
-      showToast('Неверный формат JSON: ожидается JSON-объект со структурой разделов или массив', 'error', 'Ошибка файла');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      showToast('Неверный формат JSON: ожидается JSON-объект со структурой разделов', 'error', 'Ошибка файла');
       return;
     }
 
-    if (Array.isArray(parsed)) {
-      currentWorksRules = { "Строительные работы": parsed };
-    } else {
-      currentWorksRules = parsed;
-    }
+    currentWorksRules = parsed;
 
     // Synchronize editor textarea and CodeMirror if modal exists
     setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
@@ -4339,81 +4305,35 @@ function renderCableCatalogModalContent() {
 // RENDER EQUIPMENT CATALOG TAB IN WORKS RULES MODAL
 // --------------------------------------------------------------------------
 
-// Helper to extract equipment list supporting arrays, objects, and alternative naming
-function getEquipmentRulesList(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object') return [];
-  const raw = rulesData["Оборудование"] !== undefined ? rulesData["Оборудование"] :
-              (rulesData["оборудование"] !== undefined ? rulesData["оборудование"] :
-              (rulesData["Equipment"] !== undefined ? rulesData["Equipment"] :
-              (rulesData["equipment"] !== undefined ? rulesData["equipment"] :
-              (rulesData["Справочник оборудования"] !== undefined ? rulesData["Справочник оборудования"] :
-              (rulesData["Напольное оборудование"] !== undefined ? rulesData["Напольное оборудование"] : null)))));
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === 'object' && raw !== null) {
-    return Object.entries(raw).map(([markKey, itemVal]) => {
-      if (itemVal && typeof itemVal === 'object') {
-        return {
-          "Марка": itemVal["Марка"] || itemVal.mark || markKey,
-          ...itemVal
-        };
-      }
-      return { "Марка": markKey };
-    });
+// Helper to get equipment rules dictionary where mark is the key
+function getEquipmentRulesDict(rulesData) {
+  if (!rulesData || typeof rulesData !== 'object') return {};
+  const raw = rulesData["Оборудование"];
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw;
   }
-  return [];
+  return {};
 }
 
-// Helper to extract equipment works object supporting both "Работы" and "Работы и материалы" and multiple structures
+// Helper to extract equipment list from dictionary
+function getEquipmentRulesList(rulesData) {
+  const dict = getEquipmentRulesDict(rulesData);
+  return Object.entries(dict).map(([markKey, itemVal]) => {
+    return {
+      "Марка": markKey,
+      ...(itemVal && typeof itemVal === 'object' ? itemVal : {})
+    };
+  });
+}
+
+// Helper to extract equipment works object
 function getEquipmentItemWorksObject(item) {
   if (!item || typeof item !== 'object') return {};
-
-  // If the item itself is a single work object with a name and unit
-  if ((item["Наименование"] || item.name) && !item["Работы"] && !item["Работы и материалы"] && !item["Способы установки"] && !item["Способ установки"]) {
-    return {
-      "Не указано": [item]
-    };
+  if (item["Работы"] && typeof item["Работы"] === 'object') {
+    return item["Работы"];
   }
-
-  const raw = item["Работы"] !== undefined ? item["Работы"] :
-              (item["Работы и материалы"] !== undefined ? item["Работы и материалы"] :
-              (item["Способы установки"] !== undefined ? item["Способы установки"] :
-              (item["Способ установки"] !== undefined ? item["Способ установки"] :
-              (item["Нормы"] !== undefined ? item["Нормы"] :
-              (item.works !== undefined ? item.works :
-              (item.methods !== undefined ? item.methods : item["Материалы"]))))));
-
-  if (!raw) {
-    // If item only declared materials or equipment at root level
-    const rootSubItems = [
-      ...(Array.isArray(item["Материалы"]) ? item["Материалы"] : []),
-      ...(Array.isArray(item["Оборудование"]) ? item["Оборудование"] : []),
-      ...(Array.isArray(item.materials) ? item.materials : []),
-      ...(Array.isArray(item.equipment) ? item.equipment : [])
-    ];
-    if (rootSubItems.length > 0) {
-      const defaultName = item["Марка"] || item.mark || 'оборудования';
-      return {
-        "Не указано": [
-          {
-            "Наименование": `Монтаж оборудования ${defaultName}`,
-            "Единицы измерения": item["Единицы измерения"] || item.unit || "шт",
-            "Формула": "КОЛИЧЕСТВО",
-            "Тип": "работа",
-            "Раздел": "Монтажные работы",
-            "Материалы": rootSubItems
-          }
-        ]
-      };
-    }
-    return {};
-  }
-
-  if (Array.isArray(raw)) {
-    return { "Не указано": raw };
-  }
-  if (typeof raw === 'object' && raw !== null) {
-    return raw;
+  if (item["Работы и материалы"] && typeof item["Работы и материалы"] === 'object') {
+    return item["Работы и материалы"];
   }
   return {};
 }
@@ -5850,7 +5770,7 @@ function buildEquipmentFormulaDisplay(formula, count, unit) {
 
 // Calculate works based on equipment summary and rules JSON ("Оборудование")
 function calculateWorksFromEquipment(equipmentSummary, rulesData) {
-  const { sectionName, rules } = getEquipmentRules(rulesData);
+  const eqDict = getEquipmentRulesDict(rulesData);
   const calculatedWorks = [];
   const missingInRules = [];
   const matchedEquipmentKeys = new Set();
@@ -5865,13 +5785,16 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
 
     if (count <= 0) return;
 
-    // Search rules directly by "Марка" or name
-    const matchingRule = rules.find(rule => {
-      const rMark = (rule["Марка"] || rule.mark || rule.marka || rule["Наименование"] || rule.name || rule.type || '').trim().toLowerCase();
-      return rMark === itemMark.toLowerCase();
-    });
+    // Lookup equipment directly by mark key from "Оборудование" object
+    let equipConfig = eqDict[itemMark];
+    if (!equipConfig) {
+      const foundKey = Object.keys(eqDict).find(k => k.trim().toLowerCase() === itemMark.toLowerCase());
+      if (foundKey) {
+        equipConfig = eqDict[foundKey];
+      }
+    }
 
-    const wm = matchingRule ? getEquipmentItemWorksObject(matchingRule) : null;
+    const wm = equipConfig ? getEquipmentItemWorksObject(equipConfig) : null;
     let ruleWorks = null;
 
     if (wm && typeof wm === 'object') {
@@ -5883,8 +5806,6 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           ruleWorks = wm[matchedKey];
         } else if (Array.isArray(wm["Не указано"])) {
           ruleWorks = wm["Не указано"];
-        } else if (Object.keys(wm).length > 0 && Array.isArray(wm[Object.keys(wm)[0]])) {
-          ruleWorks = wm[Object.keys(wm)[0]];
         }
       }
     }
@@ -7043,7 +6964,7 @@ function openWorksRulesModal(activeTab = 'editor') {
 
   try {
     initWorksJsonCodeMirror();
-    setWorksJsonEditorValue(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }, null, 2));
+    setWorksJsonEditorValue(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} }, null, 2));
     validateWorksJsonInput();
   } catch (err) {
     console.warn('Editor sync warning:', err);
@@ -7225,7 +7146,7 @@ function setupWorksRulesListeners() {
       }
 
       const targetKey = (currentObj && typeof currentObj === 'object' && !Array.isArray(currentObj))
-        ? (Array.isArray(currentObj["Монтажные работы"]) ? "Монтажные работы" : (Array.isArray(currentObj["Строительные работы"]) ? "Строительные работы" : (Object.keys(currentObj).find(k => Array.isArray(currentObj[k])) || "Монтажные работы")))
+        ? ((currentObj["Монтажные работы"] && typeof currentObj["Монтажные работы"] === 'object') ? "Монтажные работы" : "Строительные работы")
         : "Монтажные работы";
 
       const isMr = targetKey.toLowerCase().includes('монтаж');
@@ -7234,20 +7155,20 @@ function setupWorksRulesListeners() {
       // Determine unique rule name if already exists
       let sampleRuleName = baseRuleName;
       if (currentObj && typeof currentObj === 'object') {
-        const rulesList = Array.isArray(currentObj[targetKey]) ? currentObj[targetKey] : (Array.isArray(currentObj) ? currentObj : []);
+        const rulesMap = (currentObj[targetKey] && typeof currentObj[targetKey] === 'object' && !Array.isArray(currentObj[targetKey])) ? currentObj[targetKey] : {};
         let count = 1;
-        while (rulesList.some(r => (r["Название"] || r.name) === sampleRuleName)) {
+        while (rulesMap[sampleRuleName]) {
           count++;
           sampleRuleName = `${baseRuleName} (${count})`;
         }
       }
 
       const sample = isMr ? {
-        "Название": sampleRuleName,
-        "Работы и материалы": {
+        "Шаблон": `Прокладка кабеля массой 1 м, кг, до: {масса} (${sampleRuleName})`,
+        "Работы": {
           "1": [
             {
-              "Наименование": "Прокладка кабеля массой 1 м, кг, до: 1 (ГНБ)",
+              "Наименование": `Прокладка кабеля массой 1 м, кг, до: 1 (${sampleRuleName})`,
               "МаксВес": 1,
               "Единицы измерения": "м",
               "Формула": "ДЛИНА",
@@ -7257,7 +7178,7 @@ function setupWorksRulesListeners() {
           ],
           "2": [
             {
-              "Наименование": "Прокладка кабеля массой 1 м, кг, до: 2 (ГНБ)",
+              "Наименование": `Прокладка кабеля массой 1 м, кг, до: 2 (${sampleRuleName})`,
               "МаксВес": 2,
               "Единицы измерения": "м",
               "Формула": "ДЛИНА",
@@ -7267,7 +7188,7 @@ function setupWorksRulesListeners() {
           ],
           "3": [
             {
-              "Наименование": "Прокладка кабеля массой 1 м, кг, до: 3 (ГНБ)",
+              "Наименование": `Прокладка кабеля массой 1 м, кг, до: 3 (${sampleRuleName})`,
               "МаксВес": 3,
               "Единицы измерения": "м",
               "Формула": "ДЛИНА",
@@ -7277,7 +7198,7 @@ function setupWorksRulesListeners() {
           ],
           "оптический": [
             {
-              "Наименование": "Прокладка оптического кабеля (ГНБ)",
+              "Наименование": `Прокладка оптического кабеля (${sampleRuleName})`,
               "Категория": "Оптический кабель",
               "Единицы измерения": "м",
               "Формула": "ДЛИНА",
@@ -7287,26 +7208,30 @@ function setupWorksRulesListeners() {
           ]
         }
       } : {
-        "Название": sampleRuleName,
-        "Работы и материалы": [
+        "Работы": [
           {
             "Наименование": "Разработка грунта механизированным способом",
-            "Единицы измерения": "м3",
-            "Формула": "ДЛИНА",
+            "Единицы измерения": "м3 грунта",
+            "Формула": "0,36*ДЛИНА",
             "Тип": "работа",
-            "ОтображатьФормулу": true
+            "ОтображатьФормулу": true,
+            "Материалы": []
+          },
+          {
+            "Наименование": "Засыпка траншей механизированным способом",
+            "Единицы измерения": "м3 грунта",
+            "Формула": "0,36*ДЛИНА",
+            "Тип": "работа",
+            "ОтображатьФормулу": true,
+            "Материалы": []
           }
         ]
       };
 
-      if (Array.isArray(currentObj)) {
-        currentObj.push(sample);
-      } else if (currentObj && typeof currentObj === 'object') {
-        if (!Array.isArray(currentObj[targetKey])) {
-          currentObj[targetKey] = [];
-        }
-        currentObj[targetKey].push(sample);
+      if (!currentObj[targetKey] || typeof currentObj[targetKey] !== 'object' || Array.isArray(currentObj[targetKey])) {
+        currentObj[targetKey] = {};
       }
+      currentObj[targetKey][sampleRuleName] = sample;
 
       currentWorksRules = currentObj;
 
@@ -7349,11 +7274,11 @@ function setupWorksRulesListeners() {
       try {
         currentObj = JSON.parse(val);
       } catch {
-        currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }));
+        currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {} }));
       }
 
       if (!currentObj || typeof currentObj !== 'object' || Array.isArray(currentObj)) {
-        currentObj = { "Строительные работы": Array.isArray(currentObj) ? currentObj : [], "Справочник кабелей": {} };
+        currentObj = { "Строительные работы": {}, "Монтажные работы": {}, "Справочник кабелей": {} };
       }
 
       if (!currentObj["Справочник кабелей"] || typeof currentObj["Справочник кабелей"] !== 'object') {
@@ -7569,20 +7494,19 @@ function setupWorksRulesListeners() {
         currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || {}));
       }
 
-      if (!Array.isArray(currentObj["Оборудование"])) {
-        currentObj["Оборудование"] = [];
+      if (!currentObj["Оборудование"] || typeof currentObj["Оборудование"] !== 'object' || Array.isArray(currentObj["Оборудование"])) {
+        currentObj["Оборудование"] = {};
       }
 
       let sampleMark = "Шкаф-ШРУ-М";
       let counter = 1;
-      while (currentObj["Оборудование"].some(e => (e["Марка"] || '').toLowerCase() === sampleMark.toLowerCase())) {
+      while (currentObj["Оборудование"][sampleMark]) {
         counter++;
         sampleMark = `Шкаф-ШРУ-М-${counter}`;
       }
 
-      currentObj["Оборудование"].push({
-        "Марка": sampleMark,
-        "Работы и материалы": {
+      currentObj["Оборудование"][sampleMark] = {
+        "Работы": {
           "Не указано": [
             {
               "Наименование": `Установка оборудования типа ${sampleMark}`,
@@ -7590,19 +7514,21 @@ function setupWorksRulesListeners() {
               "Формула": "КОЛИЧЕСТВО",
               "Тип": "работа",
               "ОтображатьФормулу": true,
-              "Раздел": "Монтажные работы"
-            },
-            {
-              "Наименование": sampleMark,
-              "Единицы измерения": "шт",
-              "Формула": "КОЛИЧЕСТВО",
-              "Тип": "материал",
-              "ОтображатьФормулу": true,
-              "Раздел": "Монтажные работы"
+              "Раздел": "Монтажные работы",
+              "Материалы": [
+                {
+                  "Наименование": sampleMark,
+                  "Единицы измерения": "шт",
+                  "Формула": "КОЛИЧЕСТВО",
+                  "Тип": "оборудование",
+                  "ОтображатьФормулу": true,
+                  "Раздел": "Монтажные работы"
+                }
+              ]
             }
           ]
         }
-      });
+      };
 
       currentWorksRules = currentObj;
 
@@ -7682,16 +7608,12 @@ function setupWorksRulesListeners() {
       try {
         const val = getWorksJsonEditorValue();
         const parsed = JSON.parse(val);
-        if (!parsed || typeof parsed !== 'object') {
-          showToast('JSON должен быть объектом со структурой разделов или массивом', 'error', 'Неверный формат');
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          showToast('JSON должен быть объектом со структурой разделов', 'error', 'Неверный формат');
           return;
         }
 
-        if (Array.isArray(parsed)) {
-          currentWorksRules = { "Строительные работы": parsed };
-        } else {
-          currentWorksRules = parsed;
-        }
+        currentWorksRules = parsed;
 
         renderRulesModalContent();
 
@@ -7721,60 +7643,45 @@ function addMissingTrenchTypesToRules(missingList) {
   if (!missingList || missingList.length === 0) return;
 
   if (!currentWorksRules) {
-    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": [] }));
+    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": {} }));
   }
-  if (!Array.isArray(currentWorksRules["Строительные работы"])) {
-    currentWorksRules["Строительные работы"] = [];
+  if (!currentWorksRules["Строительные работы"] || typeof currentWorksRules["Строительные работы"] !== 'object' || Array.isArray(currentWorksRules["Строительные работы"])) {
+    currentWorksRules["Строительные работы"] = {};
   }
 
   let addedCount = 0;
   missingList.forEach(m => {
     const typeName = (typeof m === 'object' ? (m.ruleName || m.type) : m) || '';
     if (!typeName) return;
-    const targetRule = currentWorksRules["Строительные работы"].find(r => matchesRule(typeName, r["Название"] || r.name));
-    if (!targetRule) {
-      currentWorksRules["Строительные работы"].push({
-        "Название": typeName,
-        "Работы и материалы": [
+    const existingKey = Object.keys(currentWorksRules["Строительные работы"]).find(k => matchesRule(typeName, k));
+    if (!existingKey) {
+      currentWorksRules["Строительные работы"][typeName] = {
+        "Работы": [
           {
             "Наименование": `Разработка грунта в траншеях (${typeName})`,
             "Единицы измерения": "м3 грунта",
             "Формула": "0,36*ДЛИНА",
             "Тип": "работа",
-            "ОтображатьФормулу": true
+            "ОтображатьФормулу": true,
+            "Материалы": []
           },
           {
             "Наименование": `Засыпка траншей (${typeName})`,
             "Единицы измерения": "м3 грунта",
             "Формула": "0,36*ДЛИНА",
             "Тип": "работа",
-            "ОтображатьФормулу": true
+            "ОтображатьФормулу": true,
+            "Материалы": []
           }
         ]
-      });
-      addedCount++;
-    } else if (!targetRule["Работы и материалы"] || targetRule["Работы и материалы"].length === 0) {
-      targetRule["Работы и материалы"] = [
-        {
-          "Наименование": `Разработка грунта в траншеях (${targetRule["Название"] || typeName})`,
-          "Единицы измерения": "м3 грунта",
-          "Формула": "0,36*ДЛИНА",
-          "Тип": "работа",
-          "ОтображатьФормулу": true
-        },
-        {
-          "Наименование": `Засыпка траншей (${targetRule["Название"] || typeName})`,
-          "Единицы измерения": "м3 грунта",
-          "Формула": "0,36*ДЛИНА",
-          "Тип": "работа",
-          "ОтображатьФормулу": true
-        }
-      ];
+      };
       addedCount++;
     }
   });
 
   openWorksRulesModal('editor');
+  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+  validateWorksJsonInput();
   showToast(`Добавлено способов прокладки в раздел «Строительные работы»: ${addedCount}. Отредактируйте формулы и нажмите «Применить и пересчитать».`, 'info', 'Правила дополнены');
 }
 
@@ -7783,10 +7690,10 @@ function addMissingCableWaysToRules(missingList) {
   if (!missingList || missingList.length === 0) return;
 
   if (!currentWorksRules) {
-    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": [], "Монтажные работы": [] }));
+    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {} }));
   }
-  if (!Array.isArray(currentWorksRules["Монтажные работы"])) {
-    currentWorksRules["Монтажные работы"] = [];
+  if (!currentWorksRules["Монтажные работы"] || typeof currentWorksRules["Монтажные работы"] !== 'object' || Array.isArray(currentWorksRules["Монтажные работы"])) {
+    currentWorksRules["Монтажные работы"] = {};
   }
 
   const createDefaultMrObj = (typeName) => ({
@@ -7834,37 +7741,25 @@ function addMissingCableWaysToRules(missingList) {
 
   let addedCount = 0;
   missingList.forEach(m => {
-    if (m && typeof m === 'object' && m.missingType === 'optical') {
-      const targetRule = currentWorksRules["Монтажные работы"].find(r => matchesRule(m.ruleName, r["Название"] || r.name));
-      if (targetRule) {
-        if (!targetRule["Работы и материалы"] || typeof targetRule["Работы и материалы"] !== 'object') {
-          targetRule["Работы и материалы"] = {};
-        }
-        if (Array.isArray(targetRule["Работы и материалы"])) {
-          // Convert legacy array to object
-          const oldArr = targetRule["Работы и материалы"];
-          targetRule["Работы и материалы"] = {};
-          oldArr.forEach(w => {
-            const th = extractWeightThreshold(w);
-            const k = th !== null ? String(th) : "1";
-            if (!targetRule["Работы и материалы"][k]) targetRule["Работы и материалы"][k] = [];
-            targetRule["Работы и материалы"][k].push(w);
-          });
-        }
-        const wmObj = targetRule["Работы и материалы"];
-        const hasOpt = Object.keys(wmObj).some(k => {
-          if (k.toLowerCase().includes('оптич') || k.toLowerCase().includes('волс')) return true;
-          const arr = wmObj[k];
-          return Array.isArray(arr) && arr.some(w => {
-            const cat = String(w["Категория"] || w.category || '').toLowerCase();
-            const nm = String(w["Наименование"] || w.name || '').toLowerCase();
-            return cat.includes('оптич') || nm.includes('оптическ');
-          });
-        });
-        if (!hasOpt) {
-          wmObj["оптический"] = [
+    const typeName = (typeof m === 'object' ? (m.ruleName || m.type) : m) || '';
+    if (!typeName) return;
+    const existingKey = Object.keys(currentWorksRules["Монтажные работы"]).find(k => matchesRule(typeName, k));
+    if (!existingKey) {
+      currentWorksRules["Монтажные работы"][typeName] = {
+        "Шаблон": `Прокладка кабеля массой 1 м, кг, до: {масса} (${typeName})`,
+        "Работы": createDefaultMrObj(typeName)
+      };
+      addedCount++;
+    } else {
+      const targetRule = currentWorksRules["Монтажные работы"][existingKey];
+      if (!targetRule["Работы"] || typeof targetRule["Работы"] !== 'object') {
+        targetRule["Работы"] = createDefaultMrObj(existingKey);
+        addedCount++;
+      } else if (m && typeof m === 'object' && m.missingType === 'optical') {
+        if (!targetRule["Работы"]["оптический"]) {
+          targetRule["Работы"]["оптический"] = [
             {
-              "Наименование": `Прокладка оптического кабеля (${targetRule["Название"] || m.ruleName})`,
+              "Наименование": `Прокладка оптического кабеля (${existingKey})`,
               "Единицы измерения": "м",
               "Категория": "Оптический кабель",
               "Формула": "ДЛИНА",
@@ -7874,32 +7769,14 @@ function addMissingCableWaysToRules(missingList) {
           ];
           addedCount++;
         }
-      }
-    } else if (m && typeof m === 'object' && m.missingType === 'tier') {
-      const targetRule = currentWorksRules["Монтажные работы"].find(r => matchesRule(m.ruleName, r["Название"] || r.name));
-      if (targetRule) {
-        if (!targetRule["Работы и материалы"] || typeof targetRule["Работы и материалы"] !== 'object') {
-          targetRule["Работы и материалы"] = {};
-        }
-        if (Array.isArray(targetRule["Работы и материалы"])) {
-          const oldArr = targetRule["Работы и материалы"];
-          targetRule["Работы и материалы"] = {};
-          oldArr.forEach(w => {
-            const th = extractWeightThreshold(w);
-            const k = th !== null ? String(th) : "1";
-            if (!targetRule["Работы и материалы"][k]) targetRule["Работы и материалы"][k] = [];
-            targetRule["Работы и материалы"][k].push(w);
-          });
-        }
-        const wmObj = targetRule["Работы и материалы"];
+      } else if (m && typeof m === 'object' && m.missingType === 'tier') {
         const tierKey = String(m.tierMax || 1);
-        const hasTier = wmObj[tierKey] && wmObj[tierKey].length > 0;
-        if (!hasTier) {
-          wmObj[tierKey] = [
+        if (!targetRule["Работы"][tierKey]) {
+          targetRule["Работы"][tierKey] = [
             {
-              "Наименование": `Прокладка кабеля массой 1 м, кг, до: ${tierKey} (${targetRule["Название"] || m.ruleName})`,
+              "Наименование": `Прокладка кабеля массой 1 м, кг, до: ${tierKey} (${existingKey})`,
               "Единицы измерения": "м",
-              "МаксВес": Number(tierKey) || m.tierMax || 1,
+              "МаксВес": Number(tierKey) || 1,
               "Формула": "ДЛИНА",
               "Тип": "работа",
               "ОтображатьФормулу": true
@@ -7907,31 +7784,16 @@ function addMissingCableWaysToRules(missingList) {
           ];
           addedCount++;
         }
-      }
-    } else if (m && typeof m === 'object' && m.missingType === 'empty_rule') {
-      const targetRule = currentWorksRules["Монтажные работы"].find(r => matchesRule(m.ruleName, r["Название"] || r.name));
-      if (targetRule) {
-        targetRule["Работы и материалы"] = createDefaultMrObj(targetRule["Название"] || m.ruleName);
-        addedCount++;
-      }
-    } else {
-      const typeName = (typeof m === 'object' ? (m.ruleName || m.type) : m) || '';
-      if (!typeName) return;
-      const targetRule = currentWorksRules["Монтажные работы"].find(r => matchesRule(typeName, r["Название"] || r.name));
-      if (!targetRule) {
-        currentWorksRules["Монтажные работы"].push({
-          "Название": typeName,
-          "Работы и материалы": createDefaultMrObj(typeName)
-        });
-        addedCount++;
-      } else if (!targetRule["Работы и материалы"] || (Array.isArray(targetRule["Работы и материалы"]) && targetRule["Работы и материалы"].length === 0) || Object.keys(targetRule["Работы и материалы"]).length === 0) {
-        targetRule["Работы и материалы"] = createDefaultMrObj(typeName);
+      } else if (m && typeof m === 'object' && m.missingType === 'empty_rule') {
+        targetRule["Работы"] = createDefaultMrObj(existingKey);
         addedCount++;
       }
     }
   });
 
   openWorksRulesModal('editor');
+  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+  validateWorksJsonInput();
   showToast(`Добавлено позиций в раздел «Монтажные работы»: ${addedCount}. Отредактируйте наименования/формулы и нажмите «Применить и пересчитать».`, 'info', 'Правила дополнены');
 }
 
@@ -8002,10 +7864,10 @@ function addMissingEquipmentToRules(missingList) {
   }
 
   if (!currentWorksRules) {
-    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": [], "Монтажные работы": [], "Оборудование": [] }));
+    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} }));
   }
-  if (!currentWorksRules["Оборудование"] || !Array.isArray(currentWorksRules["Оборудование"])) {
-    currentWorksRules["Оборудование"] = [];
+  if (!currentWorksRules["Оборудование"] || typeof currentWorksRules["Оборудование"] !== 'object' || Array.isArray(currentWorksRules["Оборудование"])) {
+    currentWorksRules["Оборудование"] = {};
   }
 
   let addedCount = 0;
@@ -8028,33 +7890,47 @@ function addMissingEquipmentToRules(missingList) {
         "Наименование": `${mark}`,
         "Единицы измерения": "шт",
         "Формула": "КОЛИЧЕСТВО",
-        "Тип": "материал",
+        "Тип": "оборудование",
         "ОтображатьФормулу": true,
         "Раздел": "Монтажные работы"
       }
     ];
 
-    let existingRule = currentWorksRules["Оборудование"].find(r => (r["Марка"] || '').trim().toLowerCase() === mark.toLowerCase());
+    let existingEntry = currentWorksRules["Оборудование"][mark];
+    if (!existingEntry) {
+      const foundKey = Object.keys(currentWorksRules["Оборудование"]).find(k => k.trim().toLowerCase() === mark.toLowerCase());
+      if (foundKey) {
+        existingEntry = currentWorksRules["Оборудование"][foundKey];
+      }
+    }
 
-    if (existingRule) {
-      if (!existingRule["Работы и материалы"][method]) {
-        existingRule["Работы и материалы"][method] = newWorksForMethod;
+    if (existingEntry) {
+      if (!existingEntry["Работы"] || typeof existingEntry["Работы"] !== 'object') {
+        existingEntry["Работы"] = {};
+      }
+      if (!existingEntry["Работы"][method]) {
+        existingEntry["Работы"][method] = newWorksForMethod;
         addedCount++;
         addedMarks.push(`${mark} [${method}]`);
       }
     } else {
-      currentWorksRules["Оборудование"].push({
-        "Марка": mark,
-        "Работы и материалы": {
+      currentWorksRules["Оборудование"][mark] = {
+        "Работы": {
           [method]: newWorksForMethod
         }
-      });
+      };
       addedCount++;
       addedMarks.push(`${mark} [${method}]`);
     }
   });
 
   openWorksRulesModal('editor');
+  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+  validateWorksJsonInput();
+  if (addedMarks.length > 0) {
+    const firstMark = addedMarks[0].split(' ')[0];
+    highlightAndScrollToJsonNode(firstMark, true);
+  }
   showToast(
     `В раздел «Оборудование» добавлены заготовки для ${addedCount} позиций: ${addedMarks.join(', ')}. Скорректируйте наименования/формулы и сохраните JSON.`,
     'info',
