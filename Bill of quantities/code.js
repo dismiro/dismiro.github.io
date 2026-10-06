@@ -4339,14 +4339,91 @@ function renderCableCatalogModalContent() {
 // RENDER EQUIPMENT CATALOG TAB IN WORKS RULES MODAL
 // --------------------------------------------------------------------------
 
+// Helper to extract equipment list supporting arrays, objects, and alternative naming
+function getEquipmentRulesList(rulesData) {
+  if (!rulesData || typeof rulesData !== 'object') return [];
+  const raw = rulesData["Оборудование"] !== undefined ? rulesData["Оборудование"] :
+              (rulesData["оборудование"] !== undefined ? rulesData["оборудование"] :
+              (rulesData["Equipment"] !== undefined ? rulesData["Equipment"] :
+              (rulesData["equipment"] !== undefined ? rulesData["equipment"] :
+              (rulesData["Справочник оборудования"] !== undefined ? rulesData["Справочник оборудования"] :
+              (rulesData["Напольное оборудование"] !== undefined ? rulesData["Напольное оборудование"] : null)))));
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'object' && raw !== null) {
+    return Object.entries(raw).map(([markKey, itemVal]) => {
+      if (itemVal && typeof itemVal === 'object') {
+        return {
+          "Марка": itemVal["Марка"] || itemVal.mark || markKey,
+          ...itemVal
+        };
+      }
+      return { "Марка": markKey };
+    });
+  }
+  return [];
+}
+
+// Helper to extract equipment works object supporting both "Работы" and "Работы и материалы" and multiple structures
+function getEquipmentItemWorksObject(item) {
+  if (!item || typeof item !== 'object') return {};
+
+  // If the item itself is a single work object with a name and unit
+  if ((item["Наименование"] || item.name) && !item["Работы"] && !item["Работы и материалы"] && !item["Способы установки"] && !item["Способ установки"]) {
+    return {
+      "Не указано": [item]
+    };
+  }
+
+  const raw = item["Работы"] !== undefined ? item["Работы"] :
+              (item["Работы и материалы"] !== undefined ? item["Работы и материалы"] :
+              (item["Способы установки"] !== undefined ? item["Способы установки"] :
+              (item["Способ установки"] !== undefined ? item["Способ установки"] :
+              (item["Нормы"] !== undefined ? item["Нормы"] :
+              (item.works !== undefined ? item.works :
+              (item.methods !== undefined ? item.methods : item["Материалы"]))))));
+
+  if (!raw) {
+    // If item only declared materials or equipment at root level
+    const rootSubItems = [
+      ...(Array.isArray(item["Материалы"]) ? item["Материалы"] : []),
+      ...(Array.isArray(item["Оборудование"]) ? item["Оборудование"] : []),
+      ...(Array.isArray(item.materials) ? item.materials : []),
+      ...(Array.isArray(item.equipment) ? item.equipment : [])
+    ];
+    if (rootSubItems.length > 0) {
+      const defaultName = item["Марка"] || item.mark || 'оборудования';
+      return {
+        "Не указано": [
+          {
+            "Наименование": `Монтаж оборудования ${defaultName}`,
+            "Единицы измерения": item["Единицы измерения"] || item.unit || "шт",
+            "Формула": "КОЛИЧЕСТВО",
+            "Тип": "работа",
+            "Раздел": "Монтажные работы",
+            "Материалы": rootSubItems
+          }
+        ]
+      };
+    }
+    return {};
+  }
+
+  if (Array.isArray(raw)) {
+    return { "Не указано": raw };
+  }
+  if (typeof raw === 'object' && raw !== null) {
+    return raw;
+  }
+  return {};
+}
+
 function renderEquipmentCatalogModalContent() {
   const container = document.getElementById('equipmentCatalogContainer');
   const tabBadge = document.getElementById('tabWorksEquipmentCountBadge');
   if (!container) return;
 
-  const equipmentList = (currentWorksRules && Array.isArray(currentWorksRules["Оборудование"]))
-    ? currentWorksRules["Оборудование"]
-    : [];
+  const equipmentList = getEquipmentRulesList(currentWorksRules);
   const totalEquipmentCount = equipmentList.length;
 
   if (tabBadge) {
@@ -4364,18 +4441,33 @@ function renderEquipmentCatalogModalContent() {
 
   const filtered = equipmentList.filter(item => {
     if (!query) return true;
-    const mark = (item["Марка"] || '').toLowerCase();
-    const wm = (item["Работы и материалы"] && typeof item["Работы и материалы"] === 'object')
-      ? item["Работы и материалы"]
-      : {};
+    const mark = (item["Марка"] || item.mark || '').toLowerCase();
+    const desc = (item["Полное наименование"] || item["Описание"] || item["Название"] || item.description || '').toLowerCase();
+    const wm = getEquipmentItemWorksObject(item);
     const methods = Object.keys(wm).join(' ').toLowerCase();
     let worksNames = '';
     Object.values(wm).forEach(wList => {
-      if (Array.isArray(wList)) {
-        worksNames += ' ' + wList.map(w => w["Наименование"] || '').join(' ');
-      }
+      const arr = Array.isArray(wList) ? wList : (wList ? [wList] : []);
+      arr.forEach(w => {
+        if (typeof w === 'string') {
+          worksNames += ' ' + w;
+          return;
+        }
+        worksNames += ' ' + (w["Наименование"] || w.name || '');
+        const nested = [
+          ...(Array.isArray(w["Материалы"]) ? w["Материалы"] : []),
+          ...(Array.isArray(w["Оборудование"]) ? w["Оборудование"] : []),
+          ...(Array.isArray(w["Ресурсы"]) ? w["Ресурсы"] : []),
+          ...(Array.isArray(w.materials) ? w.materials : []),
+          ...(Array.isArray(w.equipment) ? w.equipment : [])
+        ];
+        nested.forEach(n => {
+          if (typeof n === 'string') worksNames += ' ' + n;
+          else worksNames += ' ' + (n["Наименование"] || n.name || '');
+        });
+      });
     });
-    const haystack = `${mark} ${methods} ${worksNames}`.toLowerCase();
+    const haystack = `${mark} ${desc} ${methods} ${worksNames}`.toLowerCase();
     return haystack.includes(query);
   });
 
@@ -4396,38 +4488,67 @@ function renderEquipmentCatalogModalContent() {
 
   let totalMethodsAcrossAll = 0;
   let totalWorksAcrossAll = 0;
+  let totalSubItemsAcrossAll = 0;
+
   equipmentList.forEach(item => {
-    const wm = (item["Работы и материалы"] && typeof item["Работы и материалы"] === 'object')
-      ? item["Работы и материалы"]
-      : {};
+    const wm = getEquipmentItemWorksObject(item);
     const mKeys = Object.keys(wm);
     totalMethodsAcrossAll += mKeys.length;
     mKeys.forEach(mk => {
-      if (Array.isArray(wm[mk])) totalWorksAcrossAll += wm[mk].length;
+      const wList = wm[mk];
+      const arr = Array.isArray(wList) ? wList : (wList ? [wList] : []);
+      totalWorksAcrossAll += arr.length;
+      arr.forEach(w => {
+        if (w && typeof w === 'object') {
+          const nested = [
+            ...(Array.isArray(w["Материалы"]) ? w["Материалы"] : []),
+            ...(Array.isArray(w["Оборудование"]) ? w["Оборудование"] : []),
+            ...(Array.isArray(w["Ресурсы"]) ? w["Ресурсы"] : []),
+            ...(Array.isArray(w.materials) ? w.materials : []),
+            ...(Array.isArray(w.equipment) ? w.equipment : [])
+          ];
+          totalSubItemsAcrossAll += nested.length;
+        }
+      });
     });
   });
 
   let cardsHtml = '';
   filtered.forEach((item, idx) => {
-    const mark = (item["Марка"] || 'Без марки').trim();
-    const wm = (item["Работы и материалы"] && typeof item["Работы и материалы"] === 'object')
-      ? item["Работы и материалы"]
-      : {};
+    const mark = (item["Марка"] || item.mark || 'Без марки').trim();
+    const fullDesc = (item["Полное наименование"] || item["Описание"] || item["Название"] || item.description || '').trim();
+    const unitTop = item["Единицы измерения"] || item.unit || '';
+    const noteTop = item["Примечание"] || item["Комментарий"] || item.comment || '';
+    const wm = getEquipmentItemWorksObject(item);
     const methodEntries = Object.entries(wm);
+
+    let cardWorksCount = 0;
+    let cardSubCount = 0;
 
     let methodsHtml = '';
     methodEntries.forEach(([methodName, worksArr]) => {
-      const worksList = Array.isArray(worksArr) ? worksArr : [];
+      const worksList = Array.isArray(worksArr) ? worksArr : (worksArr ? [worksArr] : []);
+      cardWorksCount += worksList.length;
       let worksItemsHtml = '';
 
       worksList.forEach((work, wIdx) => {
+        if (typeof work === 'string') {
+          worksItemsHtml += `
+            <div class="p-2 rounded bg-body border mb-1 small">
+              <div class="fw-semibold text-body">${wIdx + 1}. ${escapeHtml(work)}</div>
+            </div>
+          `;
+          return;
+        }
+
         const rawType = (work["Тип"] || work.type || 'работа').trim().toLowerCase();
-        const isEquip = rawType === 'оборудование';
-        const isMat = rawType === 'материал';
-        const formula = work["Формула"] || 'КОЛИЧЕСТВО';
-        const unit = work["Единицы измерения"] || 'шт';
-        const section = work["Раздел"] || 'Монтажные работы';
-        const showFormula = shouldShowFormula(work);
+        const isEquip = rawType === 'оборудование' || rawType === 'equipment';
+        const isMat = rawType === 'материал' || rawType === 'material';
+        const formula = work["Формула"] || work.formula || 'КОЛИЧЕСТВО';
+        const unit = work["Единицы измерения"] || work.unit || unitTop || 'шт';
+        const section = work["Раздел"] || work.section || 'Монтажные работы';
+        const showFormula = (work["ОтображатьФормулу"] !== undefined) ? shouldShowFormula(work) : true;
+        const workComment = work["Комментарий"] || work.comment || '';
 
         let typeBadgeClass = 'bg-primary-subtle text-primary border';
         if (isEquip) typeBadgeClass = 'bg-warning-subtle text-warning-emphasis border';
@@ -4436,54 +4557,76 @@ function renderEquipmentCatalogModalContent() {
         let subItemsHtml = '';
         const nested = [
           ...(Array.isArray(work["Материалы"]) ? work["Материалы"] : []),
-          ...(Array.isArray(work["Оборудование"]) ? work["Оборудование"] : [])
+          ...(Array.isArray(work["Оборудование"]) ? work["Оборудование"] : []),
+          ...(Array.isArray(work["Ресурсы"]) ? work["Ресурсы"] : []),
+          ...(Array.isArray(work.materials) ? work.materials : []),
+          ...(Array.isArray(work.equipment) ? work.equipment : [])
         ];
+        cardSubCount += nested.length;
+
         nested.forEach((sub, sIdx) => {
-          const subRawType = (sub["Тип"] || sub.type || 'материал').trim().toLowerCase();
-          const subIsEquip = subRawType === 'оборудование';
-          const subFormula = sub["Формула"] || 'КОЛИЧЕСТВО';
-          const subUnit = sub["Единицы измерения"] || 'шт';
-          const subSection = sub["Раздел"] || section;
-          const subShowFormula = shouldShowFormula(sub);
+          if (typeof sub === 'string') {
+            subItemsHtml += `
+              <div class="p-2 rounded bg-body border mb-1 ms-3 small">
+                <div class="text-body"><span class="text-muted me-1 fw-bold">↳</span>${wIdx + 1}.${sIdx + 1}. ${escapeHtml(sub)}</div>
+              </div>
+            `;
+            return;
+          }
+
+          const isDirectEquip = Array.isArray(work["Оборудование"]) && work["Оборудование"].includes(sub);
+          const subRawType = (sub["Тип"] || sub.type || (isDirectEquip ? 'оборудование' : 'материал')).trim().toLowerCase();
+          const subIsEquip = subRawType === 'оборудование' || subRawType === 'equipment';
+          const subFormula = sub["Формула"] || sub.formula || 'КОЛИЧЕСТВО';
+          const subUnit = sub["Единицы измерения"] || sub.unit || 'шт';
+          const subSection = sub["Раздел"] || sub.section || section;
+          const subShowFormula = (sub["ОтображатьФормулу"] !== undefined) ? shouldShowFormula(sub) : true;
+          const subComment = sub["Комментарий"] || sub.comment || '';
 
           let subTypeBadgeClass = 'badge-material';
           if (subIsEquip) subTypeBadgeClass = 'bg-warning-subtle text-warning-emphasis border';
           else if (subRawType === 'работа') subTypeBadgeClass = 'bg-primary-subtle text-primary border';
 
+          const typeTitle = sub["Тип"] || (subIsEquip ? 'оборудование' : 'материал');
+
           subItemsHtml += `
             <div class="p-2 rounded bg-body border mb-1 ms-3 small">
               <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
                 <div class="fw-medium text-body">
-                  <span class="text-muted me-1 fw-bold">↳</span>${wIdx + 1}.${sIdx + 1}. ${escapeHtml(sub["Наименование"] || '')}
+                  <span class="text-muted me-1 fw-bold">↳</span>${wIdx + 1}.${sIdx + 1}. ${escapeHtml(sub["Наименование"] || sub.name || '')}
                 </div>
-                <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap">${escapeHtml(subUnit)}</span>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap font-monospace">${escapeHtml(subUnit)}</span>
               </div>
               <div class="d-flex align-items-center gap-1 text-muted fs-xs flex-wrap">
                 <span class="fw-medium">Формула:</span>
                 <code class="px-1 py-0 bg-body-tertiary border rounded text-primary">${escapeHtml(subFormula)}</code>
                 ${subShowFormula ? '<span class="badge bg-light text-muted border ms-1" style="font-size: 0.68rem;"><i class="bx bx-show me-0_5"></i>в формулах</span>' : ''}
                 <span class="badge bg-light text-secondary border ms-1" style="font-size: 0.68rem;">Раздел: ${escapeHtml(subSection)}</span>
-                <span class="badge ${subTypeBadgeClass} ms-auto">${escapeHtml(sub["Тип"] || 'материал')}</span>
+                <span class="badge ${subTypeBadgeClass} ms-auto"><i class='bx ${subIsEquip ? 'bx-cube' : 'bx-layer'} me-0_5'></i>${escapeHtml(typeTitle)}</span>
               </div>
+              ${subComment ? `<div class="text-muted fs-xs mt-1 fst-italic"><i class='bx bx-comment-detail me-0_5'></i>${escapeHtml(subComment)}</div>` : ''}
             </div>
           `;
         });
+
+        const mainTypeTitle = work["Тип"] || (isEquip ? 'оборудование' : 'работа');
 
         worksItemsHtml += `
           <div class="p-2 rounded bg-body border mb-1 small">
             <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
               <div class="fw-semibold text-body">
-                ${wIdx + 1}. ${escapeHtml(work["Наименование"] || '')}
+                ${wIdx + 1}. ${escapeHtml(work["Наименование"] || work.name || '')}
               </div>
-              <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap">${escapeHtml(unit)}</span>
+              <span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap font-monospace">${escapeHtml(unit)}</span>
             </div>
             <div class="d-flex align-items-center gap-1 text-muted fs-xs flex-wrap">
               <span class="fw-medium">Формула:</span>
               <code class="px-1 py-0 bg-body-tertiary border rounded text-primary">${escapeHtml(formula)}</code>
               ${showFormula ? '<span class="badge bg-light text-muted border ms-1" style="font-size: 0.68rem;"><i class="bx bx-show me-0_5"></i>в формулах</span>' : ''}
               <span class="badge bg-light text-secondary border ms-1" style="font-size: 0.68rem;">Раздел: ${escapeHtml(section)}</span>
-              <span class="badge ${typeBadgeClass} ms-auto">${escapeHtml(work["Тип"] || 'работа')}</span>
+              <span class="badge ${typeBadgeClass} ms-auto"><i class='bx ${isEquip ? 'bx-cube' : (isMat ? 'bx-layer' : 'bx-wrench')} me-0_5'></i>${escapeHtml(mainTypeTitle)}</span>
             </div>
+            ${workComment ? `<div class="text-muted fs-xs mt-1 fst-italic"><i class='bx bx-comment-detail me-0_5'></i>${escapeHtml(workComment)}</div>` : ''}
           </div>
           ${subItemsHtml}
         `;
@@ -4505,15 +4648,23 @@ function renderEquipmentCatalogModalContent() {
     cardsHtml += `
       <div class="card border shadow-sm mb-3">
         <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <div class="fw-bold d-flex align-items-center gap-2">
+          <div class="fw-bold d-flex align-items-center gap-2 flex-wrap">
             <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-monospace">${idx + 1}</span>
             <i class="bx bx-cube text-warning fs-5"></i>
             <span class="fs-6 font-monospace">${escapeHtml(mark)}</span>
+            ${fullDesc ? `<span class="text-muted small fw-normal ms-1">(${escapeHtml(fullDesc)})</span>` : ''}
+            ${unitTop ? `<span class="badge bg-body text-body border font-monospace ms-1" style="font-size: 0.72rem;">${escapeHtml(unitTop)}</span>` : ''}
           </div>
           <div class="d-flex align-items-center gap-2">
             <span class="badge bg-primary-subtle text-primary border">${methodEntries.length} способов установки</span>
+            ${cardWorksCount > 0 ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border">${cardWorksCount} норм</span>` : ''}
+            ${cardSubCount > 0 ? `<span class="badge bg-warning-subtle text-warning-emphasis border">${cardSubCount} мат./обор.</span>` : ''}
+            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5" onclick="highlightAndScrollToJsonNode('${escapeHtml(mark)}', true)" title="Перейти к позиции в редакторе JSON">
+              <i class='bx bx-code-alt me-0_5'></i>JSON
+            </button>
           </div>
         </div>
+        ${noteTop ? `<div class="px-3 pt-2 pb-0 text-muted small fst-italic"><i class='bx bx-info-circle me-1'></i>${escapeHtml(noteTop)}</div>` : ''}
         <div class="card-body p-3">
           ${methodsHtml || '<div class="text-muted small">Способы установки не заданы</div>'}
         </div>
@@ -4523,7 +4674,7 @@ function renderEquipmentCatalogModalContent() {
 
   container.innerHTML = `
     <div class="small text-muted mb-2 d-flex justify-content-between align-items-center flex-wrap gap-1">
-      <div>Показано: <strong>${filtered.length}</strong> из ${totalEquipmentCount} позиций оборудования (${totalMethodsAcrossAll} способов установки, ${totalWorksAcrossAll} норм в JSON)</div>
+      <div>Показано: <strong>${filtered.length}</strong> из ${totalEquipmentCount} позиций оборудования (${totalMethodsAcrossAll} способов установки, ${totalWorksAcrossAll} норм, ${totalSubItemsAcrossAll} вложенных мат./обор. в JSON)</div>
       <div class="fs-xs text-muted">
         <i class='bx bx-info-circle me-1'></i>Для добавления или корректировки параметров перейдите во вкладку <strong>«Редактор JSON»</strong>
       </div>
@@ -5657,10 +5808,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 // --------------------------------------------------------------------------
 
 function getEquipmentRules(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object' || !Array.isArray(rulesData['Оборудование'])) {
-    return { sectionName: 'Оборудование', rules: [] };
-  }
-  return { sectionName: 'Оборудование', rules: rulesData['Оборудование'] };
+  const rules = getEquipmentRulesList(rulesData);
+  return { sectionName: 'Оборудование', rules };
 }
 
 function evaluateEquipmentFormula(formula, count) {
@@ -5716,21 +5865,63 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
 
     if (count <= 0) return;
 
-    // Search rules directly by "Марка"
-    const matchingRule = rules.find(rule => (rule["Марка"] || '').trim().toLowerCase() === itemMark.toLowerCase());
-    const wm = matchingRule ? (matchingRule["Работы"] || matchingRule["Работы и материалы"]) : null;
-    const ruleWorks = (wm && typeof wm === 'object') ? (wm[itemMethod] || wm["Не указано"] || wm[Object.keys(wm)[0]]) : null;
+    // Search rules directly by "Марка" or name
+    const matchingRule = rules.find(rule => {
+      const rMark = (rule["Марка"] || rule.mark || rule.marka || rule["Наименование"] || rule.name || rule.type || '').trim().toLowerCase();
+      return rMark === itemMark.toLowerCase();
+    });
+
+    const wm = matchingRule ? getEquipmentItemWorksObject(matchingRule) : null;
+    let ruleWorks = null;
+
+    if (wm && typeof wm === 'object') {
+      if (Array.isArray(wm[itemMethod])) {
+        ruleWorks = wm[itemMethod];
+      } else {
+        const matchedKey = Object.keys(wm).find(k => k.trim().toLowerCase() === itemMethod.toLowerCase());
+        if (matchedKey && Array.isArray(wm[matchedKey])) {
+          ruleWorks = wm[matchedKey];
+        } else if (Array.isArray(wm["Не указано"])) {
+          ruleWorks = wm["Не указано"];
+        } else if (Object.keys(wm).length > 0 && Array.isArray(wm[Object.keys(wm)[0]])) {
+          ruleWorks = wm[Object.keys(wm)[0]];
+        }
+      }
+    }
 
     if (Array.isArray(ruleWorks) && ruleWorks.length > 0) {
       matchedEquipmentKeys.add(key);
 
       const primaryWork = ruleWorks.find(w => {
+        if (typeof w === 'string') return true;
         const t = (w["Тип"] || w.type || '').trim().toLowerCase();
         return t !== 'материал' && t !== 'оборудование';
       }) || ruleWorks[0];
-      const primaryWorkTitle = (primaryWork["Наименование"] || primaryWork.name || `Монтаж оборудования ${itemMark}`).trim();
+      const primaryWorkTitle = (typeof primaryWork === 'string' ? primaryWork : (primaryWork["Наименование"] || primaryWork.name || `Монтаж оборудования ${itemMark}`)).trim();
 
       ruleWorks.forEach(work => {
+        if (typeof work === 'string') {
+          calculatedWorks.push({
+            name: work.trim(),
+            unit: 'шт',
+            volume: count,
+            volumeFormatted: String(count),
+            formula: 'КОЛИЧЕСТВО',
+            formulaDisplay: `${count} шт`,
+            showFormula: true,
+            mark: itemMark,
+            method: itemMethod,
+            equipmentType: itemMark,
+            section: 'Монтажные работы',
+            type: 'работа',
+            parentWorkName: undefined,
+            count: count,
+            handles: handles,
+            comment: handles.length > 0 ? `handle: ${handles.join(', ')}` : ''
+          });
+          return;
+        }
+
         const rawWorkType = (work["Тип"] || work.type || '').trim().toLowerCase();
         let determinedWorkType = 'работа';
         if (rawWorkType === 'оборудование' || rawWorkType === 'equipment') {
@@ -5770,10 +5961,36 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
         // Process materials and equipment declared under this work
         const declaredSubItems = [
           ...(Array.isArray(work["Материалы"]) ? work["Материалы"] : []),
-          ...(Array.isArray(work["Оборудование"]) ? work["Оборудование"] : [])
+          ...(Array.isArray(work["Оборудование"]) ? work["Оборудование"] : []),
+          ...(Array.isArray(work["Ресурсы"]) ? work["Ресурсы"] : []),
+          ...(Array.isArray(work.materials) ? work.materials : []),
+          ...(Array.isArray(work.equipment) ? work.equipment : [])
         ];
         declaredSubItems.forEach(mat => {
-          const rawMatType = (mat["Тип"] || mat.type || (Array.isArray(work["Оборудование"]) && work["Оборудование"].includes(mat) ? 'оборудование' : 'материал')).trim().toLowerCase();
+          if (typeof mat === 'string') {
+            calculatedWorks.push({
+              name: mat.trim(),
+              unit: 'шт',
+              volume: count,
+              volumeFormatted: String(count),
+              formula: 'КОЛИЧЕСТВО',
+              formulaDisplay: `${count} шт`,
+              showFormula: true,
+              mark: itemMark,
+              method: itemMethod,
+              equipmentType: itemMark,
+              section: targetSection,
+              type: 'материал',
+              parentWorkName: workTitle,
+              count: count,
+              handles: handles,
+              comment: ''
+            });
+            return;
+          }
+
+          const isDirectEquip = Array.isArray(work["Оборудование"]) && work["Оборудование"].includes(mat);
+          const rawMatType = (mat["Тип"] || mat.type || (isDirectEquip ? 'оборудование' : 'материал')).trim().toLowerCase();
           let determinedMatType = 'материал';
           if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
             determinedMatType = 'оборудование';
@@ -6920,7 +7137,7 @@ function validateWorksJsonInput() {
     if (tabCouplingsBadge) tabCouplingsBadge.textContent = totalCouplingsCount;
 
     // Count equipment in rules
-    const eqList = (parsed && Array.isArray(parsed["Оборудование"])) ? parsed["Оборудование"] : [];
+    const eqList = getEquipmentRulesList(parsed);
     const tabEquipmentBadge = document.getElementById('tabWorksEquipmentCountBadge');
     if (tabEquipmentBadge) tabEquipmentBadge.textContent = eqList.length;
 
