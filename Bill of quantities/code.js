@@ -2692,10 +2692,16 @@ function calculateVolumes() {
   const trenchWorksCalc = renderRoutingResult(routingSummary, grandTotalRoutingCount, grandTotalRoutingLength);
 
   // 3. Calculate and render Equipment summary in Column 2
-  const equipmentData = getActiveEquipmentSummary();
-  const equipmentWorksCalc = calculateWorksFromEquipment(equipmentData.summary, currentWorksRules);
-  window.lastEquipmentWorksCalc = equipmentWorksCalc;
-  renderEquipmentStatement(equipmentData, equipmentWorksCalc);
+  let equipmentWorksCalc = { works: [], missingInRules: [] };
+  try {
+    const equipmentData = getActiveEquipmentSummary();
+    equipmentWorksCalc = calculateWorksFromEquipment(equipmentData.summary, currentWorksRules);
+    window.lastEquipmentWorksCalc = equipmentWorksCalc;
+    renderEquipmentStatement(equipmentData, equipmentWorksCalc);
+  } catch (err) {
+    console.error('Ошибка при расчете оборудования:', err);
+    window.lastEquipmentWorksCalc = equipmentWorksCalc;
+  }
 
   // 4. Calculate and render Couplings summary
   const couplingsSummary = getActiveCouplingsSummary(currentWorksRules);
@@ -5954,7 +5960,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
         type: `${itemMark} (${itemMethod})`,
         count: count,
         handles: handles,
-        missingType: matchingRule ? 'no_method_rule' : 'no_rule'
+        missingType: equipConfig ? 'no_method_rule' : 'no_rule'
       });
     }
   });
