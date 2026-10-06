@@ -4,18 +4,51 @@ let currentFileName = '';
 let isEditable = false;
 let isRawColCollapsed = false;
 
-// Helper to extract works/materials array from a rule object
+// Helper to extract works/materials array from a rule object, supporting nested "Материалы" arrays
 function getRuleWorks(rule) {
   if (!rule || typeof rule !== 'object') return [];
-  const wm = rule["Работы и материалы"];
-  if (Array.isArray(wm)) return wm;
-  if (wm && typeof wm === 'object') {
+  const raw = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] : (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
+  if (Array.isArray(raw)) {
     const list = [];
-    Object.entries(wm).forEach(([tierKey, arr]) => {
+    raw.forEach(item => {
+      if (item && typeof item === 'object') {
+        list.push(item);
+        if (Array.isArray(item["Материалы"])) {
+          item["Материалы"].forEach(mat => {
+            if (mat && typeof mat === 'object') {
+              list.push({
+                ...mat,
+                "Тип": "материал",
+                "Раздел": mat["Раздел"] || item["Раздел"] || rule["Раздел"],
+                parentWorkName: item["Наименование"]
+              });
+            }
+          });
+        }
+      }
+    });
+    return list;
+  }
+  if (raw && typeof raw === 'object') {
+    const list = [];
+    Object.entries(raw).forEach(([tierKey, arr]) => {
       if (Array.isArray(arr)) {
         arr.forEach(item => {
           if (item && typeof item === 'object') {
             list.push({ ...item, _tierKey: tierKey });
+            if (Array.isArray(item["Материалы"])) {
+              item["Материалы"].forEach(mat => {
+                if (mat && typeof mat === 'object') {
+                  list.push({
+                    ...mat,
+                    "Тип": "материал",
+                    "Раздел": mat["Раздел"] || item["Раздел"] || rule["Раздел"],
+                    parentWorkName: item["Наименование"],
+                    _tierKey: tierKey
+                  });
+                }
+              });
+            }
           }
         });
       }
@@ -25,13 +58,66 @@ function getRuleWorks(rule) {
   return [];
 }
 
+// --------------------------------------------------------------------------
+// FORMULA MATH OPERATOR NORMALIZATION
+// --------------------------------------------------------------------------
+
+// Normalize all mathematical operator symbols in formula strings to standard characters
+// - Multiplication: convert '×', '✕', '✖', '·', '∗', '•', and letter 'х'/'x' in multiplication context to standard '*'
+// - Division: convert '÷' to '/'
+// - Minus: convert '−', en-dash '–', em-dash '—' to '-'
+// - Spaces: convert non-breaking space (\u00A0), thin space (\u2009), narrow nbsp (\u202F) to standard space
+// - Formatting: ensure uniform, single spaces around operators (' * ', ' + ', ' - ', ' / ', ' = ')
+function normalizeFormulaMathOperators(formulaStr) {
+  if (formulaStr === null || formulaStr === undefined) return '';
+  let str = String(formulaStr);
+  if (!str.trim()) return '';
+
+  // 1. Replace non-breaking spaces and other irregular spaces with regular ASCII space
+  str = str.replace(/[\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g, ' ');
+
+  // 2. Replace non-standard multiplication symbols:
+  // × (U+00D7), ✕ (U+2715), ✖ (U+2716), · (U+00B7), ∗ (U+2217)
+  str = str.replace(/[×✕✖·∗]/g, '*');
+  str = str.replace(/\s*•\s*/g, ' * ');
+
+  // Letter 'х'/'Х' (Cyrillic) or 'x'/'X' (Latin) when used as multiplication between numbers or after units
+  // e.g. "5 х 10", "5x10", "3 шт. х 2 м", "3 шт х 2 м"
+  str = str.replace(/(\d+(?:[.,]\d+)?)\s*[xхXХ]\s*(\d+(?:[.,]\d+)?)/g, '$1 * $2');
+  str = str.replace(/(\b(?:шт|м|каб|перес|км)\.?)\s*[xхXХ]\s*/gi, '$1 * ');
+
+  // 3. Replace non-standard division symbol ÷
+  str = str.replace(/÷/g, '/');
+
+  // 4. Replace non-standard minus symbols: − (U+2212), – (U+2013), — (U+2014)
+  str = str.replace(/[\u2212\u2013\u2014]/g, '-');
+
+  // 5. Clean up multiple consecutive asterisks
+  str = str.replace(/\*{2,}/g, '*');
+
+  // 6. Ensure uniform spacing around operators: ' * ', ' + ', ' = ', ' / '
+  str = str.replace(/\s*\*\s*/g, ' * ');
+  str = str.replace(/\s*\+\s*/g, ' + ');
+  str = str.replace(/\s*=\s*/g, ' = ');
+  str = str.replace(/\s*\/\s*/g, ' / ');
+  str = str.replace(/(\w|\)|(?:[.,]\d+))\s*-\s*(\w|\(|\d)/g, '$1 - $2');
+
+  // 7. Collapse multiple spaces into single space and trim
+  str = str.replace(/ {2,}/g, ' ').trim();
+
+  return str;
+}
+
 // Evaluate formula (e.g. "ДЛИНА", "0.36*ДЛИНА", "1.05*ДЛИНА", "КОЛИЧЕСТВО", "1*КОЛИЧЕСТВО") with a given base value
 function evaluateWorkFormula(formula, baseValue) {
   const num = Number(baseValue) || 0;
   if (!formula || typeof formula !== 'string' || !formula.trim()) {
     return num;
   }
-  const clean = formula.trim();
+  const clean = formula.trim()
+    .replace(/[×✕✖·∗]/g, '*')
+    .replace(/÷/g, '/')
+    .replace(/[\u2212\u2013\u2014]/g, '-');
   const upper = clean.toUpperCase();
   if (upper === 'ДЛИНА' || upper === 'КОЛИЧЕСТВО' || upper === 'КОЛ-ВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
     return num;
@@ -62,7 +148,7 @@ function buildWorkFormulaDisplay(formula, totalLength, itemsCount, unit) {
   }
   let disp = clean.replace(/,/g, '.').replace(/\*/g, ' * ');
   disp = disp.replace(/ДЛИНА/gi, `${totalLength.toLocaleString('ru-RU')} м кабеля`);
-  return disp;
+  return normalizeFormulaMathOperators(disp);
 }
 
 // Check if calculation formula should be displayed for work or material item
@@ -92,7 +178,7 @@ function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume) {
 
   if (upper === 'КОЛИЧЕСТВО' || upper === 'КОЛ-ВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
     if (tierData.couplings && tierData.couplings.length > 1) {
-      return tierData.couplings.map(c => `${c.count} шт`).join(' + ') + ` = ${rawCount} шт`;
+      return normalizeFormulaMathOperators(tierData.couplings.map(c => `${c.count} шт`).join(' + ') + ` = ${rawCount} шт`);
     }
     return `${rawCount} шт`;
   }
@@ -105,7 +191,7 @@ function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume) {
   if (calculatedVolume !== undefined && calculatedVolume !== rawCount) {
     disp += ` = ${calculatedVolume} шт`;
   }
-  return disp;
+  return normalizeFormulaMathOperators(disp);
 }
 
 // Parse condition for cable count in a trench segment
@@ -1144,6 +1230,11 @@ function setupEventListeners() {
     openWorksRulesBtn.addEventListener('click', () => openWorksRulesModal('editor'));
   }
 
+  const openSettingsBtn = document.getElementById('openSettingsBtn');
+  if (openSettingsBtn) {
+    openSettingsBtn.addEventListener('click', () => openWorksRulesModal('settings'));
+  }
+
   const menuUploadWorksJson = document.getElementById('menuUploadWorksJson');
   if (menuUploadWorksJson) {
     menuUploadWorksJson.addEventListener('click', (e) => {
@@ -1158,6 +1249,14 @@ function setupEventListeners() {
     menuEditWorksJson.addEventListener('click', (e) => {
       e.preventDefault();
       openWorksRulesModal('editor');
+    });
+  }
+
+  const menuSettings = document.getElementById('menuSettings');
+  if (menuSettings) {
+    menuSettings.addEventListener('click', (e) => {
+      e.preventDefault();
+      openWorksRulesModal('settings');
     });
   }
 
@@ -1885,11 +1984,11 @@ function createRoutingAccordion(blocks, totalLength) {
 
     let typeBadge = '';
     if (pCount > 0 && pLen > 0) {
-      typeBadge += `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 600;" title="Трубы: ${pCount} шт. × ${pLen} м"><i class='bx bx-cylinder me-0_5'></i>${pCount}штх${pLen}м</span>`;
+      typeBadge += `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 600;" title="Трубы: ${pCount} шт. * ${pLen} м"><i class='bx bx-cylinder me-0_5'></i>${pCount}шт*${pLen}м</span>`;
     } else if (pCount > 0) {
       typeBadge += `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 600;" title="Трубы: ${pCount} шт."><i class='bx bx-cylinder me-0_5'></i>${pCount}шт</span>`;
     } else if (isPipeType) {
-      typeBadge += `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 600;" title="Трубы: 1 шт. × ${b.length || 0} м"><i class='bx bx-cylinder me-0_5'></i>1штх${b.length || 0}м</span>`;
+      typeBadge += `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 600;" title="Трубы: 1 шт. * ${b.length || 0} м"><i class='bx bx-cylinder me-0_5'></i>1шт*${b.length || 0}м</span>`;
     }
 
     if (b.countIntersections) {
@@ -2607,10 +2706,11 @@ function calculateVolumes() {
   const couplingsSummary = getActiveCouplingsSummary(currentWorksRules);
   renderCouplingsResult(couplingsSummary);
 
-  // 5. Re-distribute works into their target sections for Column 3 UI cards
+  // 5. Re-distribute works into their target sections for Column 3 UI cards with hierarchical aggregation
   // Any trench work with "Раздел": "Монтажные работы" goes to Installation Works
   // Any work with "Раздел": "Строительные работы" goes to Construction Works
-  const allWorks = [ ...(trenchWorksCalc.works || []), ...(cableWorksCalc.works || []), ...(equipmentWorksCalc.works || []) ];
+  const rawAllWorks = [ ...(trenchWorksCalc.works || []), ...(cableWorksCalc.works || []), ...(equipmentWorksCalc.works || []) ];
+  const allWorks = aggregateCalculatedWorks(rawAllWorks);
   const trenchWorks = allWorks.filter(w => {
     const s = (w.section || '').trim().toLowerCase();
     return s === 'строительные работы' || s.includes('строительн');
@@ -2916,8 +3016,8 @@ function renderInstallationWorks(cableWorksCalc) {
   if (!container) return;
 
   const worksList = cableWorksCalc.works || [];
-  const worksCount = worksList.filter(w => w.type === 'работа').length;
-  const materialsCount = worksList.filter(w => w.type === 'материал').length;
+  const worksCount = worksList.filter(w => !w.isSubItem && w.type === 'работа').length;
+  const materialsCount = worksList.filter(w => w.isSubItem || w.type === 'материал').length;
 
   const badgeTotal = document.getElementById('installationBadgeTotal');
   if (badgeTotal) {
@@ -3029,14 +3129,14 @@ function renderInstallationWorks(cableWorksCalc) {
   }
 
   let cableWorksRowsHtml = '';
-  cableWorksCalc.works.forEach((w, idx) => {
-    const isMaterial = (w.type === 'материал' || (w.type && String(w.type).toLowerCase().trim() === 'материал'));
+  worksList.forEach((w, idx) => {
+    const isMaterial = w.isSubItem || w.type === 'материал';
     const isWork = !isMaterial;
     const rowClass = isWork ? 'table-row-work' : 'table-row-material';
 
     const tagBadge = isMaterial
       ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal; color: #495057 !important;">материал</span>`
-      : '';
+      : `<span class="badge bg-primary-subtle text-primary border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">работа</span>`;
     const opticalBadge = w.isOptical
       ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">ВОЛС</span>`
       : '';
@@ -3059,11 +3159,16 @@ function renderInstallationWorks(cableWorksCalc) {
       ? `<div class="text-muted small mt-0_5" style="font-size: 0.74rem; font-weight: normal;"><i class='bx bx-detail me-1 opacity-75'></i>${escapeHtml(w.comment)}</div>`
       : '';
 
+    const numDisplay = w.itemNumber || `${idx + 1}`;
+    const nameDisplay = isMaterial 
+      ? `<span class="text-muted me-1 fw-bold">↳</span>${escapeHtml(w.name)}`
+      : escapeHtml(w.name);
+
     cableWorksRowsHtml += `
       <tr class="${rowClass}">
-        <td class="text-muted small text-center">${idx + 1}</td>
-        <td class="cell-wrap ${isWork ? 'fw-semibold' : 'fw-medium ps-3'}">
-          ${escapeHtml(w.name)}${tagBadge}${opticalBadge}${catalogBadge}${trenchBadge}${equipmentBadge}
+        <td class="text-muted small text-center ${isMaterial ? 'ps-3 text-secondary' : 'fw-semibold'}">${numDisplay}</td>
+        <td class="cell-wrap ${isWork ? 'fw-semibold' : 'fw-medium ps-4 text-body-secondary'}">
+          ${nameDisplay}${tagBadge}${opticalBadge}${catalogBadge}${trenchBadge}${equipmentBadge}
           ${commentHtml}
         </td>
         <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
@@ -3215,9 +3320,13 @@ function renderConstructionWorks(worksCalc) {
   const container = document.getElementById('resultConstructionWorks');
   if (!container) return;
 
+  const worksList = worksCalc.works || [];
+  const worksCount = worksList.filter(w => !w.isSubItem && w.type === 'работа').length;
+  const materialsCount = worksList.filter(w => w.isSubItem || w.type === 'материал').length;
+
   const badgeTotal = document.getElementById('constructionBadgeTotal');
   if (badgeTotal) {
-    badgeTotal.textContent = `${worksCalc.works.length} поз.`;
+    badgeTotal.textContent = materialsCount > 0 ? `${worksCount} раб. / ${materialsCount} мат.` : `${worksCount} поз.`;
     badgeTotal.classList.remove('d-none');
   }
 
@@ -3266,19 +3375,24 @@ function renderConstructionWorks(worksCalc) {
   }
 
   let worksRowsHtml = '';
-  worksCalc.works.forEach((w, idx) => {
-    const isMaterial = (w.type === 'материал' || (w.type && String(w.type).toLowerCase().trim() === 'материал'));
+  worksList.forEach((w, idx) => {
+    const isMaterial = w.isSubItem || w.type === 'материал';
     const isWork = !isMaterial;
     const rowClass = isWork ? 'table-row-work' : 'table-row-material';
     const tagBadge = isMaterial
       ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal; color: #495057 !important;">материал</span>`
-      : '';
+      : `<span class="badge bg-primary-subtle text-primary border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">работа</span>`;
+
+    const numDisplay = w.itemNumber || `${idx + 1}`;
+    const nameDisplay = isMaterial 
+      ? `<span class="text-muted me-1 fw-bold">↳</span>${escapeHtml(w.name)}`
+      : escapeHtml(w.name);
 
     worksRowsHtml += `
       <tr class="${rowClass}">
-        <td class="text-muted small text-center">${idx + 1}</td>
-        <td class="cell-wrap ${isWork ? 'fw-semibold' : 'fw-medium ps-3'}">
-          ${escapeHtml(w.name)}${tagBadge}
+        <td class="text-muted small text-center ${isMaterial ? 'ps-3 text-secondary' : 'fw-semibold'}">${numDisplay}</td>
+        <td class="cell-wrap ${isWork ? 'fw-semibold' : 'fw-medium ps-4 text-body-secondary'}">
+          ${nameDisplay}${tagBadge}
         </td>
         <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
         <td class="text-end font-monospace fw-bold text-success">${w.volume.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -3575,6 +3689,50 @@ function exportCurrentDataExcel() {
 // WORKS RULES & CALCULATION FUNCTIONS
 // --------------------------------------------------------------------------
 
+let worksJsonCodeMirror = null;
+
+// Get current JSON string from CodeMirror or fallback textarea
+function getWorksJsonEditorValue() {
+  if (worksJsonCodeMirror) {
+    return worksJsonCodeMirror.getValue();
+  }
+  const textarea = document.getElementById('worksJsonEditorTextarea');
+  return textarea ? textarea.value : '';
+}
+
+// Set JSON string in CodeMirror and fallback textarea
+function setWorksJsonEditorValue(val) {
+  const textarea = document.getElementById('worksJsonEditorTextarea');
+  if (textarea) textarea.value = val;
+  if (worksJsonCodeMirror) {
+    const cursor = worksJsonCodeMirror.getCursor();
+    worksJsonCodeMirror.setValue(val);
+    try {
+      worksJsonCodeMirror.setCursor(cursor);
+    } catch {
+      // ignore cursor reset if length changed
+    }
+  }
+}
+
+// Helper to safely parse and synchronize currentWorksRules from the editor if valid
+function syncCurrentRulesFromEditorIfValid() {
+  try {
+    const val = getWorksJsonEditorValue();
+    if (!val) return;
+    const parsed = JSON.parse(val);
+    if (parsed && typeof parsed === 'object') {
+      if (Array.isArray(parsed)) {
+        currentWorksRules = { "Строительные работы": parsed };
+      } else {
+        currentWorksRules = parsed;
+      }
+    }
+  } catch {
+    // ignore syntax error while user is actively typing in JSON
+  }
+}
+
 // Initialize rules on page load from external works_rules.json
 async function initWorksRules() {
   try {
@@ -3677,15 +3835,16 @@ function downloadWorksRules() {
   showToast('JSON файл сметных норм скачан', 'success', 'Скачивание');
 }
 
-// Render rules modal cards and cable catalog tab
+// Render rules modal cards, cable catalog, couplings, equipment and settings tabs
 function renderRulesModalContent() {
   const container = document.getElementById('rulesListContainer');
   const countBadge = document.getElementById('worksRulesCountBadge');
   
-  // Render cables, couplings and equipment tabs content as well
+  // Render cables, couplings, equipment and settings tabs content
   renderCableCatalogModalContent();
   renderCouplingCatalogModalContent();
   renderEquipmentCatalogModalContent();
+  renderSettingsModalContent();
 
   if (!container) return;
 
@@ -4284,6 +4443,122 @@ function renderEquipmentCatalogModalContent() {
 }
 
 // --------------------------------------------------------------------------
+// SETTINGS (НАСТРОЙКИ) TAB & RULES SPECIFICATION
+// --------------------------------------------------------------------------
+
+function getRulesSettings(rulesData) {
+  const raw = (rulesData && typeof rulesData === 'object')
+    ? (rulesData["Настройки"] || rulesData["settings"] || rulesData["Параметры"] || {})
+    : {};
+
+  const numModeRaw = String(raw["ТипНумерации"] || raw["НумерацияВОР"] || raw["numberingMode"] || raw["нумерация"] || 'иерархическая').trim().toLowerCase();
+  const isSeq = numModeRaw.includes('сквозн') || numModeRaw.includes('seq') || numModeRaw.includes('cont');
+
+  return {
+    numberingMode: isSeq ? 'сквозная' : 'иерархическая',
+    ggeVersion: String(raw["ВерсияGGE"] || raw["ВерсияСхемыGGE"] || raw["ggeVersion"] || '3.01').trim(),
+    accessLevel: String(raw["УровеньДоступа"] || raw["accessLevel"] || 'коммерческая тайна').trim(),
+    softName: String(raw["ПрограммныйКомплекс"] || raw["softName"] || 'Программный комплекс "Строительный эксперт"  v7.3.1.7813').trim(),
+    pluginVersion: String(raw["ПлагинGGE"] || raw["pluginVersion"] || 'Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13').trim(),
+    decimalsKm: (raw["ОкруглениеКабелейКм"] !== undefined) ? Number(raw["ОкруглениеКабелейКм"]) : 3,
+    decimalsVolume: (raw["ОкруглениеОбъемов"] !== undefined) ? Number(raw["ОкруглениеОбъемов"]) : 2,
+    raw: raw
+  };
+}
+
+// Render the Settings tab content in Works Rules Modal
+function renderSettingsModalContent() {
+  syncCurrentRulesFromEditorIfValid();
+  const settings = getRulesSettings(currentWorksRules);
+
+  const numSelect = document.getElementById('settingNumberingMode');
+  if (numSelect) numSelect.value = settings.numberingMode;
+
+  const decKmInput = document.getElementById('settingDecimalsKm');
+  if (decKmInput) decKmInput.value = settings.decimalsKm;
+
+  const decVolInput = document.getElementById('settingDecimalsVolume');
+  if (decVolInput) decVolInput.value = settings.decimalsVolume;
+
+  const ggeVerInput = document.getElementById('settingGgeVersion');
+  if (ggeVerInput) ggeVerInput.value = settings.ggeVersion;
+
+  const accLevelInput = document.getElementById('settingAccessLevel');
+  if (accLevelInput) accLevelInput.value = settings.accessLevel;
+
+  const softNameInput = document.getElementById('settingSoftName');
+  if (softNameInput) softNameInput.value = settings.softName;
+
+  const pluginVerInput = document.getElementById('settingPluginVersion');
+  if (pluginVerInput) pluginVerInput.value = settings.pluginVersion;
+}
+
+// Save settings from UI form into currentWorksRules["Настройки"] and CodeMirror editor
+function saveSettingsFromUiToJson(showToastNotification = true) {
+  syncCurrentRulesFromEditorIfValid();
+
+  const numMode = document.getElementById('settingNumberingMode')?.value || 'иерархическая';
+  const decKm = parseInt(document.getElementById('settingDecimalsKm')?.value, 10) || 3;
+  const decVol = parseInt(document.getElementById('settingDecimalsVolume')?.value, 10) || 2;
+  const ggeVer = document.getElementById('settingGgeVersion')?.value || '3.01';
+  const accLevel = document.getElementById('settingAccessLevel')?.value || 'коммерческая тайна';
+  const softName = document.getElementById('settingSoftName')?.value || 'Программный комплекс "Строительный эксперт"  v7.3.1.7813';
+  const pluginVer = document.getElementById('settingPluginVersion')?.value || 'Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13';
+
+  const updatedSettings = {
+    "ТипНумерации": numMode,
+    "ВерсияGGE": ggeVer,
+    "УровеньДоступа": accLevel,
+    "ПрограммныйКомплекс": softName,
+    "ПлагинGGE": pluginVer,
+    "ОкруглениеКабелейКм": decKm,
+    "ОкруглениеОбъемов": decVol
+  };
+
+  if (!currentWorksRules || typeof currentWorksRules !== 'object') {
+    currentWorksRules = {};
+  }
+
+  // Preserve order with Настройки at top
+  const newRulesObj = {
+    "Настройки": updatedSettings
+  };
+  for (const [k, v] of Object.entries(currentWorksRules)) {
+    if (k !== "Настройки" && k !== "settings" && k !== "Параметры") {
+      newRulesObj[k] = v;
+    }
+  }
+
+  currentWorksRules = newRulesObj;
+  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+
+  // Sync with localStorage for quick export defaults
+  localStorage.setItem('gge_numbering_mode', numMode === 'сквозная' ? 'sequential' : 'hierarchical');
+
+  if (showToastNotification) {
+    showToast('Параметры сохранены и синхронизированы в JSON', 'success', 'Настройки');
+  }
+}
+
+// Reset settings to defaults
+function resetDefaultSettings() {
+  const defaultSettings = {
+    "ТипНумерации": "иерархическая",
+    "ВерсияGGE": "3.01",
+    "УровеньДоступа": "коммерческая тайна",
+    "ПрограммныйКомплекс": "Программный комплекс \"Строительный эксперт\"  v7.3.1.7813",
+    "ПлагинGGE": "Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13",
+    "ОкруглениеКабелейКм": 3,
+    "ОкруглениеОбъемов": 2
+  };
+
+  currentWorksRules["Настройки"] = defaultSettings;
+  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+  renderSettingsModalContent();
+  showToast('Настройки сброшены к стандартным значениям', 'info', 'Сброс настроек');
+}
+
+// --------------------------------------------------------------------------
 // RENDER COUPLING CATALOG TAB IN WORKS RULES MODAL
 // --------------------------------------------------------------------------
 
@@ -4640,16 +4915,16 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
             const pCount = seg.countPipes || 1;
             const pLen = seg.lengthPipes || seg.length || 0;
             displayFormula = hasInterVar && pInter > 1
-              ? `${pInter} перес. × ${pCount} шт. × ${pLen} м`
-              : (hasInterVar ? `${pInter} × ${pCount} шт. × ${pLen} м` : `${pCount} шт. × ${pLen} м`);
+              ? `${pInter} перес. * ${pCount} шт. * ${pLen} м`
+              : (hasInterVar ? `${pInter} * ${pCount} шт. * ${pLen} м` : `${pCount} шт. * ${pLen} м`);
           } else if (matchingSegments.length <= 5) {
             displayFormula = matchingSegments.map(s => {
               const pInter = s.countIntersections > 0 ? s.countIntersections : 1;
               const pCount = s.countPipes || 1;
               const pLen = s.lengthPipes || s.length || 0;
               return hasInterVar && pInter > 1
-                ? `${pInter} перес. × ${pCount} шт. × ${pLen} м`
-                : (hasInterVar ? `${pInter} × ${pCount} шт. × ${pLen} м` : `${pCount} шт. × ${pLen} м`);
+                ? `${pInter} перес. * ${pCount} шт. * ${pLen} м`
+                : (hasInterVar ? `${pInter} * ${pCount} шт. * ${pLen} м` : `${pCount} шт. * ${pLen} м`);
             }).join(' + ');
           } else {
             const totalIntersections = matchingSegments.reduce((sum, s) => sum + (s.countIntersections > 0 ? s.countIntersections : 1), 0);
@@ -4658,11 +4933,11 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
             const allOneInter = matchingSegments.every(s => (s.countIntersections || 1) === 1);
             if (allSameLen && allOneInter && !hasInterVar) {
               const pLen = matchingSegments[0].lengthPipes || matchingSegments[0].length || 0;
-              displayFormula = `${totalPipes} шт. × ${pLen} м`;
+              displayFormula = `${totalPipes} шт. * ${pLen} м`;
             } else if (allSameLen && hasInterVar) {
               const pLen = matchingSegments[0].lengthPipes || matchingSegments[0].length || 0;
               const pCount = matchingSegments[0].countPipes || 1;
-              displayFormula = `${totalIntersections} перес. × ${pCount} шт. × ${pLen} м`;
+              displayFormula = `${totalIntersections} перес. * ${pCount} шт. * ${pLen} м`;
             } else {
               displayFormula = `${formula.replace(/\*/g, ' * ')} по ${matchingSegments.length} блокам (всего ${totalVolume} м)`;
             }
@@ -4683,15 +4958,15 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
               .replace(/(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|КОЛ[-_]?ВО[_\s]?КАБЕЛЕЙ|КОЛ_КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|\bКОЛИЧЕСТВО\b|\bКОЛ-ВО\b)/gi, `${segCables} каб.`);
             if (condSuffix) displayFormula += condSuffix;
           } else if (matchingSegments.length <= 3) {
-            // Detailed segment breakdown: "(100 м × 5 каб + 250 м × 6 каб)"
+            // Detailed segment breakdown: "(100 м * 5 каб + 250 м * 6 каб)"
             const parts = matchingSegments.map(seg => {
               const segLen = Number(seg.length) || 0;
               const segCables = Number(seg.cablesCount) || 0;
-              return `${segLen} м × ${segCables} каб`;
+              return `${segLen} м * ${segCables} каб`;
             });
             const formulaPrefix = formula.replace(/ДЛИНА.*КОЛИЧЕСТВО.*КАБЕЛЕЙ|ДЛИНА.*КАБЕЛЕЙ|КОЛИЧЕСТВО.*КАБЕЛЕЙ.*ДЛИНА/gi, '').replace(/\*/g, '').trim();
             if (formulaPrefix && formulaPrefix !== '1') {
-              displayFormula = `${formulaPrefix} × (${parts.join(' + ')})${condSuffix}`;
+              displayFormula = `${formulaPrefix} * (${parts.join(' + ')})${condSuffix}`;
             } else {
               displayFormula = `(${parts.join(' + ')})${condSuffix}`;
             }
@@ -4700,9 +4975,14 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
             displayFormula = `${formula.replace(/\*/g, ' * ')} по ${matchingSegments.length} блокам (всего ${effectiveLength} ${unitSuffix})${condSuffix}`;
           }
         }
+        displayFormula = normalizeFormulaMathOperators(displayFormula);
 
         const showFormula = shouldShowFormula(work);
         const targetSection = (work["Раздел"] || work.section || sectionName).trim();
+        const isMaterial = (work["Тип"] || work.type) === 'материал';
+        const primaryTrenchWork = works.find(w => (w["Тип"] || w.type) !== 'материал') || works[0];
+        const primaryTrenchWorkTitle = primaryTrenchWork ? (primaryTrenchWork["Наименование"] || primaryTrenchWork.name || ruleName).trim() : ruleName;
+
         calculatedWorks.push({
           name: work["Наименование"] || work.name || '',
           unit: work["Единицы измерения"] || work.unit || '',
@@ -4717,70 +4997,11 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           matchedSegmentsCount: matchingSegments.length,
           condition: conditionNote,
           section: targetSection,
-          type: work["Тип"] || work.type || '',
+          type: isMaterial ? 'материал' : 'работа',
+          parentWorkName: work.parentWorkName || (isMaterial ? primaryTrenchWorkTitle : undefined),
           comment: work["Комментарий"] || work.comment || ''
         });
       });
-
-      // Check if material "Труба" should be automatically formed if not defined in the rule
-      const hasPipeMaterial = works.some(w => {
-        const n = (w["Наименование"] || w.name || '').toLowerCase();
-        return (w["Тип"] || w.type) === 'материал' && n.includes('труб');
-      });
-
-      const allTrenchSegments = tInfo.segments || [];
-      const needsPipeMaterial = !hasPipeMaterial && (
-        tName.toLowerCase().includes('труб') ||
-        ruleName.toLowerCase().includes('труб') ||
-        allTrenchSegments.some(s => (s.countPipes > 0 && s.lengthPipes > 0))
-      );
-
-      if (needsPipeMaterial) {
-        let pipeVol = 0;
-        allTrenchSegments.forEach(seg => {
-          const pInter = seg.countIntersections > 0 ? seg.countIntersections : 1;
-          const pCount = seg.countPipes || 1;
-          const pLen = seg.lengthPipes || seg.length || 0;
-          pipeVol += (pInter * pCount * pLen);
-        });
-        pipeVol = Math.round(pipeVol * 100) / 100;
-
-        const totalIntersections = allTrenchSegments.reduce((sum, s) => sum + (s.countIntersections > 0 ? s.countIntersections : 1), 0);
-        const totalPipes = allTrenchSegments.reduce((sum, s) => sum + (s.countPipes || 1), 0);
-        const allSameLen = allTrenchSegments.every(s => (s.lengthPipes || s.length) === (allTrenchSegments[0].lengthPipes || allTrenchSegments[0].length));
-        const pipeFormulaDisplay = allTrenchSegments.length === 1
-          ? (allTrenchSegments[0].countIntersections > 1
-              ? `${allTrenchSegments[0].countIntersections} перес. × ${allTrenchSegments[0].countPipes || 1} шт. × ${allTrenchSegments[0].lengthPipes || allTrenchSegments[0].length || 0} м`
-              : `${allTrenchSegments[0].countPipes || 1} шт. × ${allTrenchSegments[0].lengthPipes || allTrenchSegments[0].length || 0} м`)
-          : (allTrenchSegments.length <= 5
-              ? allTrenchSegments.map(s => {
-                  const pInter = s.countIntersections > 0 ? s.countIntersections : 1;
-                  return pInter > 1
-                    ? `${pInter} перес. × ${s.countPipes || 1} шт. × ${s.lengthPipes || s.length || 0} м`
-                    : `${s.countPipes || 1} шт. × ${s.lengthPipes || s.length || 0} м`;
-                }).join(' + ')
-              : (allSameLen
-                  ? `${totalIntersections} перес. × ${allTrenchSegments[0].countPipes || 1} шт. × ${allTrenchSegments[0].lengthPipes || allTrenchSegments[0].length || 0} м`
-                  : `${totalIntersections} перес. по ${allTrenchSegments.length} блокам (всего ${pipeVol} м)`));
-
-        calculatedWorks.push({
-          name: 'Труба',
-          unit: 'м',
-          volume: pipeVol,
-          formulaDisplay: pipeFormulaDisplay,
-          showFormula: true,
-          rawFormulaDisplay: pipeFormulaDisplay,
-          ruleName: ruleName,
-          trenchType: tName,
-          trenchLength: tInfo.totalLength,
-          totalTrenchLength: tInfo.totalLength,
-          matchedSegmentsCount: allTrenchSegments.length,
-          condition: '',
-          section: sectionName,
-          type: 'материал',
-          comment: 'КОЛИЧЕСТВО_ПЕРЕСЕЧЕНИЙ*КОЛИЧЕСТВО_ТРУБ*ДЛИНА_ТРУБ'
-        });
-      }
     });
   });
 
@@ -4968,19 +5189,20 @@ function calculateWorksFromCables(cableSummary, rulesData) {
         const primaryWork = optItems.find(w => (w["Тип"] || w.type) !== 'материал') || optItems[0];
         const opticalPrimaryTitle = (primaryWork["Наименование"] || primaryWork.name || `Прокладка оптического кабеля (${ruleName})`).trim();
 
-        // Apply ALL works and materials from the optical list
-        optItems.forEach(item => {
-          const formula = item["Формула"] || item.formula || "ДЛИНА";
+        // Apply all works and their declared materials from the optical rules list
+        optItems.forEach(work => {
+          const isWorkMaterial = (work["Тип"] || work.type) === 'материал';
+          const formula = work["Формула"] || work.formula || "ДЛИНА";
           const rawVal = evaluateWorkFormula(formula, totalOpticalLength);
-          const isMaterial = (item["Тип"] || item.type) === 'материал';
-          const vol = isMaterial ? Math.round(rawVal * 1000) / 1000 : Math.round(rawVal * 100) / 100;
-          const unit = item["Единицы измерения"] || item.unit || 'м';
-          const itemName = (item["Наименование"] || item.name || opticalPrimaryTitle).trim();
-          const showFormula = shouldShowFormula(item);
+          const vol = isWorkMaterial ? Math.round(rawVal * 1000) / 1000 : Math.round(rawVal * 100) / 100;
+          const unit = work["Единицы измерения"] || work.unit || 'м';
+          const workTitle = (work["Наименование"] || work.name || opticalPrimaryTitle).trim();
+          const showFormula = shouldShowFormula(work);
           const formulaDisplay = showFormula ? buildWorkFormulaDisplay(formula, totalOpticalLength, opticalCables.length, unit) : '';
+          const targetSection = (work["Раздел"] || work.section || sectionName).trim();
 
           calculatedWorks.push({
-            name: itemName,
+            name: workTitle,
             unit: unit,
             volume: vol,
             formulaDisplay: formulaDisplay,
@@ -4990,36 +5212,71 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             tierKey: parsedWM.optical.key,
             isOptical: true,
             category: 'Оптический кабель',
-            section: (item["Раздел"] || item.section || sectionName).trim(),
-            type: isMaterial ? 'материал' : 'работа',
-            parentWorkName: isMaterial ? opticalPrimaryTitle : undefined,
+            section: targetSection,
+            type: isWorkMaterial ? 'материал' : 'работа',
+            parentWorkName: isWorkMaterial ? opticalPrimaryTitle : undefined,
             cablesCount: opticalCables.length,
-            comment: item["Комментарий"] || item.comment || ''
+            comment: work["Комментарий"] || work.comment || ''
           });
-        });
 
-        // List all optical cables under this primary work
-        opticalCables.forEach(c => {
-          const kmVol = Number((c.length / 1000).toFixed(3));
-          const showFormula = (c.showFormula !== undefined) ? c.showFormula : shouldShowFormula(c);
-          calculatedWorks.push({
-            name: c.fullDescription || `Кабель ${c.type}`,
-            unit: 'км',
-            volume: kmVol,
-            formulaDisplay: showFormula ? `${kmVol.toFixed(3)} км (${Math.round(c.length)} м • ВОЛС)` : '',
-            showFormula: showFormula,
-            ruleName: ruleName,
-            routingType: c.routingName,
-            cableType: c.type,
-            cableLength: c.length,
-            weight: c.weight,
-            isOptical: true,
-            category: 'Оптический кабель',
-            foundInCatalog: !!c.foundInCatalog,
-            section: sectionName,
-            type: 'материал',
-            parentWorkName: opticalPrimaryTitle,
-            comment: ''
+          // Process materials declared under this work
+          const declaredMaterials = Array.isArray(work["Материалы"]) ? work["Материалы"] : [];
+          declaredMaterials.forEach(mat => {
+            const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_КАБЕЛЯ}').trim();
+            const matUnit = mat["Единицы измерения"] || mat.unit || 'км';
+            const matFormula = mat["Формула"] || mat.formula || "ДЛИНА";
+            const matShowFormula = (mat["ОтображатьФормулу"] !== undefined) ? shouldShowFormula(mat) : true;
+            const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
+
+            if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
+              // Expand material for each optical cable
+              opticalCables.forEach(c => {
+                const cVol = (matUnit === 'км')
+                  ? Number((c.length / 1000).toFixed(3))
+                  : Math.round(evaluateWorkFormula(matFormula, c.length) * 100) / 100;
+                const cFormulaDisp = matShowFormula
+                  ? (matUnit === 'км' ? `${cVol.toFixed(3)} км (${Math.round(c.length)} м • ВОЛС)` : `${cVol} ${matUnit} (${Math.round(c.length)} м)`)
+                  : '';
+                calculatedWorks.push({
+                  name: c.fullDescription || `Кабель ${c.type}`,
+                  unit: matUnit,
+                  volume: cVol,
+                  formulaDisplay: cFormulaDisp,
+                  showFormula: matShowFormula,
+                  ruleName: ruleName,
+                  routingType: c.routingName,
+                  cableType: c.type,
+                  cableLength: c.length,
+                  weight: c.weight,
+                  isOptical: true,
+                  category: 'Оптический кабель',
+                  foundInCatalog: !!c.foundInCatalog,
+                  section: matSection,
+                  type: 'материал',
+                  parentWorkName: workTitle,
+                  comment: mat["Комментарий"] || ''
+                });
+              });
+            } else {
+              // Static material declared in work
+              const matRawVal = evaluateWorkFormula(matFormula, totalOpticalLength);
+              const matVol = (matUnit === 'км') ? Math.round(matRawVal * 1000) / 1000 : Math.round(matRawVal * 100) / 100;
+              const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalOpticalLength, opticalCables.length, matUnit) : '';
+              calculatedWorks.push({
+                name: matNameTpl,
+                unit: matUnit,
+                volume: matVol,
+                formulaDisplay: matFormulaDisp,
+                showFormula: matShowFormula,
+                ruleName: ruleName,
+                routingType: ruleName,
+                isOptical: true,
+                section: matSection,
+                type: 'материал',
+                parentWorkName: workTitle,
+                comment: mat["Комментарий"] || ''
+              });
+            }
           });
         });
       } else {
@@ -5118,19 +5375,20 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               : `Прокладка кабеля (${ruleName})`;
           }
 
-          // APPLY ALL WORKS AND MATERIALS FROM THIS TIER LIST
-          tierItems.forEach(item => {
-            const formula = item["Формула"] || item.formula || "ДЛИНА";
+          // APPLY ALL WORKS AND THEIR DECLARED MATERIALS FROM THIS TIER LIST
+          tierItems.forEach(work => {
+            const isWorkMaterial = (work["Тип"] || work.type) === 'материал';
+            const formula = work["Формула"] || work.formula || "ДЛИНА";
             const rawVal = evaluateWorkFormula(formula, totalTierLength);
-            const isMaterial = (item["Тип"] || item.type) === 'материал';
-            const vol = isMaterial ? Math.round(rawVal * 1000) / 1000 : Math.round(rawVal * 100) / 100;
-            const unit = item["Единицы измерения"] || item.unit || 'м';
-            const itemName = (item["Наименование"] || item.name || primaryWorkTitle).trim();
-            const showFormula = shouldShowFormula(item);
+            const vol = isWorkMaterial ? Math.round(rawVal * 1000) / 1000 : Math.round(rawVal * 100) / 100;
+            const unit = work["Единицы измерения"] || work.unit || 'м';
+            const workTitle = (work["Наименование"] || work.name || primaryWorkTitle).trim();
+            const showFormula = shouldShowFormula(work);
             const formulaDisplay = showFormula ? buildWorkFormulaDisplay(formula, totalTierLength, tier.cables.length, unit) : '';
+            const targetSection = (work["Раздел"] || work.section || sectionName).trim();
 
             calculatedWorks.push({
-              name: itemName,
+              name: workTitle,
               unit: unit,
               volume: vol,
               formulaDisplay: formulaDisplay,
@@ -5139,34 +5397,70 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               routingType: ruleName,
               tierMax: tier.threshold,
               tierKey: tier.key,
-              section: (item["Раздел"] || item.section || sectionName).trim(),
-              type: isMaterial ? 'материал' : 'работа',
-              parentWorkName: isMaterial ? primaryWorkTitle : undefined,
+              section: targetSection,
+              type: isWorkMaterial ? 'материал' : 'работа',
+              parentWorkName: isWorkMaterial ? primaryWorkTitle : undefined,
               cablesCount: tier.cables.length,
-              comment: item["Комментарий"] || item.comment || ''
+              comment: work["Комментарий"] || work.comment || ''
             });
-          });
 
-          // List all cables under this primary work as materials
-          tier.cables.forEach(c => {
-            const kmVol = Number((c.length / 1000).toFixed(3));
-            const showFormula = (c.showFormula !== undefined) ? c.showFormula : shouldShowFormula(c);
-            calculatedWorks.push({
-              name: c.fullDescription || `Кабель ${c.type}`,
-              unit: 'км',
-              volume: kmVol,
-              formulaDisplay: showFormula ? `${kmVol.toFixed(3)} км (${Math.round(c.length)} м • масса 1 м: ${c.weight} кг)` : '',
-              showFormula: showFormula,
-              ruleName: ruleName,
-              routingType: c.routingName,
-              cableType: c.type,
-              cableLength: c.length,
-              weight: c.weight,
-              foundInCatalog: !!c.foundInCatalog,
-              section: sectionName,
-              type: 'материал',
-              parentWorkName: primaryWorkTitle,
-              comment: ''
+            // Process materials declared under this work
+            const declaredMaterials = Array.isArray(work["Материалы"]) ? work["Материалы"] : [];
+            declaredMaterials.forEach(mat => {
+              const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_КАБЕЛЯ}').trim();
+              const matUnit = mat["Единицы измерения"] || mat.unit || 'км';
+              const matFormula = mat["Формула"] || mat.formula || "ДЛИНА";
+              const matShowFormula = (mat["ОтображатьФормулу"] !== undefined) ? shouldShowFormula(mat) : true;
+              const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
+
+              if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
+                // Expand material for each electrical cable in this tier
+                tier.cables.forEach(c => {
+                  const cVol = (matUnit === 'км')
+                    ? Number((c.length / 1000).toFixed(3))
+                    : Math.round(evaluateWorkFormula(matFormula, c.length) * 100) / 100;
+                  const cFormulaDisp = matShowFormula
+                    ? (matUnit === 'км' ? `${cVol.toFixed(3)} км (${Math.round(c.length)} м • масса 1 м: ${c.weight} кг)` : `${cVol} ${matUnit} (${Math.round(c.length)} м)`)
+                    : '';
+                  calculatedWorks.push({
+                    name: c.fullDescription || `Кабель ${c.type}`,
+                    unit: matUnit,
+                    volume: cVol,
+                    formulaDisplay: cFormulaDisp,
+                    showFormula: matShowFormula,
+                    ruleName: ruleName,
+                    routingType: c.routingName,
+                    cableType: c.type,
+                    cableLength: c.length,
+                    weight: c.weight,
+                    foundInCatalog: !!c.foundInCatalog,
+                    section: matSection,
+                    type: 'материал',
+                    parentWorkName: workTitle,
+                    comment: mat["Комментарий"] || ''
+                  });
+                });
+              } else {
+                // Static material declared under this work
+                const matRawVal = evaluateWorkFormula(matFormula, totalTierLength);
+                const matVol = (matUnit === 'км') ? Math.round(matRawVal * 1000) / 1000 : Math.round(matRawVal * 100) / 100;
+                const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalTierLength, tier.cables.length, matUnit) : '';
+                calculatedWorks.push({
+                  name: matNameTpl,
+                  unit: matUnit,
+                  volume: matVol,
+                  formulaDisplay: matFormulaDisp,
+                  showFormula: matShowFormula,
+                  ruleName: ruleName,
+                  routingType: ruleName,
+                  tierMax: tier.threshold,
+                  tierKey: tier.key,
+                  section: matSection,
+                  type: 'материал',
+                  parentWorkName: workTitle,
+                  comment: mat["Комментарий"] || ''
+                });
+              }
             });
           });
         });
@@ -5262,12 +5556,13 @@ function buildEquipmentFormulaDisplay(formula, count, unit) {
   if (!formula || formula.trim() === 'КОЛИЧЕСТВО' || formula.trim() === 'КОЛ-ВО' || formula.trim() === '1') {
     return `${count} ${unit || 'шт'}`;
   }
-  return formula.replace(/\*/g, ' * ')
+  const disp = formula
     .replace(/\bКОЛИЧЕСТВО\b/gi, `${count} шт`)
     .replace(/\bКОЛ-ВО\b/gi, `${count} шт`)
     .replace(/\bКОЛ_ВО\b/gi, `${count} шт`)
     .replace(/\bCOUNT\b/gi, `${count} шт`)
     .replace(/\bQTY\b/gi, `${count} шт`);
+  return normalizeFormulaMathOperators(disp);
 }
 
 // Calculate works based on equipment summary and rules JSON ("Оборудование")
@@ -5289,28 +5584,38 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
 
     // Search rules directly by "Марка"
     const matchingRule = rules.find(rule => (rule["Марка"] || '').trim().toLowerCase() === itemMark.toLowerCase());
-    const wm = matchingRule ? matchingRule["Работы и материалы"] : null;
-    const ruleWorks = (wm && typeof wm === 'object') ? wm[itemMethod] : null;
+    const wm = matchingRule ? (matchingRule["Работы"] || matchingRule["Работы и материалы"]) : null;
+    const ruleWorks = (wm && typeof wm === 'object') ? (wm[itemMethod] || wm["Не указано"] || wm[Object.keys(wm)[0]]) : null;
 
     if (Array.isArray(ruleWorks) && ruleWorks.length > 0) {
       matchedEquipmentKeys.add(key);
 
-      const primaryWork = ruleWorks.find(w => w["Тип"] !== 'материал') || ruleWorks[0];
-      const primaryWorkTitle = (primaryWork["Наименование"] || `Монтаж оборудования ${itemMark}`).trim();
+      const primaryWork = ruleWorks.find(w => {
+        const t = (w["Тип"] || w.type || '').trim().toLowerCase();
+        return t !== 'материал' && t !== 'оборудование';
+      }) || ruleWorks[0];
+      const primaryWorkTitle = (primaryWork["Наименование"] || primaryWork.name || `Монтаж оборудования ${itemMark}`).trim();
 
       ruleWorks.forEach(work => {
-        const formula = (work["Формула"] || "КОЛИЧЕСТВО").trim();
+        const rawWorkType = (work["Тип"] || work.type || '').trim().toLowerCase();
+        let determinedWorkType = 'работа';
+        if (rawWorkType === 'оборудование' || rawWorkType === 'equipment') {
+          determinedWorkType = 'оборудование';
+        } else if (rawWorkType === 'материал' || rawWorkType === 'material') {
+          determinedWorkType = 'материал';
+        }
+        const isWorkMaterial = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
+        const formula = (work["Формула"] || work.formula || "КОЛИЧЕСТВО").trim();
         const rawVol = evaluateEquipmentFormula(formula, count);
-        const isMaterial = work["Тип"] === 'материал';
         const vol = Math.round(rawVol * 100) / 100;
-        const unit = work["Единицы измерения"] || 'шт';
-        const itemName = (work["Наименование"] || primaryWorkTitle).trim();
+        const unit = work["Единицы измерения"] || work.unit || 'шт';
+        const workTitle = (work["Наименование"] || work.name || primaryWorkTitle).trim();
         const showFormula = shouldShowFormula(work);
         const formulaDisplay = showFormula ? buildEquipmentFormulaDisplay(formula, count, unit) : '';
-        const targetSection = (work["Раздел"] || 'Монтажные работы').trim();
+        const targetSection = (work["Раздел"] || work.section || 'Монтажные работы').trim();
 
         calculatedWorks.push({
-          name: itemName,
+          name: workTitle,
           unit: unit,
           volume: vol,
           volumeFormatted: String(vol),
@@ -5321,11 +5626,50 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           method: itemMethod,
           equipmentType: itemMark,
           section: targetSection,
-          type: isMaterial ? 'материал' : 'работа',
-          parentWorkName: isMaterial ? primaryWorkTitle : undefined,
+          type: determinedWorkType,
+          parentWorkName: isWorkMaterial ? primaryWorkTitle : undefined,
           count: count,
           handles: handles,
-          comment: work["Комментарий"] || (handles.length > 0 ? `handle: ${handles.join(', ')}` : '')
+          comment: work["Комментарий"] || work.comment || (handles.length > 0 ? `handle: ${handles.join(', ')}` : '')
+        });
+
+        // Process materials declared under this work
+        const declaredMaterials = Array.isArray(work["Материалы"]) ? work["Материалы"] : [];
+        declaredMaterials.forEach(mat => {
+          const rawMatType = (mat["Тип"] || mat.type || 'материал').trim().toLowerCase();
+          let determinedMatType = 'материал';
+          if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
+            determinedMatType = 'оборудование';
+          } else if (rawMatType === 'работа' || rawMatType === 'work') {
+            determinedMatType = 'работа';
+          }
+          const matFormula = (mat["Формула"] || mat.formula || "КОЛИЧЕСТВО").trim();
+          const matRawVol = evaluateEquipmentFormula(matFormula, count);
+          const matVol = Math.round(matRawVol * 100) / 100;
+          const matUnit = mat["Единицы измерения"] || mat.unit || 'шт';
+          const matName = (mat["Наименование"] || mat.name || itemMark).trim();
+          const matShowFormula = (mat["ОтображатьФормулу"] !== undefined) ? shouldShowFormula(mat) : true;
+          const matFormulaDisp = matShowFormula ? buildEquipmentFormulaDisplay(matFormula, count, matUnit) : '';
+          const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
+
+          calculatedWorks.push({
+            name: matName,
+            unit: matUnit,
+            volume: matVol,
+            volumeFormatted: String(matVol),
+            formula: matFormula,
+            formulaDisplay: matFormulaDisp,
+            showFormula: matShowFormula,
+            mark: itemMark,
+            method: itemMethod,
+            equipmentType: itemMark,
+            section: matSection,
+            type: determinedMatType,
+            parentWorkName: workTitle,
+            count: count,
+            handles: handles,
+            comment: mat["Комментарий"] || mat.comment || ''
+          });
         });
       });
     } else {
@@ -5346,6 +5690,250 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
   };
 }
 
+// --------------------------------------------------------------------------
+// AGGREGATION & HIERARCHICAL WORK-MATERIAL GROUPING (ВОР)
+// --------------------------------------------------------------------------
+
+/**
+ * Merges identical works by Section, Name, and Unit.
+ * Materials linked to works via `parentWorkName` are grouped directly under their parent work.
+ * Assigns hierarchical numbering: 1, 1.1, 1.2, 2, 2.1...
+ */
+function aggregateCalculatedWorks(rawWorksList) {
+  if (!Array.isArray(rawWorksList) || rawWorksList.length === 0) return [];
+
+  const workGroups = new Map();
+  const orphanMaterials = [];
+
+  rawWorksList.forEach(item => {
+    const rawType = (item.type || '').trim().toLowerCase();
+    const isMaterial = (rawType === 'материал' || item.isSubItem);
+    const section = (item.section || 'Монтажные работы').trim();
+
+    if (!isMaterial) {
+      // THIS IS A WORK ITEM
+      const workName = (item.name || '').trim();
+      const unit = (item.unit || 'м').trim();
+      const groupKey = `${section}__${workName.toLowerCase()}__${unit.toLowerCase()}`;
+
+      if (!workGroups.has(groupKey)) {
+        workGroups.set(groupKey, {
+          name: workName,
+          unit: unit,
+          section: section,
+          type: item.type || 'работа',
+          volume: 0,
+          formulaParts: [],
+          handles: new Set(),
+          comments: new Set(),
+          materialsMap: new Map(),
+          isOptical: !!item.isOptical,
+          trenchType: item.trenchType,
+          equipmentType: item.equipmentType,
+          mark: item.mark,
+          method: item.method
+        });
+      }
+
+      const group = workGroups.get(groupKey);
+      group.volume += (Number(item.volume) || 0);
+
+      if (item.formulaDisplay && item.formulaDisplay.trim()) {
+        group.formulaParts.push(item.formulaDisplay.trim());
+      } else if (item.volume) {
+        const srcLabel = item.trenchType || item.routingType || item.mark || item.ruleName || '';
+        group.formulaParts.push(srcLabel ? `${item.volume} (${srcLabel})` : `${item.volume}`);
+      }
+
+      if (Array.isArray(item.handles)) {
+        item.handles.forEach(h => group.handles.add(h));
+      }
+      if (item.comment) {
+        group.comments.add(item.comment);
+      }
+    } else {
+      // THIS IS A MATERIAL ITEM
+      const parentName = (item.parentWorkName || '').trim();
+      const matName = (item.name || '').trim();
+      const matUnit = (item.unit || 'м').trim();
+
+      let targetGroup = null;
+      if (parentName) {
+        for (const grp of workGroups.values()) {
+          if (grp.section.toLowerCase() === section.toLowerCase() && grp.name.toLowerCase() === parentName.toLowerCase()) {
+            targetGroup = grp;
+            break;
+          }
+        }
+        if (!targetGroup) {
+          for (const grp of workGroups.values()) {
+            if (grp.name.toLowerCase() === parentName.toLowerCase()) {
+              targetGroup = grp;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!targetGroup) {
+        const lastGroup = Array.from(workGroups.values()).reverse().find(g => g.section.toLowerCase() === section.toLowerCase());
+        if (lastGroup) {
+          targetGroup = lastGroup;
+        }
+      }
+
+      if (targetGroup) {
+        const matKey = `${matName.toLowerCase()}__${matUnit.toLowerCase()}`;
+        if (!targetGroup.materialsMap.has(matKey)) {
+          targetGroup.materialsMap.set(matKey, {
+            name: matName,
+            unit: matUnit,
+            section: section,
+            type: item.type || 'материал',
+            volume: 0,
+            formulaParts: [],
+            handles: new Set(),
+            comments: new Set(),
+            parentWorkName: targetGroup.name,
+            isOptical: !!item.isOptical,
+            foundInCatalog: item.foundInCatalog !== undefined ? item.foundInCatalog : true,
+            trenchType: item.trenchType,
+            equipmentType: item.equipmentType,
+            mark: item.mark,
+            method: item.method
+          });
+        }
+
+        const matEntry = targetGroup.materialsMap.get(matKey);
+        matEntry.volume += (Number(item.volume) || 0);
+
+        if (item.formulaDisplay && item.formulaDisplay.trim()) {
+          matEntry.formulaParts.push(item.formulaDisplay.trim());
+        } else if (item.volume) {
+          const srcLabel = item.trenchType || item.routingType || item.mark || '';
+          matEntry.formulaParts.push(srcLabel ? `${item.volume} (${srcLabel})` : `${item.volume}`);
+        }
+
+        if (Array.isArray(item.handles)) {
+          item.handles.forEach(h => matEntry.handles.add(h));
+        }
+        if (item.comment) {
+          matEntry.comments.add(item.comment);
+        }
+      } else {
+        orphanMaterials.push(item);
+      }
+    }
+  });
+
+  const result = [];
+  let workIndex = 1;
+
+  workGroups.forEach(work => {
+    const roundedWorkVol = Math.round(work.volume * 100) / 100;
+
+    let finalWorkFormula = '';
+    if (work.formulaParts.length > 1) {
+      const uniqueParts = Array.from(new Set(work.formulaParts));
+      if (uniqueParts.length === 1 && uniqueParts[0].includes('=')) {
+        finalWorkFormula = uniqueParts[0];
+      } else {
+        finalWorkFormula = uniqueParts.join(' + ') + ` = ${roundedWorkVol} ${work.unit}`;
+      }
+    } else if (work.formulaParts.length === 1) {
+      finalWorkFormula = work.formulaParts[0];
+    } else {
+      finalWorkFormula = `${roundedWorkVol} ${work.unit}`;
+    }
+    finalWorkFormula = normalizeFormulaMathOperators(finalWorkFormula);
+
+    result.push({
+      itemNumber: `${workIndex}`,
+      name: work.name,
+      unit: work.unit,
+      volume: roundedWorkVol,
+      volumeFormatted: String(roundedWorkVol),
+      formulaDisplay: finalWorkFormula,
+      section: work.section,
+      type: work.type || 'работа',
+      isParentWork: true,
+      isSubItem: false,
+      subItemsCount: work.materialsMap.size,
+      handles: Array.from(work.handles),
+      comment: Array.from(work.comments).join('; '),
+      isOptical: work.isOptical,
+      trenchType: work.trenchType,
+      equipmentType: work.equipmentType,
+      mark: work.mark,
+      method: work.method
+    });
+
+    let matIndex = 1;
+    work.materialsMap.forEach(mat => {
+      const roundedMatVol = (mat.unit === 'км') 
+        ? Number(mat.volume.toFixed(3)) 
+        : Math.round(mat.volume * 100) / 100;
+
+      let finalMatFormula = '';
+      if (mat.formulaParts.length > 1) {
+        const uniqueParts = Array.from(new Set(mat.formulaParts));
+        finalMatFormula = uniqueParts.join(' + ') + ` = ${roundedMatVol} ${mat.unit}`;
+      } else if (mat.formulaParts.length === 1) {
+        finalMatFormula = mat.formulaParts[0];
+      } else {
+        finalMatFormula = `${roundedMatVol} ${mat.unit}`;
+      }
+      finalMatFormula = normalizeFormulaMathOperators(finalMatFormula);
+
+      result.push({
+        itemNumber: `${workIndex}.${matIndex}`,
+        name: mat.name,
+        unit: mat.unit,
+        volume: roundedMatVol,
+        volumeFormatted: String(roundedMatVol),
+        formulaDisplay: finalMatFormula,
+        section: mat.section,
+        type: mat.type || 'материал',
+        isParentWork: false,
+        isSubItem: true,
+        parentWorkName: work.name,
+        parentNumber: `${workIndex}`,
+        handles: Array.from(mat.handles),
+        comment: Array.from(mat.comments).join('; '),
+        isOptical: mat.isOptical,
+        foundInCatalog: mat.foundInCatalog,
+        trenchType: mat.trenchType,
+        equipmentType: mat.equipmentType,
+        mark: mat.mark,
+        method: mat.method
+      });
+      matIndex++;
+    });
+
+    workIndex++;
+  });
+
+  orphanMaterials.forEach((orphan, oIdx) => {
+    result.push({
+      itemNumber: `${workIndex}.${oIdx + 1}`,
+      name: orphan.name,
+      unit: orphan.unit,
+      volume: orphan.volume,
+      volumeFormatted: String(orphan.volume),
+      formulaDisplay: normalizeFormulaMathOperators(orphan.formulaDisplay || ''),
+      section: orphan.section || 'Монтажные работы',
+      type: orphan.type || 'материал',
+      isParentWork: false,
+      isSubItem: true,
+      parentWorkName: 'Прочие материалы',
+      handles: orphan.handles || [],
+      comment: orphan.comment || ''
+    });
+  });
+
+  return result;
+}
+
 // Get combined works and missing items from Trenches ("Строительные работы"), Cables ("Монтажные работы"), and Equipment ("Оборудование")
 function getAllCalculatedWorks() {
   const trenchSummary = getActiveTrenchSummary();
@@ -5357,7 +5945,8 @@ function getAllCalculatedWorks() {
   const equipmentData = getActiveEquipmentSummary();
   const equipmentCalc = calculateWorksFromEquipment(equipmentData.summary, currentWorksRules);
 
-  const allWorks = [ ...trenchCalc.works, ...cableCalc.works, ...equipmentCalc.works ];
+  const rawAllWorks = [ ...(trenchCalc.works || []), ...(cableCalc.works || []), ...(equipmentCalc.works || []) ];
+  const allWorks = aggregateCalculatedWorks(rawAllWorks);
 
   // Group works by actual target section:
   // Items with section "Строительные работы" (or containing "строительн") go to trenchWorks (Section 1)
@@ -5411,7 +6000,15 @@ function formatGgeQuantity(val) {
 }
 
 // Generate GGE XML format (QuantityTakeoff-3_01.xsd) for Главгосэкспертиза
-function generateVorGgeXml(worksData, currentFileName) {
+// Supports numberingMode: 'hierarchical' (1, 1.1, 1.2, 2, 2.1...) or 'sequential' (1, 2, 3, 4, 5...)
+function generateVorGgeXml(worksData, currentFileName, numberingMode = null) {
+  const settings = getRulesSettings(currentWorksRules);
+  const effectiveNumMode = numberingMode || (settings.numberingMode === 'сквозная' ? 'sequential' : 'hierarchical');
+  const ggeVersion = settings.ggeVersion || '3.01';
+  const accessLevel = settings.accessLevel || 'коммерческая тайна';
+  const softName = settings.softName || 'Программный комплекс "Строительный эксперт"  v7.3.1.7813';
+  const pluginVersion = settings.pluginVersion || 'Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13';
+
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
@@ -5431,21 +6028,43 @@ function generateVorGgeXml(worksData, currentFileName) {
     sectionsMap.get(secName).push(w);
   });
 
-  let globalWorkNum = 1;
   let sectionNum = 1;
+  let globalSequentialNum = 1;
   let sectionsXml = '';
 
   for (const [secName, works] of sectionsMap.entries()) {
     let worksXml = '';
+
     works.forEach(work => {
-      const typeXml = work.type ? `\t\t\t\t<Type>${escapeXml(work.type)}</Type>\n` : '';
+      let ggeType = 'работа';
+      const rawType = (work.type || '').trim().toLowerCase();
+      if (rawType === 'оборудование' || rawType === 'equipment') {
+        ggeType = 'оборудование';
+      } else if (rawType === 'материал' || rawType === 'material') {
+        ggeType = 'материал';
+      } else if (work.isSubItem) {
+        ggeType = 'материал';
+      } else {
+        ggeType = 'работа';
+      }
+      const typeXml = `\t\t\t\t<Type>${ggeType}</Type>\n`;
       const commentXml = work.comment ? `\t\t\t\t<Comment>${escapeXml(work.comment)}</Comment>\n` : '';
       const unitStr = escapeXml(work.unit || 'м');
       const qtyStr = formatGgeQuantity(work.volume);
-      const formulaStr = escapeXml(work.formulaDisplay || String(work.volume));
+      const formulaRaw = work.formulaDisplay || String(work.volume);
+      const formulaStr = escapeXml(normalizeFormulaMathOperators(formulaRaw));
+
+      let numStr = '';
+      if (effectiveNumMode === 'sequential' || effectiveNumMode === 'continuous') {
+        // Mode 2: Continuous sequential numbering (1, 2, 3, 4, 5...)
+        numStr = String(globalSequentialNum++);
+      } else {
+        // Mode 1: Hierarchical numbering (1, 1.1, 1.2, 2, 2.1...)
+        numStr = work.itemNumber || String(globalSequentialNum++);
+      }
 
       worksXml += `\t\t\t<Work>
-\t\t\t\t<Num>${globalWorkNum++}</Num>
+\t\t\t\t<Num>${escapeXml(numStr)}</Num>
 ${typeXml}\t\t\t\t<Name>${escapeXml(work.name)}</Name>
 \t\t\t\t<Unit>${unitStr}</Unit>
 \t\t\t\t<Quantity>${qtyStr}</Quantity>
@@ -5467,15 +6086,15 @@ ${worksXml}\t\t</Works>
 <Construction xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="QuantityTakeoff-3_01.xsd">
 <Meta>
 \t<Soft>
-\t\t<Name>Программный комплекс &quot;Строительный эксперт&quot;  v7.3.1.7813</Name>
-\t\t<Version>Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13</Version>
+\t\t<Name>${escapeXml(softName)}</Name>
+\t\t<Version>${escapeXml(pluginVersion)}</Version>
 \t</Soft>
 \t<File>
 \t\t<Type>Ведомость объемов работ</Type>
-\t\t<Version>3.01</Version>
+\t\t<Version>${escapeXml(ggeVersion)}</Version>
 \t</File>
 </Meta>
-<AccessLevel>коммерческая тайна</AccessLevel>
+<AccessLevel>${escapeXml(accessLevel)}</AccessLevel>
 <ConstructionSite></ConstructionSite>
 <ObjectName>${escapeXml(objectName)}</ObjectName>
 <Num></Num>
@@ -5510,7 +6129,7 @@ ${sectionsXml}</Sections>
 }
 
 // Generate Excel Workbook matching the user's template format
-function generateVorWorkbook(worksData, currentFileName) {
+function generateVorWorkbook(worksData, currentFileName, numberingMode = 'hierarchical') {
   const headersRow1 = [
     '№ п.п.',
     'Наименование работ, ресурсов, затрат по проекту',
@@ -5555,18 +6174,28 @@ function generateVorWorkbook(worksData, currentFileName) {
     merges.push({ s: { r: secRowIndex, c: 0 }, e: { r: secRowIndex, c: 8 } });
     secIndex++;
 
+    let secSequentialNum = 1;
     works.forEach((w, idx) => {
       dataRowIndexes.push(aoa.length);
+      const isMaterial = w.isSubItem || w.type === 'материал';
+      let numStr = '';
+      if (numberingMode === 'sequential' || numberingMode === 'continuous') {
+        numStr = secSequentialNum++;
+      } else {
+        numStr = w.itemNumber || (idx + 1);
+      }
+      const nameStr = isMaterial ? `    ↳ ${w.name}` : w.name;
+
       aoa.push([
-        idx + 1,
-        w.name,
+        numStr,
+        nameStr,
         w.unit,
         w.volume,
-        w.formulaDisplay,
+        normalizeFormulaMathOperators(w.formulaDisplay),
         '', // Ссылка на чертежи
         '', // Наименование файла
         '', // Номера страниц
-        ''  // Дополнительная информация
+        w.comment || ''  // Дополнительная информация
       ]);
     });
   }
@@ -5620,25 +6249,17 @@ function generateVorWorkbook(worksData, currentFileName) {
   return wb;
 }
 
-// Export calculation results to XML GGE (.gge) matching Главгосэкспертиза format
-function exportCalculationResults() {
-  // Ensure calculations have been executed
-  const resCable = document.querySelector('#result table');
-  const resRouting = document.querySelector('#resultCouplings table');
-
-  if (!resCable && !resRouting) {
-    if (currentData) {
-      calculateVolumes();
-    } else {
-      showToast('Сначала загрузите исходные данные для расчета', 'error', 'Ошибка');
-      return;
-    }
+// Download GGE file with selected numbering mode (or read from settings)
+function downloadGgeFile(numberingMode) {
+  if (!numberingMode) {
+    const settings = getRulesSettings(currentWorksRules);
+    numberingMode = settings.numberingMode === 'сквозная' ? 'sequential' : 'hierarchical';
   }
 
   const { works, missingInRules, cableMissingInCatalog } = getAllCalculatedWorks();
 
   if (works.length === 0) {
-    showToast('Не найдено подходящих правил сметных норм для траншей или кабелей в проекте', 'error', 'Ошибка');
+    showToast('Не найдено подходящих сметных норм для выгрузки ВОР', 'error', 'Ошибка');
     return;
   }
 
@@ -5651,27 +6272,30 @@ function exportCalculationResults() {
       `Внимание: для способов ${missingStr} в файле правил сметных норм отсутствуют работы. Экспорт продолжен для остальных позиций.`,
       'warning',
       'Внимание',
-      8000
+      6000
     );
   }
 
   if (cableMissingInCatalog && cableMissingInCatalog.length > 0) {
     const missingCables = cableMissingInCatalog.map(m => m.type).join(', ');
     showToast(
-      `Внимание: в ВОР присутствуют марки кабелей (${missingCables}), отсутствующие в справочнике. Применен приблизительный расчетный вес.`,
+      `Внимание: в ВОР присутствуют марки кабелей (${missingCables}), отсутствующие в справочнике. Применен расчетный вес.`,
       'warning',
       'Справочник кабелей',
-      8000
+      6000
     );
   }
 
-  const xmlContent = generateVorGgeXml(works, currentFileName);
-  const outBaseName = currentFileName
-    ? currentFileName.replace(/\.[^/.]+$/, '')
+  const xmlContent = generateVorGgeXml(works, currentFileName, numberingMode);
+  let baseName = currentFileName
+    ? currentFileName.replace(/\.[^/.]+$/, '').trim()
     : 'Ведомость_объемов_работ';
-  const outFileName = `ВОР_${outBaseName}.gge`;
+  if (baseName.toLowerCase().endsWith('.gge')) {
+    baseName = baseName.slice(0, -4);
+  }
+  const outFileName = `${baseName.startsWith('ВОР_') ? baseName : 'ВОР_' + baseName}.gge`;
 
-  const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8' });
+  const blob = new Blob([xmlContent], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -5681,7 +6305,27 @@ function exportCalculationResults() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  showToast(`Ведомость объемов работ (ВОР) успешно экспортирована в файл «${outFileName}» (${works.length} поз.)`, 'success', 'Экспорт GGE завершен');
+  const modeLabel = (numberingMode === 'sequential') ? 'сквозная (1, 2, 3...)' : 'иерархическая (1, 1.1, 1.2...)';
+  showToast(`Ведомость объемов работ (ВОР) успешно экспортирована в «${outFileName}» (${works.length} поз., нумерация: ${modeLabel})`, 'success', 'Экспорт GGE завершен');
+}
+
+// Export calculation results directly to XML GGE (.gge) matching Главгосэкспертиза format
+function exportCalculationResults() {
+  const resCable = document.querySelector('#result table');
+  const resRouting = document.querySelector('#resultCouplings table');
+
+  if (!resCable && !resRouting) {
+    if (currentData) {
+      calculateVolumes();
+    } else {
+      showToast('Сначала загрузите исходные данные для расчета', 'error', 'Ошибка');
+      return;
+    }
+  }
+
+  const settings = getRulesSettings(currentWorksRules);
+  const mode = settings.numberingMode === 'сквозная' ? 'sequential' : 'hierarchical';
+  downloadGgeFile(mode);
 }
 
 // Optional secondary export to Excel (.xlsx)
@@ -5715,7 +6359,9 @@ function exportVorExcel() {
       7000
     );
   }
-  const wb = generateVorWorkbook(works, currentFileName);
+  const settings = getRulesSettings(currentWorksRules);
+  const mode = settings.numberingMode === 'сквозная' ? 'sequential' : 'hierarchical';
+  const wb = generateVorWorkbook(works, currentFileName, mode);
   const outBaseName = currentFileName
     ? currentFileName.replace(/\.[^/.]+$/, '')
     : 'Ведомость_объемов_работ';
@@ -5826,38 +6472,8 @@ function syncTableToCurrentData() {
 }
 
 // --------------------------------------------------------------------------
-// WORKS RULES & NORMS JSON EDITOR
-// --------------------------------------------------------------------------
-
-// --------------------------------------------------------------------------
 // WORKS RULES & NORMS JSON EDITOR (WITH CODEMIRROR & CODE FOLDING)
 // --------------------------------------------------------------------------
-
-let worksJsonCodeMirror = null;
-
-// Get current JSON string from CodeMirror or fallback textarea
-function getWorksJsonEditorValue() {
-  if (worksJsonCodeMirror) {
-    return worksJsonCodeMirror.getValue();
-  }
-  const textarea = document.getElementById('worksJsonEditorTextarea');
-  return textarea ? textarea.value : '';
-}
-
-// Set JSON string in CodeMirror and fallback textarea
-function setWorksJsonEditorValue(val) {
-  const textarea = document.getElementById('worksJsonEditorTextarea');
-  if (textarea) textarea.value = val;
-  if (worksJsonCodeMirror) {
-    const cursor = worksJsonCodeMirror.getCursor();
-    worksJsonCodeMirror.setValue(val);
-    try {
-      worksJsonCodeMirror.setCursor(cursor);
-    } catch {
-      // ignore cursor reset if length changed
-    }
-  }
-}
 
 // Fold all collapsible blocks in JSON editor
 function foldAllWorksJson() {
@@ -5940,52 +6556,172 @@ function initWorksJsonCodeMirror() {
   return worksJsonCodeMirror;
 }
 
-// Open Works Rules Modal with specific tab active ('editor', 'cards', 'cables', or 'couplings')
+// Helper to focus, center-scroll, select and visually highlight newly added JSON node in CodeMirror
+function highlightAndScrollToJsonNode(targetString, isKey = true) {
+  // 1. Switch to JSON editor tab
+  const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
+  if (jsonTabBtn && window.bootstrap && bootstrap.Tab) {
+    bootstrap.Tab.getOrCreateInstance(jsonTabBtn).show();
+  }
+
+  // 2. Perform CodeMirror scroll, selection, fold expansion and animated line highlight
+  setTimeout(() => {
+    if (!worksJsonCodeMirror) {
+      const textarea = document.getElementById('worksJsonEditorTextarea');
+      if (textarea) {
+        const searchPattern = isKey ? `"${targetString}":` : `"${targetString}"`;
+        let idx = textarea.value.lastIndexOf(searchPattern);
+        if (idx === -1) idx = textarea.value.lastIndexOf(targetString);
+        if (idx !== -1) {
+          const startIdx = idx + (isKey ? 1 : (textarea.value.charAt(idx) === '"' ? 1 : 0));
+          textarea.focus();
+          textarea.setSelectionRange(startIdx, startIdx + targetString.length);
+        }
+      }
+      return;
+    }
+
+    worksJsonCodeMirror.refresh();
+
+    const doc = worksJsonCodeMirror.getDoc();
+    const fullText = doc.getValue();
+
+    // Look specifically for the KEY declaration first, to avoid matching substrings in "Полное описание"
+    let searchStr = isKey ? `"${targetString}":` : `"${targetString}"`;
+    let foundIndex = fullText.lastIndexOf(searchStr);
+    if (foundIndex === -1) {
+      searchStr = targetString;
+      foundIndex = fullText.lastIndexOf(searchStr);
+    }
+
+    if (foundIndex !== -1) {
+      // Find position of the exact target string inside the match for clean cursor selection
+      const nameIndex = fullText.indexOf(targetString, foundIndex);
+      const actualPos = nameIndex !== -1 ? nameIndex : foundIndex;
+      const posFrom = doc.posFromIndex(actualPos);
+      const posTo = doc.posFromIndex(actualPos + targetString.length);
+
+      let startLine = posFrom.line;
+
+      // If rule item starts with '{' on line above
+      if (!isKey && startLine > 0) {
+        const prevLine = doc.getLine(startLine - 1).trim();
+        if (prevLine === '{') {
+          startLine = startLine - 1;
+        }
+      }
+
+      // Unfold code around this line
+      if (typeof worksJsonCodeMirror.foldCode === 'function') {
+        for (let l = Math.max(0, startLine - 15); l <= Math.min(doc.lineCount() - 1, startLine + 50); l++) {
+          worksJsonCodeMirror.foldCode({ line: l, ch: 0 }, null, "unfold");
+        }
+      }
+
+      // Determine exact end line of this JSON object by tracking bracket/brace depth
+      let endLine = startLine;
+      let openBraces = 0;
+      let startedCounting = false;
+      
+      for (let l = startLine; l < doc.lineCount(); l++) {
+        const lineText = doc.getLine(l);
+        for (let ch = 0; ch < lineText.length; ch++) {
+          const c = lineText[ch];
+          if (c === '{' || c === '[') {
+            openBraces++;
+            startedCounting = true;
+          } else if (c === '}' || c === ']') {
+            openBraces--;
+          }
+        }
+        if (startedCounting && openBraces <= 0) {
+          endLine = l;
+          break;
+        }
+      }
+
+      if (endLine < startLine) {
+        endLine = Math.min(doc.lineCount() - 1, startLine + (isKey ? 6 : 14));
+      }
+
+      // Center the inserted block in the viewport
+      const lineCoords = worksJsonCodeMirror.charCoords(posFrom, "local");
+      const editorHeight = worksJsonCodeMirror.getWrapperElement().clientHeight || 420;
+      const targetScrollTop = Math.max(0, lineCoords.top - Math.floor(editorHeight / 3));
+      worksJsonCodeMirror.scrollTo(null, targetScrollTop);
+
+      // Select the key/name so user can immediately type a replacement
+      doc.setSelection(posFrom, posTo);
+      worksJsonCodeMirror.focus();
+
+      // Add animated glow pulse highlight to the EXACT lines of the added block
+      const highlightedLines = [];
+      for (let l = startLine; l <= endLine; l++) {
+        worksJsonCodeMirror.addLineClass(l, 'background', 'cm-new-node-glow');
+        highlightedLines.push(l);
+      }
+
+      setTimeout(() => {
+        highlightedLines.forEach(l => {
+          worksJsonCodeMirror.removeLineClass(l, 'background', 'cm-new-node-glow');
+        });
+      }, 3600);
+    }
+  }, 160);
+}
+
+// Open Works Rules Modal with specific tab active ('editor', 'cards', 'cables', 'couplings', 'equipment', or 'settings')
 function openWorksRulesModal(activeTab = 'editor') {
   const modalEl = document.getElementById('worksRulesModal');
   if (!modalEl) return;
 
-  initWorksJsonCodeMirror();
-  setWorksJsonEditorValue(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }, null, 2));
-  validateWorksJsonInput();
-
-  renderRulesModalContent();
-
-  if (activeTab === 'cards') {
-    const cardsTabBtn = document.getElementById('tabWorksCardsBtn');
-    if (cardsTabBtn && window.bootstrap && bootstrap.Tab) {
-      bootstrap.Tab.getOrCreateInstance(cardsTabBtn).show();
-    }
-  } else if (activeTab === 'cables') {
-    const cablesTabBtn = document.getElementById('tabWorksCablesBtn');
-    if (cablesTabBtn && window.bootstrap && bootstrap.Tab) {
-      bootstrap.Tab.getOrCreateInstance(cablesTabBtn).show();
-    }
-  } else if (activeTab === 'couplings') {
-    const couplingsTabBtn = document.getElementById('tabWorksCouplingsBtn');
-    if (couplingsTabBtn && window.bootstrap && bootstrap.Tab) {
-      bootstrap.Tab.getOrCreateInstance(couplingsTabBtn).show();
-    }
-  } else if (activeTab === 'equipment') {
-    const equipmentTabBtn = document.getElementById('tabWorksEquipmentBtn');
-    if (equipmentTabBtn && window.bootstrap && bootstrap.Tab) {
-      bootstrap.Tab.getOrCreateInstance(equipmentTabBtn).show();
-    }
-  } else {
-    const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
-    if (jsonTabBtn && window.bootstrap && bootstrap.Tab) {
-      bootstrap.Tab.getOrCreateInstance(jsonTabBtn).show();
-    }
+  try {
+    initWorksJsonCodeMirror();
+    setWorksJsonEditorValue(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }, null, 2));
+    validateWorksJsonInput();
+  } catch (err) {
+    console.warn('Editor sync warning:', err);
   }
 
-  if (window.bootstrap && bootstrap.Modal) {
-    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  try {
+    renderRulesModalContent();
+  } catch (err) {
+    console.warn('Modal content render warning:', err);
+  }
+
+  try {
+    let tabBtnId = 'tabWorksJsonBtn';
+    if (activeTab === 'cards') tabBtnId = 'tabWorksCardsBtn';
+    else if (activeTab === 'cables') tabBtnId = 'tabWorksCablesBtn';
+    else if (activeTab === 'couplings') tabBtnId = 'tabWorksCouplingsBtn';
+    else if (activeTab === 'equipment') tabBtnId = 'tabWorksEquipmentBtn';
+    else if (activeTab === 'settings') tabBtnId = 'tabWorksSettingsBtn';
+
+    const tabBtn = document.getElementById(tabBtnId);
+    if (tabBtn && window.bootstrap && bootstrap.Tab) {
+      bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+    }
+  } catch (err) {
+    console.warn('Tab switch warning:', err);
+  }
+
+  try {
+    if (window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  } catch (err) {
+    console.error('Failed to open modal with Bootstrap:', err);
   }
 
   setTimeout(() => {
-    if (worksJsonCodeMirror) worksJsonCodeMirror.refresh();
+    try {
+      if (worksJsonCodeMirror) worksJsonCodeMirror.refresh();
+    } catch {
+      // ignore refresh errors
+    }
   }, 100);
 }
+window.openWorksRulesModal = openWorksRulesModal;
 
 // Validate Works Rules JSON in textarea/CodeMirror, update stats, status badge and error display
 function validateWorksJsonInput() {
@@ -6110,138 +6846,6 @@ function setupWorksRulesListeners() {
       }
     });
   }
-
-  // Helper to safely parse and synchronize currentWorksRules from the editor if valid
-  const syncCurrentRulesFromEditorIfValid = () => {
-    try {
-      const val = getWorksJsonEditorValue();
-      if (!val) return;
-      const parsed = JSON.parse(val);
-      if (parsed && typeof parsed === 'object') {
-        if (Array.isArray(parsed)) {
-          currentWorksRules = { "Строительные работы": parsed };
-        } else {
-          currentWorksRules = parsed;
-        }
-      }
-    } catch {
-      // ignore syntax error while user is actively typing in JSON
-    }
-  };
-
-  // Helper to focus, center-scroll, select and visually highlight newly added JSON node in CodeMirror
-  const highlightAndScrollToJsonNode = (targetString, isKey = true) => {
-    // 1. Switch to JSON editor tab
-    const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
-    if (jsonTabBtn && window.bootstrap && bootstrap.Tab) {
-      bootstrap.Tab.getOrCreateInstance(jsonTabBtn).show();
-    }
-
-    // 2. Perform CodeMirror scroll, selection, fold expansion and animated line highlight
-    setTimeout(() => {
-      if (!worksJsonCodeMirror) {
-        const textarea = document.getElementById('worksJsonEditorTextarea');
-        if (textarea) {
-          const searchPattern = isKey ? `"${targetString}":` : `"${targetString}"`;
-          let idx = textarea.value.lastIndexOf(searchPattern);
-          if (idx === -1) idx = textarea.value.lastIndexOf(targetString);
-          if (idx !== -1) {
-            const startIdx = idx + (isKey ? 1 : (textarea.value.charAt(idx) === '"' ? 1 : 0));
-            textarea.focus();
-            textarea.setSelectionRange(startIdx, startIdx + targetString.length);
-          }
-        }
-        return;
-      }
-
-      worksJsonCodeMirror.refresh();
-
-      const doc = worksJsonCodeMirror.getDoc();
-      const fullText = doc.getValue();
-
-      // Look specifically for the KEY declaration first, to avoid matching substrings in "Полное описание"
-      let searchStr = isKey ? `"${targetString}":` : `"${targetString}"`;
-      let foundIndex = fullText.lastIndexOf(searchStr);
-      if (foundIndex === -1) {
-        searchStr = targetString;
-        foundIndex = fullText.lastIndexOf(searchStr);
-      }
-
-      if (foundIndex !== -1) {
-        // Find position of the exact target string inside the match for clean cursor selection
-        const nameIndex = fullText.indexOf(targetString, foundIndex);
-        const actualPos = nameIndex !== -1 ? nameIndex : foundIndex;
-        const posFrom = doc.posFromIndex(actualPos);
-        const posTo = doc.posFromIndex(actualPos + targetString.length);
-
-        let startLine = posFrom.line;
-
-        // If rule item starts with '{' on line above
-        if (!isKey && startLine > 0) {
-          const prevLine = doc.getLine(startLine - 1).trim();
-          if (prevLine === '{') {
-            startLine = startLine - 1;
-          }
-        }
-
-        // Unfold code around this line
-        if (typeof worksJsonCodeMirror.foldCode === 'function') {
-          for (let l = Math.max(0, startLine - 15); l <= Math.min(doc.lineCount() - 1, startLine + 50); l++) {
-            worksJsonCodeMirror.foldCode({ line: l, ch: 0 }, null, "unfold");
-          }
-        }
-
-        // Determine exact end line of this JSON object by tracking bracket/brace depth
-        let endLine = startLine;
-        let openBraces = 0;
-        let startedCounting = false;
-        
-        for (let l = startLine; l < doc.lineCount(); l++) {
-          const lineText = doc.getLine(l);
-          for (let ch = 0; ch < lineText.length; ch++) {
-            const c = lineText[ch];
-            if (c === '{' || c === '[') {
-              openBraces++;
-              startedCounting = true;
-            } else if (c === '}' || c === ']') {
-              openBraces--;
-            }
-          }
-          if (startedCounting && openBraces <= 0) {
-            endLine = l;
-            break;
-          }
-        }
-
-        if (endLine < startLine) {
-          endLine = Math.min(doc.lineCount() - 1, startLine + (isKey ? 6 : 14));
-        }
-
-        // Center the inserted block in the viewport
-        const lineCoords = worksJsonCodeMirror.charCoords(posFrom, "local");
-        const editorHeight = worksJsonCodeMirror.getWrapperElement().clientHeight || 420;
-        const targetScrollTop = Math.max(0, lineCoords.top - Math.floor(editorHeight / 3));
-        worksJsonCodeMirror.scrollTo(null, targetScrollTop);
-
-        // Select the key/name so user can immediately type a replacement
-        doc.setSelection(posFrom, posTo);
-        worksJsonCodeMirror.focus();
-
-        // Add animated glow pulse highlight to the EXACT lines of the added block
-        const highlightedLines = [];
-        for (let l = startLine; l <= endLine; l++) {
-          worksJsonCodeMirror.addLineClass(l, 'background', 'cm-new-node-glow');
-          highlightedLines.push(l);
-        }
-
-        setTimeout(() => {
-          highlightedLines.forEach(l => {
-            worksJsonCodeMirror.removeLineClass(l, 'background', 'cm-new-node-glow');
-          });
-        }, 3600);
-      }
-    }, 160);
-  };
 
   // Add rule template button (+ Способ) and Quick Add in cards tab
   const insertRuleSample = () => {
@@ -6554,6 +7158,39 @@ function setupWorksRulesListeners() {
       renderEquipmentCatalogModalContent();
     });
   }
+
+  // Settings tab show listener
+  const settingsTabBtn = document.getElementById('tabWorksSettingsBtn');
+  if (settingsTabBtn) {
+    settingsTabBtn.addEventListener('shown.bs.tab', () => {
+      syncCurrentRulesFromEditorIfValid();
+      renderSettingsModalContent();
+    });
+  }
+
+  // Settings action buttons
+  const syncSettingsBtn = document.getElementById('syncSettingsToJsonBtn');
+  if (syncSettingsBtn) {
+    syncSettingsBtn.addEventListener('click', () => saveSettingsFromUiToJson(true));
+  }
+
+  const resetSettingsBtn = document.getElementById('resetDefaultSettingsBtn');
+  if (resetSettingsBtn) {
+    resetSettingsBtn.addEventListener('click', resetDefaultSettings);
+  }
+
+  // Auto-sync settings inputs on change
+  [
+    'settingNumberingMode',
+    'settingDecimalsKm', 'settingDecimalsVolume',
+    'settingGgeVersion', 'settingAccessLevel',
+    'settingSoftName', 'settingPluginVersion'
+  ].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', () => saveSettingsFromUiToJson(false));
+    }
+  });
 
   // Add equipment sample (+ Оборудование)
   const insertEquipmentSample = () => {
