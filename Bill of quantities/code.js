@@ -1,7 +1,6 @@
 // Bill of quantities (ВОР) module logic
 let currentData = null;
 let currentFileName = '';
-let isEditable = false;
 let isRawColCollapsed = false;
 
 // Helper to extract works/materials array from a rule object, supporting nested "Материалы" arrays
@@ -151,7 +150,7 @@ function evaluateWorkFormula(formula, baseValue) {
   try {
     if (/^[0-9+\-*/().\s]+$/.test(expr)) {
       const val = Function("'use strict'; return (" + expr + ");")();
-      if (typeof val === 'number' && !isNaN(val)) {
+      if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
         return val;
       }
     }
@@ -173,17 +172,30 @@ function buildWorkFormulaDisplay(formula, totalLength, itemsCount, unit) {
 }
 
 // Check if calculation formula should be displayed for work or material item
-// Controlled by "ОтображатьФормулу": true/false (or "Отображать формулу": true/false)
-function shouldShowFormula(item) {
-  if (!item || typeof item !== 'object') return true;
-  const val = item["ОтображатьФормулу"] !== undefined ? item["ОтображатьФормулу"] : item["Отображать формулу"];
+// Controlled by "ОтображатьФормулу", "Показывать формулу", "showFormula", etc.
+function shouldShowFormula(item, fallbackValue = true) {
+  if (!item || typeof item !== 'object') return fallbackValue;
 
-  if (val === undefined || val === null) return true;
+  const formulaKeyRegex = /^(?:отображать|показывать|show|display)[ _-]*(?:формулу|формула|formula)$/i;
+
+  let val = undefined;
+  for (const [key, v] of Object.entries(item)) {
+    if (formulaKeyRegex.test(key.trim())) {
+      val = v;
+      break;
+    }
+  }
+
+  if (val === undefined || val === null) {
+    if (item.showFormula !== undefined) val = item.showFormula;
+  }
+
+  if (val === undefined || val === null) return fallbackValue;
   if (typeof val === 'boolean') return val;
   if (typeof val === 'number') return val !== 0;
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
-    if (s === 'false' || s === '0' || s === 'нет' || s === 'ложь') {
+    if (s === 'false' || s === '0' || s === 'нет' || s === 'ложь' || s === 'off' || s === 'no' || s === 'не показывать' || s === 'не отображать') {
       return false;
     }
     return true;
@@ -830,24 +842,11 @@ function getActiveCouplingsSummary(rulesData) {
   const cableCatalog = getCableCatalog(rules);
   const couplingCatalog = getCouplingCatalog(rules);
 
-  // Extract individual cable runs from tableCables or currentData
+  // Extract individual cable runs directly from currentData
   const cableRows = [];
-  const cableTable = document.getElementById('tableCables');
-  if (cableTable) {
-    const rows = cableTable.querySelectorAll('tbody tr');
-    rows.forEach(r => {
-      const typeCell = r.querySelector('[data-field="type"]');
-      const lengthCell = r.querySelector('[data-field="length"]');
-      const cableCell = r.querySelector('[data-field="cable"]');
-      if (typeCell && lengthCell) {
-        const rawType = typeCell.textContent.trim();
-        const length = parseFloat(lengthCell.textContent.replace(/\s+/g, '').replace(/,/g, '.')) || 0;
-        const cableName = cableCell ? cableCell.textContent.trim() : '';
-        cableRows.push({ type: rawType, length, cable: cableName });
-      }
-    });
-  } else if (currentData && Array.isArray(currentData.cables)) {
+  if (currentData && Array.isArray(currentData.cables)) {
     currentData.cables.forEach(c => {
+      if (!c) return;
       cableRows.push({
         type: c.type || '',
         length: Number(c.length) || 0,
@@ -1168,11 +1167,6 @@ function setupEventListeners() {
     loadSampleBtn.addEventListener('click', loadSampleData);
   }
 
-  const canEditBtn = document.getElementById('canEdit');
-  if (canEditBtn) {
-    canEditBtn.addEventListener('click', toggleEditMode);
-  }
-
   const calculateBtn = document.getElementById('calculate');
   if (calculateBtn) {
     calculateBtn.addEventListener('click', calculateVolumes);
@@ -1233,22 +1227,6 @@ function setupEventListeners() {
 
   // Setup Works Rules modal controls & JSON editor listeners
   setupWorksRulesListeners();
-
-  const exportBtn = document.getElementById('export');
-  if (exportBtn) {
-    exportBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      exportCurrentDataJSON();
-    });
-  }
-
-  const exportExcelBtn = document.getElementById('exportExcel');
-  if (exportExcelBtn) {
-    exportExcelBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      exportCurrentDataExcel();
-    });
-  }
 
   const exportResultBtn = document.getElementById('exportResult');
   if (exportResultBtn) {
@@ -1656,8 +1634,6 @@ function renderProcessedData(data, fileName) {
     }
   }
 
-  // Update edit styles if active
-  updateEditableElements();
   initTooltips();
 }
 
@@ -1692,7 +1668,6 @@ function createCablesAccordion(cables, totalLength) {
         <th style="min-width: 160px;">Способ прокладки</th>
         <th style="width: 85px;" class="text-center">Муфты</th>
         <th style="width: 65px;" class="text-center">Длина</th>
-        <th class="action-col d-none" style="width: 35px;"></th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -1700,9 +1675,8 @@ function createCablesAccordion(cables, totalLength) {
 
   const tbody = table.querySelector('tbody');
   cables.forEach((c, idx) => {
+    if (!c) return;
     const row = document.createElement('tr');
-    row.dataset.index = idx;
-    row._cableData = c;
 
     // Formatting routing type: render each routing type as a multi-line badge
     let routingHtml = '<span class="text-muted">-</span>';
@@ -1791,25 +1765,13 @@ function createCablesAccordion(cables, totalLength) {
     row.innerHTML = `
       <td class="text-muted small text-center">${idx + 1}</td>
       <td class="font-monospace text-muted small cell-wrap" style="font-size: 0.75rem;">${escapeHtml(c.handle || '')}</td>
-      <td class="fw-medium canEdit cell-wrap small" data-field="cable">${escapeHtml(c.cable || '')}</td>
-      <td class="canEdit text-end font-monospace fw-semibold small" data-field="length">${c.length ?? 0}</td>
-      <td class="canEdit cell-wrap small" data-field="type"${typeTitleAttr}>${escapeHtml(rawType)}</td>
+      <td class="fw-medium cell-wrap small">${escapeHtml(c.cable || '')}</td>
+      <td class="text-end font-monospace fw-semibold small">${c.length ?? 0}</td>
+      <td class="cell-wrap small"${typeTitleAttr}>${escapeHtml(rawType)}</td>
       <td class="cell-wrap">${routingHtml}</td>
       <td class="text-center align-middle">${couplingHtml}</td>
       <td class="text-center align-middle">${mismatchIcon}</td>
-      <td class="action-col d-none text-center">
-        <button type="button" class="btn btn-sm btn-outline-danger p-0 border-0 removeRowBtn" title="Удалить строку">
-          <i class='bx bx-trash fs-5'></i>
-        </button>
-      </td>
     `;
-
-    const removeBtn = row.querySelector('.removeRowBtn');
-    if (removeBtn) {
-      removeBtn.addEventListener('click', () => {
-        row.remove();
-      });
-    }
 
     tbody.appendChild(row);
   });
@@ -1914,7 +1876,6 @@ function createRoutingAccordion(blocks, totalLength) {
         <th style="width: 90px;" class="text-end">Длина, м</th>
         <th style="width: 70px;" class="text-center">Кабелей</th>
         <th style="min-width: 240px;">Состав кабелей в траншее</th>
-        <th class="action-col d-none" style="width: 40px;"></th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -1922,10 +1883,8 @@ function createRoutingAccordion(blocks, totalLength) {
 
   const tbody = table.querySelector('tbody');
   blocks.forEach((b, idx) => {
+    if (!b) return;
     const row = document.createElement('tr');
-    row.dataset.index = idx;
-    row.dataset.blockType = b.type || '';
-    row._blockData = b;
 
     // Multiline wrapped pills for contained cables - NEVER TRUNCATE
     let containedHtml = '<span class="text-muted">-</span>';
@@ -1961,25 +1920,13 @@ function createRoutingAccordion(blocks, totalLength) {
     row.innerHTML = `
       <td class="text-muted small text-center">${idx + 1}</td>
       <td class="font-monospace text-muted small cell-wrap">${escapeHtml(b.handle || '')}</td>
-      <td class="canEdit fw-bold cell-wrap" data-field="type">
+      <td class="fw-bold cell-wrap">
         <span class="block-type-name">${escapeHtml(b.type || '')}</span>${typeBadge}
       </td>
-      <td class="canEdit text-end font-monospace fw-semibold" data-field="length">${b.length ?? 0}</td>
+      <td class="text-end font-monospace fw-semibold">${b.length ?? 0}</td>
       <td class="text-center font-monospace">${b.cablesCount ?? 0}</td>
       <td class="cell-wrap">${containedHtml}</td>
-      <td class="action-col d-none text-center">
-        <button type="button" class="btn btn-sm btn-outline-danger p-0 border-0 removeRowBtn" title="Удалить строку">
-          <i class='bx bx-trash fs-5'></i>
-        </button>
-      </td>
     `;
-
-    const removeBtn = row.querySelector('.removeRowBtn');
-    if (removeBtn) {
-      removeBtn.addEventListener('click', () => {
-        row.remove();
-      });
-    }
 
     tbody.appendChild(row);
   });
@@ -2031,7 +1978,6 @@ function createEquipmentAccordion(equipmentList, totalCount) {
         <th style="min-width: 140px;">Способ установки</th>
         <th style="width: 90px;" class="text-center">Кол-во, шт</th>
         <th style="min-width: 130px;">handle блоков</th>
-        <th class="action-col d-none text-center" style="width: 45px;">Действие</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -2040,9 +1986,8 @@ function createEquipmentAccordion(equipmentList, totalCount) {
   const tbody = table.querySelector('tbody');
 
   equipmentList.forEach((eq, idx) => {
+    if (!eq) return;
     const row = document.createElement('tr');
-    row.dataset.index = idx;
-    row._equipmentData = eq;
 
     const mark = (eq.EquipmentType || eq.equipmentType || eq.mark || eq.marka || eq.type || eq['Марка'] || 'Без марки').trim();
     const method = (eq.InstallationMethod || eq.installationMethod || eq.method || eq['Способ установки'] || 'Не указано').trim();
@@ -2064,23 +2009,11 @@ function createEquipmentAccordion(equipmentList, totalCount) {
 
     row.innerHTML = `
       <td class="text-muted small text-center">${idx + 1}</td>
-      <td class="canEdit fw-bold cell-wrap font-monospace" data-field="mark">${escapeHtml(mark)}</td>
-      <td class="canEdit cell-wrap" data-field="method">${methodBadge}</td>
-      <td class="canEdit text-center font-monospace fw-semibold" data-field="count">${count}</td>
+      <td class="fw-bold cell-wrap font-monospace">${escapeHtml(mark)}</td>
+      <td class="cell-wrap">${methodBadge}</td>
+      <td class="text-center font-monospace fw-semibold">${count}</td>
       <td class="cell-wrap">${handlesHtml}</td>
-      <td class="action-col d-none text-center">
-        <button type="button" class="btn btn-sm btn-outline-danger p-0 border-0 removeRowBtn" title="Удалить строку">
-          <i class='bx bx-trash fs-5'></i>
-        </button>
-      </td>
     `;
-
-    const removeBtn = row.querySelector('.removeRowBtn');
-    if (removeBtn) {
-      removeBtn.addEventListener('click', () => {
-        row.remove();
-      });
-    }
 
     tbody.appendChild(row);
   });
@@ -2147,7 +2080,7 @@ function createGenericTableAccordion(title, items) {
       if (typeof val === 'object' && val !== null) {
         val = JSON.stringify(val);
       }
-      rowHtml += `<td class="canEdit cell-wrap small" data-field="${escapeHtml(k)}">${escapeHtml(String(val ?? ''))}</td>`;
+      rowHtml += `<td class="cell-wrap small">${escapeHtml(String(val ?? ''))}</td>`;
     });
     row.innerHTML = rowHtml;
     tbody.appendChild(row);
@@ -2359,50 +2292,7 @@ function resetDataToEmpty() {
   const fileInput = document.getElementById('input');
   if (fileInput) fileInput.value = '';
 
-  // Reset editable mode if active
-  if (isEditable) {
-    isEditable = false;
-    const canEditBtn = document.getElementById('canEdit');
-    if (canEditBtn) {
-      canEditBtn.classList.remove('btn-primary', 'text-white');
-      canEditBtn.classList.add('btn-outline-secondary');
-    }
-  }
-
   showToast('Исходные данные сброшены', 'info', 'Сброс');
-}
-
-function toggleEditMode() {
-  isEditable = !isEditable;
-  const canEditBtn = document.getElementById('canEdit');
-  if (canEditBtn) {
-    if (isEditable) {
-      canEditBtn.classList.add('btn-primary', 'text-white');
-      canEditBtn.classList.remove('btn-outline-secondary');
-      showToast('Режим редактирования включен: кликните на ячейку для изменения данных', 'info', 'Редактирование');
-    } else {
-      canEditBtn.classList.remove('btn-primary', 'text-white');
-      canEditBtn.classList.add('btn-outline-secondary');
-      showToast('Режим редактирования выключен', 'info', 'Редактирование');
-    }
-  }
-  updateEditableElements();
-}
-
-function updateEditableElements() {
-  const editableCells = document.querySelectorAll('#processedData .canEdit');
-  editableCells.forEach(cell => {
-    cell.contentEditable = isEditable ? 'true' : 'false';
-  });
-
-  const actionCols = document.querySelectorAll('#processedData .action-col');
-  actionCols.forEach(col => {
-    if (isEditable) {
-      col.classList.remove('d-none');
-    } else {
-      col.classList.add('d-none');
-    }
-  });
 }
 
 /**
@@ -2443,73 +2333,16 @@ function normalizeCableType(typeStr) {
   return cleaned || str || 'Без типа';
 }
 
-// Extract aggregated cable summary from DOM table or currentData
+// Extract aggregated cable summary directly from currentData
 function getActiveCableSummary() {
-  const cableTable = document.getElementById('tableCables');
   const cableSummary = {};
   const grandRoutingSummary = {};
   let grandTotalCableLength = 0;
   let grandTotalCableCount = 0;
 
-  if (cableTable) {
-    const rows = cableTable.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-      const typeCell = row.querySelector('[data-field="type"]');
-      const lengthCell = row.querySelector('[data-field="length"]');
-      if (typeCell && lengthCell) {
-        const rawType = typeCell.textContent.trim() || 'Без типа';
-        const type = normalizeCableType(rawType);
-        const length = parseFloat(lengthCell.textContent.replace(/\s+/g, '').replace(/,/g, '.')) || 0;
-
-        if (!cableSummary[type]) {
-          cableSummary[type] = { count: 0, length: 0, routingTypes: {} };
-        }
-        cableSummary[type].count += 1;
-        cableSummary[type].length += length;
-        grandTotalCableCount += 1;
-        grandTotalCableLength += length;
-
-        // Extract routing type for this cable row
-        const cableObj = row._cableData || (currentData && currentData.cables && currentData.cables[row.dataset.index]);
-        let rawRt = (cableObj && (cableObj['routing type'] || cableObj.routingType || cableObj.routing_type || cableObj['способы прокладки'] || cableObj['способ прокладки'] || cableObj.way)) || {};
-        if (typeof rawRt === 'string' && rawRt.trim()) {
-          rawRt = { [rawRt.trim()]: [length] };
-        } else if (Array.isArray(rawRt)) {
-          const conv = {};
-          rawRt.forEach(item => {
-            if (typeof item === 'string') conv[item.trim()] = [length];
-            else if (item && typeof item === 'object') Object.assign(conv, item);
-          });
-          rawRt = conv;
-        }
-
-        let hasRouting = false;
-        const rtEntries = Object.entries(rawRt);
-        for (const [rName, lengths] of rtEntries) {
-          const trimmedName = (rName || '').trim();
-          if (!trimmedName) continue;
-          const arr = Array.isArray(lengths) ? lengths : [lengths];
-          let sum = arr.reduce((acc, val) => acc + (Number(val) || 0), 0);
-          // If 1 routing type has sum 0 but cable length > 0, assign full cable length
-          if (sum === 0 && rtEntries.length === 1 && length > 0) {
-            sum = length;
-          }
-          if (sum > 0) {
-            hasRouting = true;
-            cableSummary[type].routingTypes[trimmedName] = (cableSummary[type].routingTypes[trimmedName] || 0) + sum;
-            grandRoutingSummary[trimmedName] = (grandRoutingSummary[trimmedName] || 0) + sum;
-          }
-        }
-
-        if (!hasRouting && length > 0) {
-          const fallbackName = 'Не определен';
-          cableSummary[type].routingTypes[fallbackName] = (cableSummary[type].routingTypes[fallbackName] || 0) + length;
-          grandRoutingSummary[fallbackName] = (grandRoutingSummary[fallbackName] || 0) + length;
-        }
-      }
-    });
-  } else if (currentData && currentData.cables) {
+  if (currentData && Array.isArray(currentData.cables)) {
     currentData.cables.forEach(c => {
+      if (!c) return;
       const rawType = c.type || 'Без типа';
       const type = normalizeCableType(rawType);
       const length = Number(c.length) || 0;
@@ -2566,41 +2399,14 @@ function getActiveCableSummary() {
   };
 }
 
+// Extract equipment summary directly from currentData
 function getActiveEquipmentSummary() {
-  const eqTable = document.getElementById('tableEquipment');
   const summary = {};
   let totalCount = 0;
   let totalPositions = 0;
   const list = [];
 
-  if (eqTable) {
-    const rows = eqTable.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-      const markCell = row.querySelector('[data-field="mark"]');
-      const methodCell = row.querySelector('[data-field="method"]');
-      const countCell = row.querySelector('[data-field="count"]');
-
-      if (markCell && countCell) {
-        const mark = (markCell.textContent || '').trim() || 'Без марки';
-        const method = methodCell ? (methodCell.textContent || '').trim() || 'Не указано' : 'Не указано';
-        const count = parseInt((countCell.textContent || '').replace(/\s+/g, ''), 10) || 0;
-        const eqData = row._equipmentData || {};
-        const handles = Array.isArray(eqData.handles) ? eqData.handles : (eqData.handles ? [eqData.handles] : []);
-
-        const key = `${mark}____${method}`;
-        if (!summary[key]) {
-          summary[key] = { mark, method, count: 0, handles: [] };
-          totalPositions++;
-        }
-        summary[key].count += count;
-        totalCount += count;
-        handles.forEach(h => {
-          if (!summary[key].handles.includes(h)) summary[key].handles.push(h);
-        });
-        list.push({ mark, method, count, handles });
-      }
-    });
-  } else if (currentData) {
+  if (currentData) {
     const rawList = (currentData.TracksideEquipment && Array.isArray(currentData.TracksideEquipment))
       ? currentData.TracksideEquipment
       : (currentData.tracksideEquipment && Array.isArray(currentData.tracksideEquipment))
@@ -2616,6 +2422,7 @@ function getActiveEquipmentSummary() {
       : [];
 
     rawList.forEach(eq => {
+      if (!eq) return;
       const mark = (eq.EquipmentType || eq.equipmentType || eq.mark || eq.marka || eq.type || eq['Марка'] || 'Без марки').trim();
       const method = (eq.InstallationMethod || eq.installationMethod || eq.method || eq['Способ установки'] || 'Не указано').trim();
       const count = Number(eq.countEquipment || eq.count || eq.qty || (eq.handles ? eq.handles.length : 1)) || 1;
@@ -2640,11 +2447,7 @@ function getActiveEquipmentSummary() {
 
 // Calculate Cable Volumes & Trench/Routing Volumes & Equipment
 function calculateVolumes() {
-  const cableTable = document.getElementById('tableCables');
-  const routingTable = document.getElementById('tableRouting');
-  const equipmentTable = document.getElementById('tableEquipment');
-
-  if (!cableTable && !routingTable && !equipmentTable && !currentData) {
+  if (!currentData) {
     showToast('Сначала загрузите исходные данные для расчета', 'error', 'Внимание');
     return;
   }
@@ -2658,27 +2461,9 @@ function calculateVolumes() {
   let grandTotalRoutingLength = 0;
   let grandTotalRoutingCount = 0;
 
-  if (routingTable) {
-    const rows = routingTable.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-      const typeCell = row.querySelector('[data-field="type"]');
-      const lengthCell = row.querySelector('[data-field="length"]');
-      if (typeCell && lengthCell) {
-        const typeEl = typeCell.querySelector('.block-type-name');
-        const type = (row.dataset.blockType || (typeEl ? typeEl.textContent : typeCell.textContent)).trim() || 'Без типа';
-        const length = parseFloat(lengthCell.textContent.replace(/\s+/g, '').replace(/,/g, '.')) || 0;
-
-        if (!routingSummary[type]) {
-          routingSummary[type] = { count: 0, length: 0 };
-        }
-        routingSummary[type].count += 1;
-        routingSummary[type].length += length;
-        grandTotalRoutingCount += 1;
-        grandTotalRoutingLength += length;
-      }
-    });
-  } else if (currentData && currentData.routingTypeBlocks) {
+  if (currentData && Array.isArray(currentData.routingTypeBlocks)) {
     currentData.routingTypeBlocks.forEach(r => {
+      if (!r) return;
       const type = r.type || 'Без типа';
       const length = Number(r.length) || 0;
       if (!routingSummary[type]) routingSummary[type] = { count: 0, length: 0 };
@@ -3187,7 +2972,7 @@ function renderInstallationWorks(cableWorksCalc) {
         </td>
         <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
         <td class="text-end font-monospace fw-bold text-success">${volumeStr}</td>
-        <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${escapeHtml(w.formulaDisplay)}</td>
+        <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${(w.showFormula !== false && w.formulaDisplay) ? escapeHtml(w.formulaDisplay) : '<span class="text-muted opacity-50">-</span>'}</td>
       </tr>
     `;
   });
@@ -3423,7 +3208,7 @@ function renderConstructionWorks(worksCalc) {
         </td>
         <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
         <td class="text-end font-monospace fw-bold text-success">${w.volume.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${escapeHtml(w.formulaDisplay)}</td>
+        <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${(w.showFormula !== false && w.formulaDisplay) ? escapeHtml(w.formulaDisplay) : '<span class="text-muted opacity-50">-</span>'}</td>
       </tr>
     `;
   });
@@ -3658,58 +3443,6 @@ function renderCouplingsResult(couplingsSummary) {
       </table>
     </div>
   `;
-}
-
-// Export current data as JSON
-function exportCurrentDataJSON() {
-  syncTableToCurrentData();
-  if (!currentData) {
-    showToast('Нет данных для экспорта', 'error', 'Ошибка');
-    return;
-  }
-  const jsonStr = JSON.stringify(currentData, null, 2);
-  const blob = new Blob([jsonStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = currentFileName ? `export_${currentFileName}` : 'data_export.json';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('Файл JSON успешно сохранен', 'success', 'Экспорт');
-}
-
-// Export current data to Excel
-function exportCurrentDataExcel() {
-  if (typeof XLSX === 'undefined') {
-    showToast('Библиотека XLSX недоступна', 'error', 'Ошибка');
-    return;
-  }
-  const cableTable = document.getElementById('tableCables');
-  const routingTable = document.getElementById('tableRouting');
-  const equipmentTable = document.getElementById('tableEquipment');
-
-  if (!cableTable && !routingTable && !equipmentTable) {
-    showToast('Нет таблиц для экспорта', 'error', 'Ошибка');
-    return;
-  }
-
-  const wb = XLSX.utils.book_new();
-  if (cableTable) {
-    const wsCable = XLSX.utils.table_to_sheet(cableTable);
-    XLSX.utils.book_append_sheet(wb, wsCable, 'Кабели');
-  }
-  if (routingTable) {
-    const wsRouting = XLSX.utils.table_to_sheet(routingTable);
-    XLSX.utils.book_append_sheet(wb, wsRouting, 'Трассы');
-  }
-  if (equipmentTable) {
-    const wsEquipment = XLSX.utils.table_to_sheet(equipmentTable);
-    XLSX.utils.book_append_sheet(wb, wsEquipment, 'Оборудование');
-  }
-  XLSX.writeFile(wb, 'Исходные_данные_ВОР.xlsx');
-  showToast('Файл Excel успешно экспортирован', 'success', 'Экспорт');
 }
 
 // --------------------------------------------------------------------------
@@ -4473,7 +4206,7 @@ function renderEquipmentCatalogModalContent() {
         const formula = work["Формула"] || work.formula || 'КОЛИЧЕСТВО';
         const unit = work["Единицы измерения"] || work.unit || unitTop || 'шт';
         const section = work["Раздел"] || work.section || 'Монтажные работы';
-        const showFormula = (work["ОтображатьФормулу"] !== undefined) ? shouldShowFormula(work) : true;
+        const showFormula = shouldShowFormula(work);
         const workComment = work["Комментарий"] || work.comment || '';
 
         let typeBadgeClass = 'bg-primary-subtle text-primary border';
@@ -4506,7 +4239,7 @@ function renderEquipmentCatalogModalContent() {
           const subFormula = sub["Формула"] || sub.formula || 'КОЛИЧЕСТВО';
           const subUnit = sub["Единицы измерения"] || sub.unit || 'шт';
           const subSection = sub["Раздел"] || sub.section || section;
-          const subShowFormula = (sub["ОтображатьФормулу"] !== undefined) ? shouldShowFormula(sub) : true;
+          const subShowFormula = shouldShowFormula(sub, showFormula);
           const subComment = sub["Комментарий"] || sub.comment || '';
 
           let subTypeBadgeClass = 'badge-material';
@@ -4836,82 +4569,13 @@ function matchesRule(trenchTypeName, ruleName) {
   return t === r;
 }
 
-// Extract active trench segments and lengths from table or state
+// Extract active trench segments and lengths directly from currentData
 function getActiveTrenchSummary() {
-  const routingTable = document.getElementById('tableRouting');
   const summary = {};
 
-  if (routingTable) {
-    const rows = routingTable.querySelectorAll('tbody tr');
-    rows.forEach((row) => {
-      const typeCell = row.querySelector('[data-field="type"]');
-      const lengthCell = row.querySelector('[data-field="length"]');
-      if (typeCell && lengthCell) {
-        const typeEl = typeCell.querySelector('.block-type-name');
-        const type = (row.dataset.blockType || (typeEl ? typeEl.textContent : typeCell.textContent)).trim() || 'Без типа';
-        const length = parseFloat((lengthCell.textContent || '').replace(/\s+/g, '').replace(/,/g, '.')) || 0;
-
-        const handleCell = row.children[1];
-        const handle = handleCell ? handleCell.textContent.trim() : '';
-
-        // Extract countPipes & lengthPipes
-        const countPipesCell = row.querySelector('[data-field="countPipes"]');
-        let countPipes = countPipesCell ? (parseInt(countPipesCell.textContent.replace(/\s+/g, ''), 10) || 0) : 0;
-        const lengthPipesCell = row.querySelector('[data-field="lengthPipes"]');
-        let lengthPipes = lengthPipesCell ? (parseFloat(lengthPipesCell.textContent.replace(/\s+/g, '').replace(/,/g, '.')) || 0) : 0;
-
-        let countIntersections = 0;
-        if (row._blockData) {
-          if (!countPipes && row._blockData.countPipes !== undefined) countPipes = Number(row._blockData.countPipes) || 0;
-          if (!lengthPipes && row._blockData.lengthPipes !== undefined) lengthPipes = Number(row._blockData.lengthPipes) || 0;
-          if (row._blockData.countIntersections) countIntersections = Number(row._blockData.countIntersections) || 0;
-        }
-
-        const isPipeType = type.toLowerCase().includes('труб');
-        if (isPipeType && countPipes === 0 && lengthPipes === 0) {
-          countPipes = 1;
-          lengthPipes = length;
-        } else if (isPipeType && countPipes === 0) {
-          countPipes = 1;
-        } else if (countPipes > 0 && lengthPipes === 0) {
-          lengthPipes = length;
-        }
-
-        const cablesCountCell = row.querySelector('[data-field="cablesCount"]') || row.children[4];
-        let cablesCount = cablesCountCell ? (parseInt(cablesCountCell.textContent.trim(), 10) || 0) : 0;
-        const containedCell = row.children[5];
-        const contained = containedCell ? containedCell.textContent.trim() : '';
-
-        if (cablesCount === 0 && contained && contained !== '-') {
-          const pills = row.querySelectorAll('.cable-pill');
-          if (pills.length > 0) {
-            cablesCount = pills.length;
-          } else {
-            cablesCount = contained.split(',').filter(Boolean).length;
-          }
-        }
-
-        if (!summary[type]) {
-          summary[type] = { totalLength: 0, count: 0, totalPipesCount: 0, totalPipesLength: 0, segments: [] };
-        }
-        summary[type].totalLength += length;
-        summary[type].count += 1;
-        summary[type].totalPipesCount += countPipes;
-        summary[type].totalPipesLength += (countPipes * lengthPipes);
-        summary[type].segments.push({
-          handle,
-          length,
-          cablesCount,
-          countPipes,
-          lengthPipes,
-          countIntersections,
-          contained,
-          type
-        });
-      }
-    });
-  } else if (currentData && currentData.routingTypeBlocks) {
+  if (currentData && Array.isArray(currentData.routingTypeBlocks)) {
     currentData.routingTypeBlocks.forEach(b => {
+      if (!b) return;
       const type = (b.type || 'Без типа').trim();
       const length = Number(b.length) || 0;
       let countPipes = Number(b.countPipes) || 0;
@@ -4996,7 +4660,7 @@ function evaluateTrenchSegmentFormula(formula, length, cablesCount, seg = null) 
   try {
     if (/^[0-9+\-*/().\s]+$/.test(expr)) {
       const val = Function("'use strict'; return (" + expr + ");")();
-      if (typeof val === 'number' && !isNaN(val)) return val;
+      if (typeof val === 'number' && !isNaN(val) && isFinite(val)) return val;
     }
   } catch (e) {}
 
@@ -5419,7 +5083,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_КАБЕЛЯ}').trim();
             const matUnit = mat["Единицы измерения"] || mat.unit || 'км';
             const matFormula = mat["Формула"] || mat.formula || "ДЛИНА";
-            const matShowFormula = (mat["ОтображатьФормулу"] !== undefined) ? shouldShowFormula(mat) : true;
+            const matShowFormula = shouldShowFormula(mat, showFormula);
             const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
 
             if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
@@ -5621,7 +5285,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_КАБЕЛЯ}').trim();
               const matUnit = mat["Единицы измерения"] || mat.unit || 'км';
               const matFormula = mat["Формула"] || mat.formula || "ДЛИНА";
-              const matShowFormula = (mat["ОтображатьФормулу"] !== undefined) ? shouldShowFormula(mat) : true;
+              const matShowFormula = shouldShowFormula(mat, showFormula);
               const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
 
               if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
@@ -5754,7 +5418,7 @@ function evaluateEquipmentFormula(formula, count) {
   try {
     if (/^[0-9+\-*/().\s]+$/.test(expr)) {
       const val = Function("'use strict'; return (" + expr + ");")();
-      if (typeof val === 'number' && !isNaN(val)) return val;
+      if (typeof val === 'number' && !isNaN(val) && isFinite(val)) return val;
     }
   } catch (e) {}
 
@@ -5929,7 +5593,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           const matVol = Math.round(matRawVol * 100) / 100;
           const matUnit = mat["Единицы измерения"] || mat.unit || 'шт';
           const matName = (mat["Наименование"] || mat.name || itemMark).trim();
-          const matShowFormula = (mat["ОтображатьФормулу"] !== undefined) ? shouldShowFormula(mat) : true;
+          const matShowFormula = shouldShowFormula(mat, showFormula);
           const matFormulaDisp = matShowFormula ? buildEquipmentFormulaDisplay(matFormula, count, matUnit) : '';
           const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
 
@@ -6001,6 +5665,7 @@ function aggregateCalculatedWorks(rawWorksList) {
     const workName = (item.name || '').trim();
     const unit = (item.unit || 'м').trim();
     const groupKey = `${section}__${workName.toLowerCase()}__${unit.toLowerCase()}`;
+    const itemShowFormula = (item.showFormula !== undefined) ? item.showFormula : Boolean(item.formulaDisplay && item.formulaDisplay.trim());
 
     if (!workGroups.has(groupKey)) {
       workGroups.set(groupKey, {
@@ -6010,6 +5675,7 @@ function aggregateCalculatedWorks(rawWorksList) {
         type: item.type || 'работа',
         volume: 0,
         formulaParts: [],
+        showFormula: itemShowFormula,
         handles: new Set(),
         comments: new Set(),
         materialsMap: new Map(),
@@ -6024,11 +5690,17 @@ function aggregateCalculatedWorks(rawWorksList) {
     const group = workGroups.get(groupKey);
     group.volume += (Number(item.volume) || 0);
 
-    if (item.formulaDisplay && item.formulaDisplay.trim()) {
-      group.formulaParts.push(item.formulaDisplay.trim());
-    } else if (item.volume) {
-      const srcLabel = item.trenchType || item.routingType || item.mark || item.ruleName || '';
-      group.formulaParts.push(srcLabel ? `${item.volume} (${srcLabel})` : `${item.volume}`);
+    if (itemShowFormula === false) {
+      group.showFormula = false;
+    }
+
+    if (group.showFormula && itemShowFormula !== false) {
+      if (item.formulaDisplay && item.formulaDisplay.trim()) {
+        group.formulaParts.push(item.formulaDisplay.trim());
+      } else if (item.volume) {
+        const srcLabel = item.trenchType || item.routingType || item.mark || item.ruleName || '';
+        group.formulaParts.push(srcLabel ? `${item.volume} (${srcLabel})` : `${item.volume}`);
+      }
     }
 
     if (Array.isArray(item.handles)) {
@@ -6076,6 +5748,8 @@ function aggregateCalculatedWorks(rawWorksList) {
       const isEquip = rawMatType === 'оборудование' || rawMatType === 'equipment';
       const determinedType = isEquip ? 'оборудование' : (rawMatType === 'работа' ? 'работа' : 'материал');
       const matKey = `${matName.toLowerCase()}__${matUnit.toLowerCase()}__${determinedType}`;
+      const itemShowFormula = (item.showFormula !== undefined) ? item.showFormula : (targetGroup.showFormula !== false && Boolean(item.formulaDisplay && item.formulaDisplay.trim()));
+
       if (!targetGroup.materialsMap.has(matKey)) {
         targetGroup.materialsMap.set(matKey, {
           name: matName,
@@ -6084,6 +5758,7 @@ function aggregateCalculatedWorks(rawWorksList) {
           type: item.type || determinedType,
           volume: 0,
           formulaParts: [],
+          showFormula: itemShowFormula,
           handles: new Set(),
           comments: new Set(),
           parentWorkName: targetGroup.name,
@@ -6099,11 +5774,17 @@ function aggregateCalculatedWorks(rawWorksList) {
       const matEntry = targetGroup.materialsMap.get(matKey);
       matEntry.volume += (Number(item.volume) || 0);
 
-      if (item.formulaDisplay && item.formulaDisplay.trim()) {
-        matEntry.formulaParts.push(item.formulaDisplay.trim());
-      } else if (item.volume) {
-        const srcLabel = item.trenchType || item.routingType || item.mark || '';
-        matEntry.formulaParts.push(srcLabel ? `${item.volume} (${srcLabel})` : `${item.volume}`);
+      if (itemShowFormula === false) {
+        matEntry.showFormula = false;
+      }
+
+      if (matEntry.showFormula && itemShowFormula !== false) {
+        if (item.formulaDisplay && item.formulaDisplay.trim()) {
+          matEntry.formulaParts.push(item.formulaDisplay.trim());
+        } else if (item.volume) {
+          const srcLabel = item.trenchType || item.routingType || item.mark || '';
+          matEntry.formulaParts.push(srcLabel ? `${item.volume} (${srcLabel})` : `${item.volume}`);
+        }
       }
 
       if (Array.isArray(item.handles)) {
@@ -6124,7 +5805,9 @@ function aggregateCalculatedWorks(rawWorksList) {
     const roundedWorkVol = Math.round(work.volume * 100) / 100;
 
     let finalWorkFormula = '';
-    if (work.formulaParts.length > 1) {
+    if (work.showFormula === false) {
+      finalWorkFormula = '';
+    } else if (work.formulaParts.length > 1) {
       const uniqueParts = Array.from(new Set(work.formulaParts));
       if (uniqueParts.length === 1 && uniqueParts[0].includes('=')) {
         finalWorkFormula = uniqueParts[0];
@@ -6144,7 +5827,8 @@ function aggregateCalculatedWorks(rawWorksList) {
       unit: work.unit,
       volume: roundedWorkVol,
       volumeFormatted: String(roundedWorkVol),
-      formulaDisplay: finalWorkFormula,
+      formulaDisplay: work.showFormula === false ? '' : finalWorkFormula,
+      showFormula: work.showFormula !== false,
       section: work.section,
       type: work.type || 'работа',
       isParentWork: true,
@@ -6166,7 +5850,9 @@ function aggregateCalculatedWorks(rawWorksList) {
         : Math.round(mat.volume * 100) / 100;
 
       let finalMatFormula = '';
-      if (mat.formulaParts.length > 1) {
+      if (mat.showFormula === false) {
+        finalMatFormula = '';
+      } else if (mat.formulaParts.length > 1) {
         const uniqueParts = Array.from(new Set(mat.formulaParts));
         finalMatFormula = uniqueParts.join(' + ') + ` = ${roundedMatVol} ${mat.unit}`;
       } else if (mat.formulaParts.length === 1) {
@@ -6182,7 +5868,8 @@ function aggregateCalculatedWorks(rawWorksList) {
         unit: mat.unit,
         volume: roundedMatVol,
         volumeFormatted: String(roundedMatVol),
-        formulaDisplay: finalMatFormula,
+        formulaDisplay: mat.showFormula === false ? '' : finalMatFormula,
+        showFormula: mat.showFormula !== false,
         section: mat.section,
         type: mat.type || 'материал',
         isParentWork: false,
@@ -6207,13 +5894,15 @@ function aggregateCalculatedWorks(rawWorksList) {
   orphanMaterials.forEach((orphan, oIdx) => {
     const rawType = (orphan.type || '').trim().toLowerCase();
     const isEquip = rawType === 'оборудование' || rawType === 'equipment';
+    const isShowFormula = orphan.showFormula !== false && Boolean(orphan.formulaDisplay && orphan.formulaDisplay.trim());
     result.push({
       itemNumber: `${workIndex}.${oIdx + 1}`,
       name: orphan.name,
       unit: orphan.unit,
       volume: orphan.volume,
       volumeFormatted: String(orphan.volume),
-      formulaDisplay: normalizeFormulaMathOperators(orphan.formulaDisplay || ''),
+      formulaDisplay: isShowFormula ? normalizeFormulaMathOperators(orphan.formulaDisplay || '') : '',
+      showFormula: isShowFormula,
       section: orphan.section || 'Монтажные работы',
       type: orphan.type || (isEquip ? 'оборудование' : 'материал'),
       isParentWork: false,
@@ -6344,7 +6033,8 @@ function generateVorGgeXml(worksData, currentFileName, numberingMode = null) {
       const commentXml = work.comment ? `\t\t\t\t<Comment>${escapeXml(work.comment)}</Comment>\n` : '';
       const unitStr = escapeXml(work.unit || 'м');
       const qtyStr = formatGgeQuantity(work.volume);
-      const formulaRaw = work.formulaDisplay || String(work.volume);
+      const isShowFormula = work.showFormula !== false && Boolean(work.formulaDisplay && work.formulaDisplay.trim());
+      const formulaRaw = isShowFormula ? work.formulaDisplay : '';
       const formulaStr = escapeXml(normalizeFormulaMathOperators(formulaRaw));
 
       let numStr = '';
@@ -6479,12 +6169,14 @@ function generateVorWorkbook(worksData, currentFileName, numberingMode = 'hierar
       }
       const nameStr = isMaterial ? `    ↳ ${w.name}` : w.name;
 
+      const isShowFormula = w.showFormula !== false && Boolean(w.formulaDisplay && w.formulaDisplay.trim());
+
       aoa.push([
         numStr,
         nameStr,
         w.unit,
         w.volume,
-        normalizeFormulaMathOperators(w.formulaDisplay),
+        isShowFormula ? normalizeFormulaMathOperators(w.formulaDisplay) : '',
         '', // Ссылка на чертежи
         '', // Наименование файла
         '', // Номера страниц
@@ -6542,6 +6234,349 @@ function generateVorWorkbook(worksData, currentFileName, numberingMode = 'hierar
   return wb;
 }
 
+// Collect all warnings and unannounced rules / items across all sections
+function collectAllGgeWarnings(calcData) {
+  if (!calcData) calcData = getAllCalculatedWorks();
+
+  const trenchMissing = calcData.trenchMissing || [];
+  const cableMissing = calcData.cableMissing || [];
+  const equipmentMissing = calcData.equipmentMissing || [];
+  const cableMissingInCatalog = calcData.cableMissingInCatalog || [];
+
+  const couplingsSummary = calcData.couplingsSummary || {};
+  const couplingsMissing = [
+    ...(couplingsSummary.missingCouplings || []),
+    ...(couplingsSummary.missingInCatalog || [])
+  ];
+
+  const totalCount = trenchMissing.length + cableMissing.length + equipmentMissing.length + cableMissingInCatalog.length + couplingsMissing.length;
+
+  return {
+    hasWarnings: totalCount > 0,
+    totalCount,
+    worksCount: (calcData.works || []).length,
+    trenchMissing,
+    cableMissing,
+    equipmentMissing,
+    cableMissingInCatalog,
+    couplingsMissing,
+    calcData
+  };
+}
+
+// Show modal window with all accumulated notices before GGE formation
+function showGgeExportWarningsModal(warningsInfo, onProceed) {
+  const modalEl = document.getElementById('ggeExportWarningsModal');
+  const bodyEl = document.getElementById('ggeExportWarningsModalBody');
+  const confirmBtn = document.getElementById('confirmProceedGgeDownloadBtn');
+  const openRulesBtn = document.getElementById('openRulesFromGgeModalBtn');
+
+  if (!modalEl || !bodyEl) {
+    if (typeof onProceed === 'function') onProceed();
+    return;
+  }
+
+  const { totalCount, worksCount, trenchMissing, cableMissing, equipmentMissing, cableMissingInCatalog, couplingsMissing } = warningsInfo;
+
+  let bodyHtml = `
+    <div class="alert alert-warning border border-warning-subtle d-flex align-items-start gap-2 mb-3 py-2 px-3">
+      <i class='bx bx-error-circle fs-4 text-warning flex-shrink-0 mt-0_5'></i>
+      <div class="small">
+        <div class="fw-bold mb-0_5">Обнаружено замечаний: ${totalCount} (ВОР содержит ${worksCount} сметных позиций)</div>
+        <div class="text-muted">Ниже сгруппированы все работы, оборудование и параметры, для которых в правилах сметных норм отсутствуют описания или записи в справочниках. Вы можете добавить недостающие нормы в JSON или продолжить экспорт ВОР.</div>
+      </div>
+    </div>
+  `;
+
+  // 1. Equipment section
+  if (equipmentMissing.length > 0) {
+    let eqRows = '';
+    equipmentMissing.forEach((eq, idx) => {
+      const handlesStr = (eq.handles && eq.handles.length > 0) ? `<code>${escapeHtml(eq.handles.join(', '))}</code>` : '<span class="text-muted">-</span>';
+      eqRows += `
+        <tr>
+          <td class="text-center text-muted small">${idx + 1}</td>
+          <td class="fw-bold text-dark cell-wrap">${escapeHtml(eq.mark || eq.type || 'Без марки')}</td>
+          <td class="cell-wrap text-secondary small">${escapeHtml(eq.method || 'Не указано')}</td>
+          <td class="text-center font-monospace fw-semibold">${eq.count || 1} шт</td>
+          <td class="cell-wrap small">${handlesStr}</td>
+        </tr>
+      `;
+    });
+
+    bodyHtml += `
+      <div class="card mb-3 border-warning-subtle shadow-none">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark"><i class='bx bx-cube me-1'></i>Оборудование</span>
+            <span class="fw-semibold small">Не объявлено в разделе «Оборудование» (${equipmentMissing.length} поз.)</span>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnAddEquipmentFromModal">
+            <i class='bx bx-plus-circle'></i> Добавить марки в JSON правил
+          </button>
+        </div>
+        <div class="table-responsive" style="max-height: 220px;">
+          <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.82rem;">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 35px;" class="text-center">№</th>
+                <th>Марка оборудования</th>
+                <th>Способ установки</th>
+                <th style="width: 90px;" class="text-center">Кол-во</th>
+                <th>handle блоков</th>
+              </tr>
+            </thead>
+            <tbody>${eqRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // 2. Trenches / Construction section
+  if (trenchMissing.length > 0) {
+    let trRows = '';
+    trenchMissing.forEach((tr, idx) => {
+      const lenStr = tr.length !== undefined ? `${Math.round(tr.length).toLocaleString('ru-RU')} м` : '-';
+      trRows += `
+        <tr>
+          <td class="text-center text-muted small">${idx + 1}</td>
+          <td class="fw-bold text-dark cell-wrap">${escapeHtml(tr.type || 'Способ')}</td>
+          <td class="text-end font-monospace fw-semibold">${lenStr}</td>
+        </tr>
+      `;
+    });
+
+    bodyHtml += `
+      <div class="card mb-3 border-warning-subtle shadow-none">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark"><i class='bx bx-layer me-1'></i>Строительные работы</span>
+            <span class="fw-semibold small">Не объявлены способы прокладки (${trenchMissing.length} поз.)</span>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnAddTrenchFromModal">
+            <i class='bx bx-plus-circle'></i> Добавить способы в JSON правил
+          </button>
+        </div>
+        <div class="table-responsive" style="max-height: 220px;">
+          <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.82rem;">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 35px;" class="text-center">№</th>
+                <th>Способ прокладки</th>
+                <th style="width: 100px;" class="text-end">Метраж</th>
+              </tr>
+            </thead>
+            <tbody>${trRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // 3. Cables / Installation section
+  if (cableMissing.length > 0) {
+    let cbRows = '';
+    cableMissing.forEach((cb, idx) => {
+      const lenStr = cb.length !== undefined ? `${Math.round(cb.length).toLocaleString('ru-RU')} м` : '-';
+      let reason = 'Нет правила в разделе «Монтажные работы»';
+      if (cb.missingType === 'optical') reason = 'Отсутствует норма для оптического кабеля';
+      if (cb.missingType === 'tier') reason = `Отсутствует весовая ступень (до ${cb.tierMax} кг/м)`;
+      cbRows += `
+        <tr>
+          <td class="text-center text-muted small">${idx + 1}</td>
+          <td class="fw-bold text-dark cell-wrap">${escapeHtml(cb.type || 'Способ')}</td>
+          <td class="text-end font-monospace fw-semibold">${lenStr}</td>
+          <td class="cell-wrap text-secondary small">${reason}</td>
+        </tr>
+      `;
+    });
+
+    bodyHtml += `
+      <div class="card mb-3 border-warning-subtle shadow-none">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark"><i class='bx bx-wrench me-1'></i>Монтажные работы</span>
+            <span class="fw-semibold small">Не объявлены сметные нормы кабелей (${cableMissing.length} поз.)</span>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnAddCableWaysFromModal">
+            <i class='bx bx-plus-circle'></i> Добавить работы в JSON правил
+          </button>
+        </div>
+        <div class="table-responsive" style="max-height: 220px;">
+          <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.82rem;">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 35px;" class="text-center">№</th>
+                <th>Способ прокладки</th>
+                <th style="width: 100px;" class="text-end">Метраж</th>
+                <th>Причина замечания</th>
+              </tr>
+            </thead>
+            <tbody>${cbRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // 4. Cables not in Catalog
+  if (cableMissingInCatalog.length > 0) {
+    let catRows = '';
+    cableMissingInCatalog.forEach((cat, idx) => {
+      const lenStr = cat.length !== undefined ? `${Math.round(cat.length).toLocaleString('ru-RU')} м` : '-';
+      catRows += `
+        <tr>
+          <td class="text-center text-muted small">${idx + 1}</td>
+          <td class="fw-bold text-dark cell-wrap">${escapeHtml(cat.type || 'Марка')}</td>
+          <td class="text-center font-monospace">${cat.weight || 0.35} кг/м</td>
+          <td class="text-end font-monospace fw-semibold">${lenStr}</td>
+        </tr>
+      `;
+    });
+
+    bodyHtml += `
+      <div class="card mb-3 border-warning-subtle shadow-none">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-secondary"><i class='bx bx-book-open me-1'></i>Справочник кабелей</span>
+            <span class="fw-semibold small">Марки отсутствуют в справочнике весов (${cableMissingInCatalog.length} поз.)</span>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnAddCablesToCatalogFromModal">
+            <i class='bx bx-plus-circle'></i> Добавить марки в справочник
+          </button>
+        </div>
+        <div class="table-responsive" style="max-height: 220px;">
+          <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.82rem;">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 35px;" class="text-center">№</th>
+                <th>Марка кабеля</th>
+                <th style="width: 120px;" class="text-center">Принят вес</th>
+                <th style="width: 100px;" class="text-end">Метраж</th>
+              </tr>
+            </thead>
+            <tbody>${catRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // 5. Couplings Missing
+  if (couplingsMissing.length > 0) {
+    let coupRows = '';
+    couplingsMissing.forEach((cp, idx) => {
+      const typeStr = cp.type || cp.cableType || 'Кабель';
+      const reason = cp.reason || 'Не задана марка муфты или строительная длина';
+      coupRows += `
+        <tr>
+          <td class="text-center text-muted small">${idx + 1}</td>
+          <td class="fw-bold text-dark cell-wrap">${escapeHtml(typeStr)}</td>
+          <td class="cell-wrap text-secondary small">${reason}</td>
+        </tr>
+      `;
+    });
+
+    bodyHtml += `
+      <div class="card mb-3 border-warning-subtle shadow-none">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info text-dark"><i class='bx bx-git-merge me-1'></i>Соединительные муфты</span>
+            <span class="fw-semibold small">Требуется сопоставление муфт (${couplingsMissing.length} поз.)</span>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-primary fw-semibold d-inline-flex align-items-center gap-1" id="btnOpenCouplingsFromModal">
+            <i class='bx bx-slider'></i> Настроить справочник муфт
+          </button>
+        </div>
+        <div class="table-responsive" style="max-height: 220px;">
+          <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.82rem;">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 35px;" class="text-center">№</th>
+                <th>Тип кабеля</th>
+                <th>Замечание</th>
+              </tr>
+            </thead>
+            <tbody>${coupRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  bodyEl.innerHTML = bodyHtml;
+
+  // Bind Quick Add buttons in modal
+  const btnEq = bodyEl.querySelector('#btnAddEquipmentFromModal');
+  if (btnEq) {
+    btnEq.addEventListener('click', () => {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      addMissingEquipmentToRules(equipmentMissing);
+    });
+  }
+
+  const btnTr = bodyEl.querySelector('#btnAddTrenchFromModal');
+  if (btnTr) {
+    btnTr.addEventListener('click', () => {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      addMissingTrenchTypesToRules(trenchMissing);
+    });
+  }
+
+  const btnCb = bodyEl.querySelector('#btnAddCableWaysFromModal');
+  if (btnCb) {
+    btnCb.addEventListener('click', () => {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      addMissingCableWaysToRules(cableMissing);
+    });
+  }
+
+  const btnCat = bodyEl.querySelector('#btnAddCablesToCatalogFromModal');
+  if (btnCat) {
+    btnCat.addEventListener('click', () => {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      addMissingCablesToCatalog(cableMissingInCatalog);
+    });
+  }
+
+  const btnCp = bodyEl.querySelector('#btnOpenCouplingsFromModal');
+  if (btnCp) {
+    btnCp.addEventListener('click', () => {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      openWorksRulesModal('couplings');
+    });
+  }
+
+  // Footer Actions
+  if (openRulesBtn) {
+    openRulesBtn.onclick = () => {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      openWorksRulesModal('editor');
+    };
+  }
+
+  if (confirmBtn) {
+    confirmBtn.onclick = () => {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      if (typeof onProceed === 'function') {
+        onProceed();
+      }
+    };
+  }
+
+  // Show the modal
+  const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  bsModal.show();
+}
+
 // Download GGE file with selected numbering mode (or read from settings)
 function downloadGgeFile(numberingMode) {
   if (!numberingMode) {
@@ -6549,34 +6584,11 @@ function downloadGgeFile(numberingMode) {
     numberingMode = settings.numberingMode === 'сквозная' ? 'sequential' : 'hierarchical';
   }
 
-  const { works, missingInRules, cableMissingInCatalog } = getAllCalculatedWorks();
+  const { works } = getAllCalculatedWorks();
 
   if (works.length === 0) {
     showToast('Не найдено подходящих сметных норм для выгрузки ВОР', 'error', 'Ошибка');
     return;
-  }
-
-  // If any types had missing works in the rules, notify user
-  if (missingInRules.length > 0) {
-    const missingStr = missingInRules
-      .map(m => `«${m.type}» (${m.length !== undefined ? Math.round(m.length) + ' м' : (m.count || 0) + ' шт'})`)
-      .join(', ');
-    showToast(
-      `Внимание: для способов ${missingStr} в файле правил сметных норм отсутствуют работы. Экспорт продолжен для остальных позиций.`,
-      'warning',
-      'Внимание',
-      6000
-    );
-  }
-
-  if (cableMissingInCatalog && cableMissingInCatalog.length > 0) {
-    const missingCables = cableMissingInCatalog.map(m => m.type).join(', ');
-    showToast(
-      `Внимание: в ВОР присутствуют марки кабелей (${missingCables}), отсутствующие в справочнике. Применен расчетный вес.`,
-      'warning',
-      'Справочник кабелей',
-      6000
-    );
   }
 
   const xmlContent = generateVorGgeXml(works, currentFileName, numberingMode);
@@ -6603,7 +6615,7 @@ function downloadGgeFile(numberingMode) {
 }
 
 // Export calculation results directly to XML GGE (.gge) matching Главгосэкспертиза format
-function exportCalculationResults() {
+function exportCalculationResults(skipWarningsCheck = false) {
   const resCable = document.querySelector('#result table');
   const resRouting = document.querySelector('#resultCouplings table');
 
@@ -6616,9 +6628,22 @@ function exportCalculationResults() {
     }
   }
 
+  const calcData = getAllCalculatedWorks();
+  if (!calcData.works || calcData.works.length === 0) {
+    showToast('Не найдено подходящих сметных норм для выгрузки ВОР', 'error', 'Ошибка');
+    return;
+  }
+
   const settings = getRulesSettings(currentWorksRules);
   const mode = settings.numberingMode === 'сквозная' ? 'sequential' : 'hierarchical';
-  downloadGgeFile(mode);
+
+  const warnings = collectAllGgeWarnings(calcData);
+
+  if (!skipWarningsCheck && warnings.hasWarnings) {
+    showGgeExportWarningsModal(warnings, () => downloadGgeFile(mode));
+  } else {
+    downloadGgeFile(mode);
+  }
 }
 
 // Optional secondary export to Excel (.xlsx)
@@ -6672,97 +6697,6 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// ---------------------------------------------------------
-// JSON Editor & Custom Data Utilities
-// ---------------------------------------------------------
-
-// Synchronize table cell values to currentData
-function syncTableToCurrentData() {
-  if (!currentData) return;
-  const cableTable = document.getElementById('tableCables');
-  if (cableTable && Array.isArray(currentData.cables)) {
-    const rows = cableTable.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-      const idx = parseInt(row.dataset.index, 10);
-      if (!isNaN(idx) && currentData.cables[idx]) {
-        const cableField = row.querySelector('[data-field="cable"]');
-        const typeField = row.querySelector('[data-field="type"]');
-        const lengthField = row.querySelector('[data-field="length"]');
-        if (cableField) currentData.cables[idx].cable = cableField.textContent.trim();
-        if (typeField) currentData.cables[idx].type = typeField.textContent.trim();
-        if (lengthField) {
-          const num = parseFloat(lengthField.textContent.replace(/\s+/g, '').replace(/,/g, '.'));
-          if (!isNaN(num)) currentData.cables[idx].length = num;
-        }
-      }
-    });
-  }
-
-  const routingTable = document.getElementById('tableRouting');
-  if (routingTable && Array.isArray(currentData.routingTypeBlocks)) {
-    const rows = routingTable.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-      const idx = parseInt(row.dataset.index, 10);
-      if (!isNaN(idx) && currentData.routingTypeBlocks[idx]) {
-        const typeField = row.querySelector('[data-field="type"]');
-        const lengthField = row.querySelector('[data-field="length"]');
-        if (typeField) {
-          const typeEl = typeField.querySelector('.block-type-name');
-          currentData.routingTypeBlocks[idx].type = (typeEl ? typeEl.textContent : typeField.textContent).trim();
-        }
-        if (lengthField) {
-          const num = parseFloat(lengthField.textContent.replace(/\s+/g, '').replace(/,/g, '.'));
-          if (!isNaN(num)) currentData.routingTypeBlocks[idx].length = num;
-        }
-        const countPipesField = row.querySelector('[data-field="countPipes"]');
-        if (countPipesField) {
-          const raw = countPipesField.textContent.replace(/\s+/g, '');
-          if (raw !== '-' && raw !== '') {
-            const num = parseInt(raw, 10);
-            if (!isNaN(num)) currentData.routingTypeBlocks[idx].countPipes = num;
-          }
-        }
-        const lengthPipesField = row.querySelector('[data-field="lengthPipes"]');
-        if (lengthPipesField) {
-          const raw = lengthPipesField.textContent.replace(/\s+/g, '').replace(/,/g, '.');
-          if (raw !== '-' && raw !== '') {
-            const num = parseFloat(raw);
-            if (!isNaN(num)) currentData.routingTypeBlocks[idx].lengthPipes = num;
-          }
-        }
-      }
-    });
-  }
-
-  const equipmentTable = document.getElementById('tableEquipment');
-  const eqTargetList = (currentData.TracksideEquipment && Array.isArray(currentData.TracksideEquipment))
-    ? currentData.TracksideEquipment
-    : (currentData.tracksideEquipment && Array.isArray(currentData.tracksideEquipment))
-    ? currentData.tracksideEquipment
-    : (currentData.equipment && Array.isArray(currentData.equipment))
-    ? currentData.equipment
-    : (currentData.Equipment && Array.isArray(currentData.Equipment))
-    ? currentData.Equipment
-    : null;
-
-  if (equipmentTable && eqTargetList) {
-    const rows = equipmentTable.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-      const idx = parseInt(row.dataset.index, 10);
-      if (!isNaN(idx) && eqTargetList[idx]) {
-        const markField = row.querySelector('[data-field="mark"]');
-        const methodField = row.querySelector('[data-field="method"]');
-        const countField = row.querySelector('[data-field="count"]');
-        if (markField) eqTargetList[idx].EquipmentType = markField.textContent.trim();
-        if (methodField) eqTargetList[idx].InstallationMethod = methodField.textContent.trim();
-        if (countField) {
-          const num = parseInt(countField.textContent.replace(/\s+/g, ''), 10);
-          if (!isNaN(num)) eqTargetList[idx].countEquipment = num;
-        }
-      }
-    });
-  }
-}
 
 // --------------------------------------------------------------------------
 // WORKS RULES & NORMS JSON EDITOR (WITH CODEMIRROR & CODE FOLDING)
