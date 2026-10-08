@@ -128,35 +128,238 @@ function normalizeFormulaMathOperators(formulaStr) {
   return str;
 }
 
-// Evaluate formula (e.g. "ДЛИНА", "0.36*ДЛИНА", "1.05*ДЛИНА", "КОЛИЧЕСТВО", "1*КОЛИЧЕСТВО") with a given base value
-function evaluateWorkFormula(formula, baseValue) {
-  const num = Number(baseValue) || 0;
-  if (!formula || typeof formula !== 'string' || !formula.trim()) {
-    return num;
+// --------------------------------------------------------------------------
+// FORMULA VALIDATION & EVALUATION
+// --------------------------------------------------------------------------
+
+// Validate formula string: checks for unknown variables and syntax validity
+// Returns { valid: true, normalized: string } or { valid: false, reason: string, unknownVariables: string[] }
+function validateFormulaString(formulaStr, allowedVars = ['ДЛИНА', 'КОЛИЧЕСТВО']) {
+  if (formulaStr === null || formulaStr === undefined) {
+    return { valid: true, isDefault: true };
   }
-  const clean = formula.trim()
-    .replace(/[×✕✖·∗]/g, '*')
-    .replace(/÷/g, '/')
-    .replace(/[\u2212\u2013\u2014]/g, '-');
-  const upper = clean.toUpperCase();
-  if (upper === 'ДЛИНА' || upper === 'КОЛИЧЕСТВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
-    return num;
+  const rawStr = String(formulaStr).trim();
+  if (!rawStr) {
+    return { valid: true, isDefault: true };
   }
-  const expr = clean.replace(/,/g, '.')
-    .replace(/ДЛИНА/gi, String(num))
-    .replace(/КОЛИЧЕСТВО_МУФТ/gi, String(num))
-    .replace(/КОЛИЧЕСТВО/gi, String(num));
-  try {
-    if (/^[0-9+\-*/().\s]+$/.test(expr)) {
-      const val = Function("'use strict'; return (" + expr + ");")();
-      if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
-        return val;
-      }
+
+  // 1. Normalize math operator symbols
+  const normalized = normalizeFormulaMathOperators(rawStr);
+
+  // 2. Check for unknown variables
+  const allowedSet = new Set(allowedVars.map(v => v.toUpperCase().trim()));
+
+  // Extract all identifiers (words consisting of Latin/Cyrillic letters or underscores)
+  const rawIdentifiers = normalized.match(/[a-zA-Zа-яА-ЯёЁ_][a-zA-Zа-яА-ЯёЁ0-9_]*/g) || [];
+  const unknownVars = [];
+
+  rawIdentifiers.forEach(id => {
+    const idUpper = id.toUpperCase();
+    if (!allowedSet.has(idUpper)) {
+      unknownVars.push(id);
     }
-  } catch (e) {
-    // fallback
+  });
+
+  if (unknownVars.length > 0) {
+    const uniqueUnknown = Array.from(new Set(unknownVars));
+    return {
+      valid: false,
+      error: 'unknown_variable',
+      unknownVariables: uniqueUnknown,
+      reason: `Неизвестная переменная: «${uniqueUnknown.join(', ')}»`
+    };
   }
-  return num;
+
+  return { valid: true, isDefault: false, normalized };
+}
+
+// Universal formula evaluator with strict validation and detailed error reporting
+// domain: 'cable' | 'coupling' | 'trench' | 'equipment'
+// If formula is invalid or contains unknown variables: returns { valid: false, reason, error, errorInfo }
+// If formula is valid: returns { valid: true, value, normalized }
+function validateAndEvaluateFormula(formula, dataCtx, domain = 'cable', context = null) {
+  const baseValue = (typeof dataCtx === 'object' && dataCtx !== null)
+    ? (dataCtx.length !== undefined ? dataCtx.length : (dataCtx.count !== undefined ? dataCtx.count : 0))
+    : Number(dataCtx) || 0;
+
+  if (formula === null || formula === undefined) {
+    return { valid: true, value: baseValue, isDefault: true };
+  }
+  const rawStr = String(formula).trim();
+  if (!rawStr) {
+    return { valid: true, value: baseValue, isDefault: true };
+  }
+
+  const clean = normalizeFormulaMathOperators(rawStr);
+  let expr = clean.replace(/,/g, '.');
+
+  // Helper to safely replace identifier tokens without JS \b limitation on Cyrillic
+  function replaceToken(str, tokenName, val) {
+    const pattern = new RegExp('(^|[^a-zA-Z0-9а-яА-ЯёЁ_])' + tokenName + '([^a-zA-Z0-9а-яА-ЯёЁ_]|$)', 'gi');
+    return str.replace(pattern, (match, p1, p2) => p1 + ' ' + val + ' ' + p2);
+  }
+
+  if (domain === 'trench') {
+    const seg = (typeof dataCtx === 'object' && dataCtx !== null) ? dataCtx : {};
+    const len = Number(seg.length !== undefined ? seg.length : baseValue) || 0;
+    const cab = Number(seg.cablesCount !== undefined ? seg.cablesCount : (seg.count !== undefined ? seg.count : 0)) || 0;
+    const countPipes = Number(seg.countPipes !== undefined ? seg.countPipes : (seg.lengthPipes ? 1 : 0)) || 0;
+    const lengthPipes = Number(seg.lengthPipes !== undefined && seg.lengthPipes > 0 ? seg.lengthPipes : len) || 0;
+    const countIntersections = Number(seg.countIntersections !== undefined && seg.countIntersections > 0 ? seg.countIntersections : (seg.countPipes || seg.lengthPipes ? 1 : 0)) || 0;
+
+    // Intersections
+    expr = replaceToken(expr, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]', countIntersections);
+    expr = replaceToken(expr, 'INTERSECTIONS[_\\s]?COUNT', countIntersections);
+    expr = replaceToken(expr, 'COUNT[_\\s]?INTERSECTIONS', countIntersections);
+    expr = replaceToken(expr, 'ПЕРЕСЕЧЕНИ[ЙЯЕ]', countIntersections);
+    // Pipe count
+    expr = replaceToken(expr, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ТРУБ[АЫ]?', countPipes);
+    expr = replaceToken(expr, 'PIPES[_\\s]?COUNT', countPipes);
+    expr = replaceToken(expr, 'COUNT[_\\s]?PIPES', countPipes);
+    expr = replaceToken(expr, 'ТРУБ[АЫ]?', countPipes);
+    // Pipe length
+    expr = replaceToken(expr, 'ДЛИН[АЫ][_\\s]?ТРУБ[АЫ]?', lengthPipes);
+    expr = replaceToken(expr, 'PIPES[_\\s]?LENGTH', lengthPipes);
+    expr = replaceToken(expr, 'LENGTH[_\\s]?PIPES', lengthPipes);
+    // Cable count
+    expr = replaceToken(expr, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ', cab);
+    expr = replaceToken(expr, 'CABLES_COUNT', cab);
+    expr = replaceToken(expr, 'CABLES', cab);
+    expr = replaceToken(expr, 'КАБЕЛЕ[ЙЯИ]', cab);
+    // Generic
+    expr = replaceToken(expr, 'КОЛИЧЕСТВО', cab);
+    expr = replaceToken(expr, 'COUNT', cab);
+    expr = replaceToken(expr, 'QTY', cab);
+    expr = replaceToken(expr, 'ДЛИНА', len);
+    expr = replaceToken(expr, 'LENGTH', len);
+  } else if (domain === 'equipment') {
+    const count = Number(baseValue) || 0;
+    expr = replaceToken(expr, 'КОЛИЧЕСТВО', count);
+    expr = replaceToken(expr, 'COUNT', count);
+    expr = replaceToken(expr, 'QTY', count);
+    expr = replaceToken(expr, 'ШТ', count);
+    expr = replaceToken(expr, 'ДЛИНА', count);
+    expr = replaceToken(expr, 'LENGTH', count);
+  } else if (domain === 'coupling') {
+    const count = Number(baseValue) || 0;
+    expr = replaceToken(expr, 'КОЛИЧЕСТВО_МУФТ', count);
+    expr = replaceToken(expr, 'КОЛИЧЕСТВО', count);
+    expr = replaceToken(expr, 'COUNT', count);
+    expr = replaceToken(expr, 'QTY', count);
+    expr = replaceToken(expr, 'ШТ', count);
+    expr = replaceToken(expr, 'ДЛИНА', count);
+    expr = replaceToken(expr, 'LENGTH', count);
+  } else {
+    // domain === 'cable' (default)
+    const num = Number(baseValue) || 0;
+    expr = replaceToken(expr, 'КОЛИЧЕСТВО_МУФТ', num);
+    expr = replaceToken(expr, 'КОЛИЧЕСТВО', num);
+    expr = replaceToken(expr, 'COUNT', num);
+    expr = replaceToken(expr, 'QTY', num);
+    expr = replaceToken(expr, 'ШТ', num);
+    expr = replaceToken(expr, 'ДЛИНА', num);
+    expr = replaceToken(expr, 'LENGTH', num);
+  }
+
+  // Check for remaining unknown identifiers (variables)
+  const unknown = expr.match(/[a-zA-Zа-яА-ЯёЁ_][a-zA-Zа-яА-ЯёЁ0-9_]*/g);
+  if (unknown && unknown.length > 0) {
+    const unique = Array.from(new Set(unknown));
+    const reason = `Неизвестная переменная: «${unique.join(', ')}»`;
+    const errObj = {
+      valid: false,
+      error: 'unknown_variable',
+      unknownVariables: unique,
+      reason: reason,
+      errorInfo: {
+        name: (context && context.name) || 'Без названия',
+        type: (context && context.type) || 'работа',
+        section: (context && context.section) || '',
+        ruleName: (context && context.ruleName) || '',
+        formula: rawStr,
+        reason: reason
+      }
+    };
+    if (context && context.collector && Array.isArray(context.collector)) {
+      context.collector.push(errObj.errorInfo);
+    }
+    return errObj;
+  }
+
+  if (!/^[0-9+\-*/().\s]+$/.test(expr)) {
+    const reason = 'Формула содержит недопустимые математические знаки';
+    const errObj = {
+      valid: false,
+      error: 'invalid_syntax',
+      reason: reason,
+      errorInfo: {
+        name: (context && context.name) || 'Без названия',
+        type: (context && context.type) || 'работа',
+        section: (context && context.section) || '',
+        ruleName: (context && context.ruleName) || '',
+        formula: rawStr,
+        reason: reason
+      }
+    };
+    if (context && context.collector && Array.isArray(context.collector)) {
+      context.collector.push(errObj.errorInfo);
+    }
+    return errObj;
+  }
+
+  try {
+    const val = Function("'use strict'; return (" + expr + ");")();
+    if (typeof val !== 'number' || isNaN(val) || !isFinite(val)) {
+      const reason = isNaN(val) ? 'Ошибка вычисления формулы (NaN)' : 'Деление на ноль или недопустимый результат';
+      const errObj = {
+        valid: false,
+        error: 'eval_error',
+        reason: reason,
+        errorInfo: {
+          name: (context && context.name) || 'Без названия',
+          type: (context && context.type) || 'работа',
+          section: (context && context.section) || '',
+          ruleName: (context && context.ruleName) || '',
+          formula: rawStr,
+          reason: reason
+        }
+      };
+      if (context && context.collector && Array.isArray(context.collector)) {
+        context.collector.push(errObj.errorInfo);
+      }
+      return errObj;
+    }
+    return { valid: true, value: val, isDefault: false, normalized: clean };
+  } catch (e) {
+    const reason = `Синтаксическая ошибка в формуле: ${e.message}`;
+    const errObj = {
+      valid: false,
+      error: 'syntax_error',
+      reason: reason,
+      errorInfo: {
+        name: (context && context.name) || 'Без названия',
+        type: (context && context.type) || 'работа',
+        section: (context && context.section) || '',
+        ruleName: (context && context.ruleName) || '',
+        formula: rawStr,
+        reason: reason
+      }
+    };
+    if (context && context.collector && Array.isArray(context.collector)) {
+      context.collector.push(errObj.errorInfo);
+    }
+    return errObj;
+  }
+}
+
+// Evaluate formula (e.g. "ДЛИНА", "0.36*ДЛИНА", "1.05*ДЛИНА", "КОЛИЧЕСТВО", "1*КОЛИЧЕСТВО") with a given base value
+// Returns evaluated number, or null if formula is invalid / has unknown variables (skips item and records reason if context provided)
+function evaluateWorkFormula(formula, baseValue, context = null) {
+  const res = validateAndEvaluateFormula(formula, baseValue, 'cable', context);
+  if (!res.valid) {
+    return null;
+  }
+  return res.value;
 }
 
 // Build display string for formula in VOR
@@ -2577,13 +2780,15 @@ function calculateVolumes(options = {}) {
 
   renderConstructionWorks({
     works: trenchWorks,
-    missingInRules: trenchWorksCalc.missingInRules
+    missingInRules: trenchWorksCalc.missingInRules,
+    formulaErrors: trenchWorksCalc.formulaErrors || []
   });
   renderInstallationWorks({
     works: cableWorks,
     missingInRules: cableWorksCalc.missingInRules,
     missingInCatalog: cableWorksCalc.missingInCatalog,
-    missingEquipment: equipmentWorksCalc.missingInRules
+    missingEquipment: equipmentWorksCalc.missingInRules,
+    formulaErrors: cableWorksCalc.formulaErrors || []
   });
 
   // Check if any rules or data are missing in Cable works, Trench works, Equipment, or Couplings
@@ -2594,7 +2799,32 @@ function calculateVolumes(options = {}) {
     ? ((couplingsSummary.missingCouplings || []).length + (couplingsSummary.missingInCatalog || []).length)
     : 0;
 
-  if (cableMissingCount > 0 || trenchMissingCount > 0 || equipmentMissingCount > 0 || couplingMissingCount > 0) {
+  const allFormulaErrors = [
+    ...(trenchWorksCalc && trenchWorksCalc.formulaErrors ? trenchWorksCalc.formulaErrors : []),
+    ...(cableWorksCalc && cableWorksCalc.formulaErrors ? cableWorksCalc.formulaErrors : []),
+    ...(equipmentWorksCalc && equipmentWorksCalc.formulaErrors ? equipmentWorksCalc.formulaErrors : [])
+  ];
+  window.lastFormulaErrors = allFormulaErrors;
+
+  if (allFormulaErrors.length > 0) {
+    const errorDetails = allFormulaErrors.map(e => `«${e.name}» [${e.formula}]: ${e.reason}`).slice(0, 2).join('; ');
+    const moreSuffix = allFormulaErrors.length > 2 ? ` и еще ${allFormulaErrors.length - 2} поз.` : '';
+    if (cableMissingCount > 0 || trenchMissingCount > 0 || equipmentMissingCount > 0 || couplingMissingCount > 0) {
+      showToast(
+        `Внимание: некорректная формула (${allFormulaErrors.length} поз. пропущено: ${errorDetails}${moreSuffix}) и неполные правила. Проверьте предупреждения в ведомостях.`,
+        'warning',
+        'Внимание: ошибки формул',
+        9000
+      );
+    } else {
+      showToast(
+        `Внимание: некорректная формула (${allFormulaErrors.length} поз. пропущено: ${errorDetails}${moreSuffix}). Данные работы/материалы не вошли в расчет.`,
+        'warning',
+        'Ошибка формулы',
+        9000
+      );
+    }
+  } else if (cableMissingCount > 0 || trenchMissingCount > 0 || equipmentMissingCount > 0 || couplingMissingCount > 0) {
     const missingItems = [];
     if (cableMissingCount > 0) {
       const names = cableWorksCalc.missingInRules.map(m => `«${m.type}»`).join(', ');
@@ -2746,14 +2976,55 @@ function renderEquipmentStatement(equipmentData, equipmentWorksCalc) {
 
   const missingBadge = document.getElementById('equipmentMissingBadge');
   const hasMissing = equipmentWorksCalc && equipmentWorksCalc.missingInRules && equipmentWorksCalc.missingInRules.length > 0;
+  const hasFormulaErrors = equipmentWorksCalc && equipmentWorksCalc.formulaErrors && equipmentWorksCalc.formulaErrors.length > 0;
   if (missingBadge) {
-    if (hasMissing) {
+    if (hasFormulaErrors) {
       missingBadge.classList.remove('d-none');
+      missingBadge.classList.remove('bg-warning-subtle', 'text-warning-emphasis');
+      missingBadge.classList.add('bg-danger-subtle', 'text-danger-emphasis');
+      missingBadge.innerHTML = `<i class='bx bx-error me-1'></i>Ошибка формулы (${equipmentWorksCalc.formulaErrors.length})`;
+      missingBadge.onclick = () => openWorksRulesModal('editor');
+    } else if (hasMissing) {
+      missingBadge.classList.remove('d-none');
+      missingBadge.classList.remove('bg-danger-subtle', 'text-danger-emphasis');
+      missingBadge.classList.add('bg-warning-subtle', 'text-warning-emphasis');
       missingBadge.textContent = `Неполные правила (${equipmentWorksCalc.missingInRules.length})`;
       missingBadge.onclick = () => openWorksRulesModal('editor');
     } else {
       missingBadge.classList.add('d-none');
     }
+  }
+
+  let formulaErrorAlertHtml = '';
+  if (hasFormulaErrors) {
+    const errorItems = equipmentWorksCalc.formulaErrors.map(e => `
+      <li class="mb-1">
+        <strong class="text-danger">«${escapeHtml(e.name)}»</strong>: формула <code>${escapeHtml(e.formula)}</code> — <span class="text-danger-emphasis">${escapeHtml(e.reason)}</span>
+      </li>
+    `).join('');
+    formulaErrorAlertHtml = `
+      <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
+        <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+          <div class="d-flex align-items-start gap-2">
+            <i class="bx bx-error-circle fs-5 text-danger flex-shrink-0 mt-0_5"></i>
+            <div>
+              <div class="fw-bold text-danger mb-1">
+                Внимание: некорректная формула в разделе «Оборудование» (${equipmentWorksCalc.formulaErrors.length} поз. пропущено)
+              </div>
+              <ul class="mb-1 ps-3 text-body-secondary" style="font-size: 0.8rem; line-height: 1.35;">
+                ${errorItems}
+              </ul>
+              <div class="text-danger small" style="font-size: 0.75rem;">
+                Данные позиции пропущены и не вошли в итоговую ведомость (ВОР). Исправьте формулу или переменные в правилах сметных норм.
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('editor')">
+            <i class="bx bx-edit"></i> Исправить в JSON
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   let missingAlertHtml = '';
@@ -2823,6 +3094,7 @@ function renderEquipmentStatement(equipmentData, equipmentWorksCalc) {
   });
 
   container.innerHTML = `
+    ${formulaErrorAlertHtml}
     ${missingAlertHtml}
     <div class="mb-2 d-flex flex-wrap gap-2">
       <div class="stat-summary-card flex-fill text-center py-1 px-2">
@@ -2893,19 +3165,60 @@ function renderInstallationWorks(cableWorksCalc) {
   const installationMissingBadge = document.getElementById('installationMissingBadge');
   const hasMissingCable = cableWorksCalc.missingInRules && cableWorksCalc.missingInRules.length > 0;
   const hasMissingEquipment = cableWorksCalc.missingEquipment && cableWorksCalc.missingEquipment.length > 0;
+  const hasFormulaErrors = cableWorksCalc.formulaErrors && cableWorksCalc.formulaErrors.length > 0;
   const hasMissing = hasMissingCable || hasMissingEquipment;
   const totalMissingCount = (hasMissingCable ? cableWorksCalc.missingInRules.length : 0) + (hasMissingEquipment ? cableWorksCalc.missingEquipment.length : 0);
 
   [cableMissingBadge, installationMissingBadge].forEach(b => {
     if (!b) return;
-    if (hasMissing) {
+    if (hasFormulaErrors) {
       b.classList.remove('d-none');
+      b.classList.remove('bg-warning-subtle', 'text-warning-emphasis');
+      b.classList.add('bg-danger-subtle', 'text-danger-emphasis');
+      b.innerHTML = `<i class='bx bx-error me-1'></i>Ошибка формулы (${cableWorksCalc.formulaErrors.length})`;
+      b.onclick = () => openWorksRulesModal('editor');
+    } else if (hasMissing) {
+      b.classList.remove('d-none');
+      b.classList.remove('bg-danger-subtle', 'text-danger-emphasis');
+      b.classList.add('bg-warning-subtle', 'text-warning-emphasis');
       b.innerHTML = `Неполные правила (${totalMissingCount})`;
       b.onclick = () => openWorksRulesModal('editor');
     } else {
       b.classList.add('d-none');
     }
   });
+
+  let formulaErrorAlertHtml = '';
+  if (hasFormulaErrors) {
+    const errorItems = cableWorksCalc.formulaErrors.map(e => `
+      <li class="mb-1">
+        <strong class="text-danger">«${escapeHtml(e.name)}»</strong>: формула <code>${escapeHtml(e.formula)}</code> — <span class="text-danger-emphasis">${escapeHtml(e.reason)}</span>
+      </li>
+    `).join('');
+    formulaErrorAlertHtml = `
+      <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
+        <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+          <div class="d-flex align-items-start gap-2">
+            <i class="bx bx-error-circle fs-5 text-danger flex-shrink-0 mt-0_5"></i>
+            <div>
+              <div class="fw-bold text-danger mb-1">
+                Внимание: некорректная формула в монтажных работах/материалах (${cableWorksCalc.formulaErrors.length} поз. пропущено)
+              </div>
+              <ul class="mb-1 ps-3 text-body-secondary" style="font-size: 0.8rem; line-height: 1.35;">
+                ${errorItems}
+              </ul>
+              <div class="text-danger small" style="font-size: 0.75rem;">
+                Данные работы и материалы пропущены и не вошли в итоговую ведомость (ВОР). Исправьте формулу или переменные в правилах сметных норм.
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('editor')">
+            <i class="bx bx-edit"></i> Исправить в JSON
+          </button>
+        </div>
+      </div>
+    `;
+  }
 
   let missingCableAlertHtml = '';
   if (hasMissingCable) {
@@ -3048,6 +3361,7 @@ function renderInstallationWorks(cableWorksCalc) {
 
   if (cableWorksCalc.works.length > 0) {
     container.innerHTML = `
+      ${formulaErrorAlertHtml}
       ${missingCableAlertHtml}
       ${missingEquipmentAlertHtml}
       ${missingCatalogAlertHtml}
@@ -3207,17 +3521,58 @@ function renderConstructionWorks(worksCalc) {
   const trenchMissingBadge = document.getElementById('trenchMissingBadge');
   const constructionMissingBadge = document.getElementById('constructionMissingBadge');
   const hasMissing = worksCalc.missingInRules && worksCalc.missingInRules.length > 0;
+  const hasFormulaErrors = worksCalc.formulaErrors && worksCalc.formulaErrors.length > 0;
 
   [trenchMissingBadge, constructionMissingBadge].forEach(badge => {
     if (!badge) return;
-    if (hasMissing) {
+    if (hasFormulaErrors) {
       badge.classList.remove('d-none');
+      badge.classList.remove('bg-warning-subtle', 'text-warning-emphasis');
+      badge.classList.add('bg-danger-subtle', 'text-danger-emphasis');
+      badge.innerHTML = `<i class='bx bx-error me-1'></i>Ошибка формулы (${worksCalc.formulaErrors.length})`;
+      badge.onclick = () => openWorksRulesModal('editor');
+    } else if (hasMissing) {
+      badge.classList.remove('d-none');
+      badge.classList.remove('bg-danger-subtle', 'text-danger-emphasis');
+      badge.classList.add('bg-warning-subtle', 'text-warning-emphasis');
       badge.innerHTML = `Неполные правила (${worksCalc.missingInRules.length})`;
       badge.onclick = () => openWorksRulesModal('editor');
     } else {
       badge.classList.add('d-none');
     }
   });
+
+  let formulaErrorAlertHtml = '';
+  if (hasFormulaErrors) {
+    const errorItems = worksCalc.formulaErrors.map(e => `
+      <li class="mb-1">
+        <strong class="text-danger">«${escapeHtml(e.name)}»</strong>: формула <code>${escapeHtml(e.formula)}</code> — <span class="text-danger-emphasis">${escapeHtml(e.reason)}</span>
+      </li>
+    `).join('');
+    formulaErrorAlertHtml = `
+      <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
+        <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+          <div class="d-flex align-items-start gap-2">
+            <i class="bx bx-error-circle fs-5 text-danger flex-shrink-0 mt-0_5"></i>
+            <div>
+              <div class="fw-bold text-danger mb-1">
+                Внимание: некорректная формула в строительных работах/материалах (${worksCalc.formulaErrors.length} поз. пропущено)
+              </div>
+              <ul class="mb-1 ps-3 text-body-secondary" style="font-size: 0.8rem; line-height: 1.35;">
+                ${errorItems}
+              </ul>
+              <div class="text-danger small" style="font-size: 0.75rem;">
+                Данные работы и материалы пропущены и не вошли в итоговую ведомость (ВОР). Исправьте формулу или переменные в правилах сметных норм.
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('editor')">
+            <i class="bx bx-edit"></i> Исправить в JSON
+          </button>
+        </div>
+      </div>
+    `;
+  }
 
   let missingAlertHtml = '';
   if (hasMissing) {
@@ -3284,6 +3639,7 @@ function renderConstructionWorks(worksCalc) {
 
   if (worksCalc.works.length > 0) {
     container.innerHTML = `
+      ${formulaErrorAlertHtml}
       ${missingAlertHtml}
 
       <div class="table-responsive rounded-2 border mb-0 custom-table-scroll" style="max-height: 420px;">
@@ -4735,50 +5091,12 @@ function getActiveTrenchSummary() {
 
 // Evaluate formula for a single trench segment (supports both ДЛИНА and pipe/cable count variables)
 function evaluateTrenchSegmentFormula(formula, length, cablesCount, seg = null) {
-  const clean = (formula || 'ДЛИНА').trim()
-    .replace(/[×✕✖·∗]/g, '*')
-    .replace(/÷/g, '/')
-    .replace(/[\u2212\u2013\u2014]/g, '-');
-  const len = Number(length) || 0;
-  const cab = Number(cablesCount) || 0;
-  const countPipes = Number(seg && seg.countPipes !== undefined ? seg.countPipes : (seg && seg.lengthPipes ? 1 : 0)) || 0;
-  const lengthPipes = Number(seg && seg.lengthPipes !== undefined && seg.lengthPipes > 0 ? seg.lengthPipes : len) || 0;
-  const countIntersections = Number(seg && seg.countIntersections !== undefined && seg.countIntersections > 0 ? seg.countIntersections : (seg && (seg.countPipes || seg.lengthPipes || (seg.type && seg.type.includes('труб'))) ? 1 : 0)) || 0;
-
-  let expr = clean.replace(/,/g, '.')
-    // Intersections
-    .replace(/(?:КОЛИЧЕСТВО|ЧИСЛО)[_\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]/gi, String(countIntersections))
-    .replace(/\bINTERSECTIONS[_\s]?COUNT\b/gi, String(countIntersections))
-    .replace(/\bCOUNT[_\s]?INTERSECTIONS\b/gi, String(countIntersections))
-    .replace(/\bПЕРЕСЕЧЕНИ[ЙЯЕ]\b/gi, String(countIntersections))
-    // Pipe count
-    .replace(/(?:КОЛИЧЕСТВО|ЧИСЛО)[_\s]?ТРУБ[АЫ]?/gi, String(countPipes))
-    .replace(/\bPIPES[_\s]?COUNT\b/gi, String(countPipes))
-    .replace(/\bCOUNT[_\s]?PIPES\b/gi, String(countPipes))
-    // Pipe length
-    .replace(/ДЛИН[АЫ][_\s]?ТРУБ[АЫ]?/gi, String(lengthPipes))
-    .replace(/\bPIPES[_\s]?LENGTH\b/gi, String(lengthPipes))
-    .replace(/\bLENGTH[_\s]?PIPES\b/gi, String(lengthPipes))
-    // Cable count
-    .replace(/КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ/gi, String(cab))
-    .replace(/CABLES_COUNT/gi, String(cab))
-    .replace(/CABLES/gi, String(cab))
-    .replace(/КАБЕЛЕЙ/gi, String(cab))
-    .replace(/КАБЕЛЯ/gi, String(cab))
-    .replace(/КАБЕЛИ/gi, String(cab))
-    // Generic
-    .replace(/\bКОЛИЧЕСТВО\b/gi, String(cab))
-    .replace(/ДЛИНА/gi, String(len))
-    .replace(/\bLENGTH\b/gi, String(len));
-
-  try {
-    if (/^[0-9+\-*/().\s]+$/.test(expr)) {
-      const val = Function("'use strict'; return (" + expr + ");")();
-      if (typeof val === 'number' && !isNaN(val) && isFinite(val)) return val;
-    }
-  } catch (e) {}
-
-  return len;
+  const dataCtx = Object.assign({}, seg || {}, { length, cablesCount });
+  const res = validateAndEvaluateFormula(formula, dataCtx, 'trench');
+  if (!res.valid) {
+    return null;
+  }
+  return res.value;
 }
 
 // Calculate works based on trench summary and rules JSON
@@ -4787,6 +5105,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
   const { sectionName, rules } = getTrenchRules(rulesData);
   const calculatedWorks = [];
   const missingInRules = [];
+  const formulaErrors = [];
   const matchedTrenchTypes = new Set();
 
   // Iterate rules in the JSON file order
@@ -4834,16 +5153,50 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
         if (effectiveLength <= 0 && matchingSegments.length === 0) return;
 
         const formula = (work["Формула"] || "ДЛИНА").trim();
+        const trenchWorkName = (work["Наименование"] || work.name || ruleName).trim();
+        const targetSection = (work["Раздел"] || work.section || sectionName).trim();
+        const rawWorkType = (work["Тип"] || work.type || '').trim().toLowerCase();
+        let determinedWorkType = 'работа';
+        if (rawWorkType === 'оборудование' || rawWorkType === 'equipment') {
+          determinedWorkType = 'оборудование';
+        } else if (rawWorkType === 'материал' || rawWorkType === 'material') {
+          determinedWorkType = 'материал';
+        }
+
+        const trenchContext = {
+          name: trenchWorkName,
+          type: determinedWorkType,
+          section: targetSection,
+          ruleName: ruleName,
+          formula: formula
+        };
+
+        // Validate formula on matching segments: if invalid, notify & skip this work/material
+        const sampleSeg = matchingSegments[0] || { length: effectiveLength, cablesCount: 1, countPipes: 1, lengthPipes: effectiveLength, countIntersections: 1 };
+        const checkRes = validateAndEvaluateFormula(formula, sampleSeg, 'trench', trenchContext);
+        if (!checkRes.valid) {
+          formulaErrors.push(checkRes.errorInfo);
+          return; // Skip this work/material!
+        }
+
+        let totalVolume = 0;
+        let hasSegError = false;
+        for (const seg of matchingSegments) {
+          const segRes = validateAndEvaluateFormula(formula, seg, 'trench', trenchContext);
+          if (!segRes.valid) {
+            formulaErrors.push(segRes.errorInfo);
+            hasSegError = true;
+            break;
+          }
+          totalVolume += segRes.value;
+        }
+        if (hasSegError) {
+          return; // Skip this work/material!
+        }
+
         const hasCableVar = /(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|\bКОЛИЧЕСТВО\b)/i.test(formula);
         const hasPipeVar = /(?:ТРУБ|PIPES)/i.test(formula);
 
-        let totalVolume = 0;
-        matchingSegments.forEach(seg => {
-          const segLen = Number(seg.length) || 0;
-          const segCables = Number(seg.cablesCount) || 0;
-          const segVol = evaluateTrenchSegmentFormula(formula, segLen, segCables, seg);
-          totalVolume += segVol;
-        });
         const trenchWorkUnit = work["Единицы измерения"] || work.unit || '';
         totalVolume = roundQuantity(totalVolume, trenchWorkUnit, rulesData);
 
@@ -4924,14 +5277,6 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
         displayFormula = normalizeFormulaMathOperators(displayFormula);
 
         const showFormula = shouldShowFormula(work);
-        const targetSection = (work["Раздел"] || work.section || sectionName).trim();
-        const rawWorkType = (work["Тип"] || work.type || '').trim().toLowerCase();
-        let determinedWorkType = 'работа';
-        if (rawWorkType === 'оборудование' || rawWorkType === 'equipment') {
-          determinedWorkType = 'оборудование';
-        } else if (rawWorkType === 'материал' || rawWorkType === 'material') {
-          determinedWorkType = 'материал';
-        }
         const isSubWork = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
         const primaryTrenchWork = works.find(w => {
           const t = (w["Тип"] || w.type || '').trim().toLowerCase();
@@ -4974,7 +5319,8 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
 
   return {
     works: calculatedWorks,
-    missingInRules
+    missingInRules,
+    formulaErrors
   };
 }
 
@@ -4985,6 +5331,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
   const catalog = getCableCatalog(rulesData);
   const calculatedWorks = [];
   const missingInRules = [];
+  const formulaErrors = [];
   const matchedRoutingTypes = new Set();
   const allUsedRoutingTypes = new Set();
 
@@ -5013,7 +5360,18 @@ function calculateWorksFromCables(cableSummary, rulesData) {
       // 1. Add all defined work/material items from rules array for this tier
       workItems.forEach(workItem => {
         const formula = workItem.formula || 'КОЛИЧЕСТВО';
-        const rawVol = evaluateWorkFormula(formula, tierData.count);
+        const evalRes = validateAndEvaluateFormula(formula, tierData.count, 'coupling', {
+          name: workItem.name,
+          type: workItem.type || 'работа',
+          section: sectionName,
+          ruleName: `Установка муфт (до ${tier} жил)`,
+          formula: formula
+        });
+        if (!evalRes.valid) {
+          formulaErrors.push(evalRes.errorInfo);
+          return; // Skip this coupling item!
+        }
+        const rawVol = evalRes.value;
         const volume = roundQuantity(rawVol, workItem.unit || 'шт', rulesData);
         const showFormula = (workItem.showFormula !== undefined) ? workItem.showFormula : shouldShowFormula(workItem.rawItem || workItem);
         const formulaDisplay = showFormula ? buildCouplingWorkFormulaDisplay(formula, tierData, volume) : '';
@@ -5155,31 +5513,45 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           }
           const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
           const formula = work["Формула"] || work.formula || "ДЛИНА";
-          const rawVal = evaluateWorkFormula(formula, totalOpticalLength);
-          const unit = work["Единицы измерения"] || work.unit || 'м';
-          const vol = roundQuantity(rawVal, unit, rulesData);
           const workTitle = (work["Наименование"] || work.name || opticalPrimaryTitle).trim();
-          const showFormula = shouldShowFormula(work);
-          const formulaDisplay = showFormula ? buildWorkFormulaDisplay(formula, totalOpticalLength, opticalCables.length, unit) : '';
           const targetSection = (work["Раздел"] || work.section || sectionName).trim();
+          const workShowFormula = shouldShowFormula(work);
 
-          calculatedWorks.push({
+          const evalRes = validateAndEvaluateFormula(formula, totalOpticalLength, 'cable', {
             name: workTitle,
-            unit: unit,
-            volume: vol,
-            formulaDisplay: formulaDisplay,
-            showFormula: showFormula,
-            ruleName: ruleName,
-            routingType: ruleName,
-            tierKey: parsedWM.optical.key,
-            isOptical: true,
-            category: 'Оптический кабель',
-            section: targetSection,
             type: determinedWorkType,
-            parentWorkName: (isWorkSub && primaryWork !== work) ? opticalPrimaryTitle : undefined,
-            cablesCount: opticalCables.length,
-            comment: work["Комментарий"] || work.comment || ''
+            section: targetSection,
+            ruleName: ruleName,
+            formula: formula
           });
+
+          if (!evalRes.valid) {
+            formulaErrors.push(evalRes.errorInfo);
+            // Skip this work item!
+          } else {
+            const rawVal = evalRes.value;
+            const unit = work["Единицы измерения"] || work.unit || 'м';
+            const vol = roundQuantity(rawVal, unit, rulesData);
+            const formulaDisplay = workShowFormula ? buildWorkFormulaDisplay(formula, totalOpticalLength, opticalCables.length, unit) : '';
+
+            calculatedWorks.push({
+              name: workTitle,
+              unit: unit,
+              volume: vol,
+              formulaDisplay: formulaDisplay,
+              showFormula: workShowFormula,
+              ruleName: ruleName,
+              routingType: ruleName,
+              tierKey: parsedWM.optical.key,
+              isOptical: true,
+              category: 'Оптический кабель',
+              section: targetSection,
+              type: determinedWorkType,
+              parentWorkName: (isWorkSub && primaryWork !== work) ? opticalPrimaryTitle : undefined,
+              cablesCount: opticalCables.length,
+              comment: work["Комментарий"] || work.comment || ''
+            });
+          }
 
           // Process materials and equipment declared under this work
           const declaredSubItems = [
@@ -5197,11 +5569,23 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_КАБЕЛЯ}').trim();
             const matUnit = mat["Единицы измерения"] || mat.unit || 'км';
             const matFormula = mat["Формула"] || mat.formula || "ДЛИНА";
-            const matShowFormula = shouldShowFormula(mat, showFormula);
+            const matShowFormula = shouldShowFormula(mat, workShowFormula);
             const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
 
             if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
               // Expand material for each optical cable
+              const matCheck = validateAndEvaluateFormula(matFormula, 100, 'cable', {
+                name: matNameTpl,
+                type: determinedMatType,
+                section: matSection,
+                ruleName: ruleName,
+                formula: matFormula
+              });
+              if (!matCheck.valid) {
+                formulaErrors.push(matCheck.errorInfo);
+                return; // Skip this material!
+              }
+
               opticalCables.forEach(c => {
                 const cVol = roundQuantity(evaluateWorkFormula(matFormula, c.length), matUnit, rulesData);
                 const cFormulaDisp = matShowFormula
@@ -5229,7 +5613,18 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               });
             } else {
               // Static item declared in work
-              const matRawVal = evaluateWorkFormula(matFormula, totalOpticalLength);
+              const matEvalRes = validateAndEvaluateFormula(matFormula, totalOpticalLength, 'cable', {
+                name: matNameTpl,
+                type: determinedMatType,
+                section: matSection,
+                ruleName: ruleName,
+                formula: matFormula
+              });
+              if (!matEvalRes.valid) {
+                formulaErrors.push(matEvalRes.errorInfo);
+                return; // Skip this material!
+              }
+              const matRawVal = matEvalRes.value;
               const matVol = roundQuantity(matRawVal, matUnit, rulesData);
               const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalOpticalLength, opticalCables.length, matUnit) : '';
               calculatedWorks.push({
@@ -5356,30 +5751,44 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             }
             const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
             const formula = work["Формула"] || work.formula || "ДЛИНА";
-            const rawVal = evaluateWorkFormula(formula, totalTierLength);
-            const unit = work["Единицы измерения"] || work.unit || 'м';
-            const vol = roundQuantity(rawVal, unit, rulesData);
             const workTitle = (work["Наименование"] || work.name || primaryWorkTitle).trim();
-            const showFormula = shouldShowFormula(work);
-            const formulaDisplay = showFormula ? buildWorkFormulaDisplay(formula, totalTierLength, tier.cables.length, unit) : '';
             const targetSection = (work["Раздел"] || work.section || sectionName).trim();
+            const workShowFormula = shouldShowFormula(work);
 
-            calculatedWorks.push({
+            const evalRes = validateAndEvaluateFormula(formula, totalTierLength, 'cable', {
               name: workTitle,
-              unit: unit,
-              volume: vol,
-              formulaDisplay: formulaDisplay,
-              showFormula: showFormula,
-              ruleName: ruleName,
-              routingType: ruleName,
-              tierMax: tier.threshold,
-              tierKey: tier.key,
-              section: targetSection,
               type: determinedWorkType,
-              parentWorkName: (isWorkSub && primaryWork !== work) ? primaryWorkTitle : undefined,
-              cablesCount: tier.cables.length,
-              comment: work["Комментарий"] || work.comment || ''
+              section: targetSection,
+              ruleName: ruleName,
+              formula: formula
             });
+
+            if (!evalRes.valid) {
+              formulaErrors.push(evalRes.errorInfo);
+              // Skip this work item!
+            } else {
+              const rawVal = evalRes.value;
+              const unit = work["Единицы измерения"] || work.unit || 'м';
+              const vol = roundQuantity(rawVal, unit, rulesData);
+              const formulaDisplay = workShowFormula ? buildWorkFormulaDisplay(formula, totalTierLength, tier.cables.length, unit) : '';
+
+              calculatedWorks.push({
+                name: workTitle,
+                unit: unit,
+                volume: vol,
+                formulaDisplay: formulaDisplay,
+                showFormula: workShowFormula,
+                ruleName: ruleName,
+                routingType: ruleName,
+                tierMax: tier.threshold,
+                tierKey: tier.key,
+                section: targetSection,
+                type: determinedWorkType,
+                parentWorkName: (isWorkSub && primaryWork !== work) ? primaryWorkTitle : undefined,
+                cablesCount: tier.cables.length,
+                comment: work["Комментарий"] || work.comment || ''
+              });
+            }
 
             // Process materials and equipment declared under this work
             const declaredSubItems = [
@@ -5397,11 +5806,23 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_КАБЕЛЯ}').trim();
               const matUnit = mat["Единицы измерения"] || mat.unit || 'км';
               const matFormula = mat["Формула"] || mat.formula || "ДЛИНА";
-              const matShowFormula = shouldShowFormula(mat, showFormula);
+              const matShowFormula = shouldShowFormula(mat, workShowFormula);
               const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
 
               if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
                 // Expand material for each electrical cable in this tier
+                const matCheck = validateAndEvaluateFormula(matFormula, 100, 'cable', {
+                  name: matNameTpl,
+                  type: determinedMatType,
+                  section: matSection,
+                  ruleName: ruleName,
+                  formula: matFormula
+                });
+                if (!matCheck.valid) {
+                  formulaErrors.push(matCheck.errorInfo);
+                  return; // Skip this material!
+                }
+
                 tier.cables.forEach(c => {
                   const cVol = roundQuantity(evaluateWorkFormula(matFormula, c.length), matUnit, rulesData);
                   const cFormulaDisp = matShowFormula
@@ -5427,7 +5848,18 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                 });
               } else {
                 // Static item declared under this work
-                const matRawVal = evaluateWorkFormula(matFormula, totalTierLength);
+                const matEvalRes = validateAndEvaluateFormula(matFormula, totalTierLength, 'cable', {
+                  name: matNameTpl,
+                  type: determinedMatType,
+                  section: matSection,
+                  ruleName: ruleName,
+                  formula: matFormula
+                });
+                if (!matEvalRes.valid) {
+                  formulaErrors.push(matEvalRes.errorInfo);
+                  return; // Skip this material!
+                }
+                const matRawVal = matEvalRes.value;
                 const matVol = roundQuantity(matRawVal, matUnit, rulesData);
                 const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalTierLength, tier.cables.length, matUnit) : '';
                 calculatedWorks.push({
@@ -5499,7 +5931,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
     works: calculatedWorks,
     missingInRules,
     missingInCatalog,
-    couplingsSummary
+    couplingsSummary,
+    formulaErrors
   };
 }
 
@@ -5513,28 +5946,11 @@ function getEquipmentRules(rulesData) {
 }
 
 function evaluateEquipmentFormula(formula, count) {
-  if (!formula || typeof formula !== 'string') return count;
-  const clean = formula.trim()
-    .replace(/[×✕✖·∗]/g, '*')
-    .replace(/÷/g, '/')
-    .replace(/[\u2212\u2013\u2014]/g, '-');
-  const expr = clean
-    .replace(/,/g, '.')
-    .replace(/\bКОЛИЧЕСТВО\b/gi, String(count))
-    .replace(/\bQTY\b/gi, String(count))
-    .replace(/\bCOUNT\b/gi, String(count))
-    .replace(/\bШТ\b/gi, String(count))
-    .replace(/\bДЛИНА\b/gi, String(count))
-    .replace(/\bLENGTH\b/gi, String(count));
-
-  try {
-    if (/^[0-9+\-*/().\s]+$/.test(expr)) {
-      const val = Function("'use strict'; return (" + expr + ");")();
-      if (typeof val === 'number' && !isNaN(val) && isFinite(val)) return val;
-    }
-  } catch (e) {}
-
-  return count;
+  const res = validateAndEvaluateFormula(formula, count, 'equipment');
+  if (!res.valid) {
+    return null;
+  }
+  return res.value;
 }
 
 function buildEquipmentFormulaDisplay(formula, count, unit) {
@@ -5553,6 +5969,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
   const eqDict = getEquipmentRulesDict(rulesData);
   const calculatedWorks = [];
   const missingInRules = [];
+  const formulaErrors = [];
   const matchedEquipmentKeys = new Set();
 
   const eqEntries = Object.entries(equipmentSummary || {});
@@ -5633,31 +6050,45 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
         const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
         const unit = work["Единицы измерения"] || work.unit || 'шт';
         const formula = (work["Формула"] || work.formula || "КОЛИЧЕСТВО").trim();
-        const rawVol = evaluateEquipmentFormula(formula, count);
-        const vol = roundQuantity(rawVol, unit, rulesData);
         const workTitle = (work["Наименование"] || work.name || primaryWorkTitle).trim();
-        const showFormula = shouldShowFormula(work);
-        const formulaDisplay = showFormula ? buildEquipmentFormulaDisplay(formula, count, unit) : '';
         const targetSection = (work["Раздел"] || work.section || 'Монтажные работы').trim();
+        const workShowFormula = shouldShowFormula(work);
 
-        calculatedWorks.push({
+        const evalRes = validateAndEvaluateFormula(formula, count, 'equipment', {
           name: workTitle,
-          unit: unit,
-          volume: vol,
-          volumeFormatted: String(vol),
-          formula: formula,
-          formulaDisplay: formulaDisplay,
-          showFormula: showFormula,
-          mark: itemMark,
-          method: itemMethod,
-          equipmentType: itemMark,
-          section: targetSection,
           type: determinedWorkType,
-          parentWorkName: (isWorkSub && primaryWork !== work) ? primaryWorkTitle : undefined,
-          count: count,
-          handles: handles,
-          comment: work["Комментарий"] || work.comment || (handles.length > 0 ? `handle: ${handles.join(', ')}` : '')
+          section: targetSection,
+          ruleName: `${itemMark} (${itemMethod})`,
+          formula: formula
         });
+
+        if (!evalRes.valid) {
+          formulaErrors.push(evalRes.errorInfo);
+          // Skip this work item!
+        } else {
+          const rawVol = evalRes.value;
+          const vol = roundQuantity(rawVol, unit, rulesData);
+          const formulaDisplay = workShowFormula ? buildEquipmentFormulaDisplay(formula, count, unit) : '';
+
+          calculatedWorks.push({
+            name: workTitle,
+            unit: unit,
+            volume: vol,
+            volumeFormatted: String(vol),
+            formula: formula,
+            formulaDisplay: formulaDisplay,
+            showFormula: workShowFormula,
+            mark: itemMark,
+            method: itemMethod,
+            equipmentType: itemMark,
+            section: targetSection,
+            type: determinedWorkType,
+            parentWorkName: (isWorkSub && primaryWork !== work) ? primaryWorkTitle : undefined,
+            count: count,
+            handles: handles,
+            comment: work["Комментарий"] || work.comment || (handles.length > 0 ? `handle: ${handles.join(', ')}` : '')
+          });
+        }
 
         // Process materials and equipment declared under this work
         const declaredSubItems = [
@@ -5700,12 +6131,26 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           }
           const matUnit = mat["Единицы измерения"] || mat.unit || 'шт';
           const matFormula = (mat["Формула"] || mat.formula || "КОЛИЧЕСТВО").trim();
-          const matRawVol = evaluateEquipmentFormula(matFormula, count);
-          const matVol = roundQuantity(matRawVol, matUnit, rulesData);
           const matName = (mat["Наименование"] || mat.name || itemMark).trim();
-          const matShowFormula = shouldShowFormula(mat, showFormula);
-          const matFormulaDisp = matShowFormula ? buildEquipmentFormulaDisplay(matFormula, count, matUnit) : '';
           const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
+
+          const matEvalRes = validateAndEvaluateFormula(matFormula, count, 'equipment', {
+            name: matName,
+            type: determinedMatType,
+            section: matSection,
+            ruleName: `${itemMark} (${itemMethod})`,
+            formula: matFormula
+          });
+
+          if (!matEvalRes.valid) {
+            formulaErrors.push(matEvalRes.errorInfo);
+            return; // Skip this material!
+          }
+
+          const matRawVol = matEvalRes.value;
+          const matVol = roundQuantity(matRawVol, matUnit, rulesData);
+          const matShowFormula = shouldShowFormula(mat, workShowFormula);
+          const matFormulaDisp = matShowFormula ? buildEquipmentFormulaDisplay(matFormula, count, matUnit) : '';
 
           calculatedWorks.push({
             name: matName,
@@ -5741,7 +6186,8 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
 
   return {
     works: calculatedWorks,
-    missingInRules
+    missingInRules,
+    formulaErrors
   };
 }
 
@@ -6047,6 +6493,7 @@ function getAllCalculatedWorks() {
     trenchWorks: trenchWorks,
     cableWorks: cableWorks,
     missingInRules: [ ...trenchCalc.missingInRules, ...cableCalc.missingInRules, ...equipmentCalc.missingInRules ],
+    formulaErrors: [ ...(trenchCalc.formulaErrors || []), ...(cableCalc.formulaErrors || []), ...(equipmentCalc.formulaErrors || []) ],
     trenchMissing: trenchCalc.missingInRules,
     cableMissing: cableCalc.missingInRules,
     equipmentMissing: equipmentCalc.missingInRules,
