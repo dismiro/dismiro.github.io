@@ -139,14 +139,13 @@ function evaluateWorkFormula(formula, baseValue) {
     .replace(/÷/g, '/')
     .replace(/[\u2212\u2013\u2014]/g, '-');
   const upper = clean.toUpperCase();
-  if (upper === 'ДЛИНА' || upper === 'КОЛИЧЕСТВО' || upper === 'КОЛ-ВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
+  if (upper === 'ДЛИНА' || upper === 'КОЛИЧЕСТВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
     return num;
   }
   const expr = clean.replace(/,/g, '.')
     .replace(/ДЛИНА/gi, String(num))
     .replace(/КОЛИЧЕСТВО_МУФТ/gi, String(num))
-    .replace(/КОЛИЧЕСТВО/gi, String(num))
-    .replace(/КОЛ-ВО/gi, String(num));
+    .replace(/КОЛИЧЕСТВО/gi, String(num));
   try {
     if (/^[0-9+\-*/().\s]+$/.test(expr)) {
       const val = Function("'use strict'; return (" + expr + ");")();
@@ -209,7 +208,7 @@ function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume) {
   const rawCount = tierData.count || 0;
   const upper = clean.toUpperCase();
 
-  if (upper === 'КОЛИЧЕСТВО' || upper === 'КОЛ-ВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
+  if (upper === 'КОЛИЧЕСТВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
     if (tierData.couplings && tierData.couplings.length > 1) {
       return normalizeFormulaMathOperators(tierData.couplings.map(c => `${c.count} шт`).join(' + ') + ` = ${rawCount} шт`);
     }
@@ -219,7 +218,6 @@ function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume) {
   let disp = clean.replace(/,/g, '.').replace(/\*/g, ' * ');
   disp = disp.replace(/КОЛИЧЕСТВО_МУФТ/gi, `${rawCount} шт`)
              .replace(/КОЛИЧЕСТВО/gi, `${rawCount} шт`)
-             .replace(/КОЛ-ВО/gi, `${rawCount} шт`)
              .replace(/ДЛИНА/gi, `${rawCount} шт`);
   if (calculatedVolume !== undefined && calculatedVolume !== rawCount) {
     disp += ` = ${calculatedVolume} шт`;
@@ -351,7 +349,7 @@ function parseRuleWorksAndMaterials(rule) {
       const cleanKey = String(key).trim().replace(',', '.');
       const numKey = parseFloat(cleanKey);
       if (!isNaN(numKey) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
-        threshold = numKey > 50 ? numKey / 1000 : numKey;
+        threshold = numKey;
       } else {
         const matchDo = cleanKey.match(/(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
         if (matchDo) {
@@ -847,8 +845,11 @@ function getActiveCouplingsSummary(rulesData) {
   if (currentData && Array.isArray(currentData.cables)) {
     currentData.cables.forEach(c => {
       if (!c) return;
+      const rawType = c.type || '';
+      const normType = normalizeCableType(rawType);
       cableRows.push({
-        type: c.type || '',
+        type: normType,
+        rawType: rawType,
         length: Number(c.length) || 0,
         cable: c.cable || ''
       });
@@ -874,9 +875,11 @@ function getActiveCouplingsSummary(rulesData) {
         missingCouplings.push({
           cable: c.cable || c.type,
           cableType: c.type,
+          rawCableType: c.rawType,
           length: c.length,
           buildingLength: buildLen,
-          couplingsNeeded: count
+          couplingsNeeded: count,
+          reason: `В справочнике кабелей не указан тип муфты (длина ${Math.round(c.length)} м > стр. длины ${buildLen} м, требуется ${count} шт.)`
         });
       } else {
         if (!couplingsMap.has(cTypeKey)) {
@@ -893,6 +896,7 @@ function getActiveCouplingsSummary(rulesData) {
         item.cables.push({
           cable: c.cable || c.type,
           type: c.type,
+          rawType: c.rawType,
           length: c.length,
           count: count
         });
@@ -917,7 +921,8 @@ function getActiveCouplingsSummary(rulesData) {
       missingInCatalog.push({
         couplingType: cTypeKey,
         count: cData.count,
-        usedInCables: Array.from(cData.cableTypes)
+        usedInCables: Array.from(cData.cableTypes),
+        reason: `Муфта «${cTypeKey}» отсутствует в «Справочнике муфт» (используется для кабелей: ${Array.from(cData.cableTypes).join(', ')}, ${cData.count} шт.)`
       });
     }
     const tier = getCouplingInstallationTier(cInfo.maxCores, rules);
@@ -964,7 +969,7 @@ function getActiveCouplingsSummary(rulesData) {
 // Extract numeric weight threshold (kg/m) from a work item
 // Supports explicit properties (МаксВес, maxWeight, вес, масса) and parsing from Наименование
 // Handles decimal comma or dot ("1,5" -> 1.5, "1.5" -> 1.5)
-// Handles "до 1", "до: 1", "до 1,5", "до: 1,5", "до 1.5 кг", "массой 1 км, кг; до 1,5", "массой 1 км, кг; до 1000" (-> 1.0)
+// Handles "до 1", "до: 1", "до 1,5", "до: 1,5", "до 1.5 кг", "массой 1 м, кг; до 1,5"
 function extractWeightThreshold(work) {
   if (!work || typeof work !== 'object') return null;
 
@@ -977,7 +982,7 @@ function extractWeightThreshold(work) {
     const s = String(propVal).trim().replace(',', '.');
     const n = parseFloat(s);
     if (!isNaN(n)) {
-      numProp = n > 50 ? n / 1000 : n;
+      numProp = n;
     }
   }
 
@@ -1009,11 +1014,7 @@ function extractWeightThreshold(work) {
     if (matchDo) {
       const rawVal = parseFloat(matchDo[1].replace(',', '.'));
       if (!isNaN(rawVal)) {
-        if (rawVal > 50 && /1\s*км/i.test(name)) {
-          numFromName = rawVal / 1000;
-        } else {
-          numFromName = rawVal;
-        }
+        numFromName = rawVal;
       }
     }
   }
@@ -2908,7 +2909,7 @@ function renderInstallationWorks(cableWorksCalc) {
               ${missingBadges}
             </div>
             <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
-              Для данных кабелей применен приблизительный вес 1 м (до 1 кг/м). Рекомендуется дополнить справочник точными паспортными данными.
+              Для данных кабелей применен приблизительный вес 1 м (от 0.15 до 3 кг/м в зависимости от ёмкости). Рекомендуется дополнить справочник точными паспортными данными.
             </div>
           </div>
         </div>
@@ -2949,10 +2950,7 @@ function renderInstallationWorks(cableWorksCalc) {
       ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1 font-monospace" style="font-size: 0.7rem;" title="Оборудование: ${escapeHtml(w.equipmentType || w.mark)}${w.method ? ` (${escapeHtml(w.method)})` : ''}"><i class='bx bx-cube me-0_5'></i>${escapeHtml(w.equipmentType || w.mark)}</span>`
       : '';
 
-    const volumeStr = w.volume.toLocaleString('ru-RU', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: w.unit === 'км' ? 3 : 2
-    });
+    const volumeStr = formatVolumeDisplay(w.volume, w.unit, currentWorksRules);
 
     const commentHtml = w.comment
       ? `<div class="text-muted small mt-0_5" style="font-size: 0.74rem; font-weight: normal;"><i class='bx bx-detail me-1 opacity-75'></i>${escapeHtml(w.comment)}</div>`
@@ -3207,7 +3205,7 @@ function renderConstructionWorks(worksCalc) {
           ${nameDisplay}${tagBadge}
         </td>
         <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
-        <td class="text-end font-monospace fw-bold text-success">${w.volume.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td class="text-end font-monospace fw-bold text-success">${formatVolumeDisplay(w.volume, w.unit, currentWorksRules)}</td>
         <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${(w.showFormula !== false && w.formulaDisplay) ? escapeHtml(w.formulaDisplay) : '<span class="text-muted opacity-50">-</span>'}</td>
       </tr>
     `;
@@ -4354,16 +4352,54 @@ function getRulesSettings(rulesData) {
   const numModeRaw = String(raw["ТипНумерации"] || raw["НумерацияВОР"] || raw["numberingMode"] || raw["нумерация"] || 'иерархическая').trim().toLowerCase();
   const isSeq = numModeRaw.includes('сквозн') || numModeRaw.includes('seq') || numModeRaw.includes('cont');
 
+  const decKmRaw = raw["ОкруглениеКабелейКм"] !== undefined ? raw["ОкруглениеКабелейКм"] : (raw["decimalsKm"] !== undefined ? raw["decimalsKm"] : 3);
+  const decVolRaw = raw["ОкруглениеОбъемов"] !== undefined ? raw["ОкруглениеОбъемов"] : (raw["decimalsVolume"] !== undefined ? raw["decimalsVolume"] : 2);
+
+  const decimalsKm = (!isNaN(Number(decKmRaw)) && Number(decKmRaw) >= 0) ? Math.min(10, Math.floor(Number(decKmRaw))) : 3;
+  const decimalsVolume = (!isNaN(Number(decVolRaw)) && Number(decVolRaw) >= 0) ? Math.min(10, Math.floor(Number(decVolRaw))) : 2;
+
   return {
     numberingMode: isSeq ? 'сквозная' : 'иерархическая',
     ggeVersion: String(raw["ВерсияGGE"] || raw["ВерсияСхемыGGE"] || raw["ggeVersion"] || '3.01').trim(),
     accessLevel: String(raw["УровеньДоступа"] || raw["accessLevel"] || 'коммерческая тайна').trim(),
     softName: String(raw["ПрограммныйКомплекс"] || raw["softName"] || 'Программный комплекс "Строительный эксперт"  v7.3.1.7813').trim(),
     pluginVersion: String(raw["ПлагинGGE"] || raw["pluginVersion"] || 'Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13').trim(),
-    decimalsKm: (raw["ОкруглениеКабелейКм"] !== undefined) ? Number(raw["ОкруглениеКабелейКм"]) : 3,
-    decimalsVolume: (raw["ОкруглениеОбъемов"] !== undefined) ? Number(raw["ОкруглениеОбъемов"]) : 2,
+    decimalsKm: decimalsKm,
+    decimalsVolume: decimalsVolume,
     raw: raw
   };
+}
+
+/**
+ * Returns the configured decimal precision for a given unit based on Settings rules.
+ */
+function getVolumeDecimals(unit, rulesData = currentWorksRules) {
+  const settings = getRulesSettings(rulesData);
+  const isKm = String(unit || '').trim().toLowerCase() === 'км';
+  return isKm ? settings.decimalsKm : settings.decimalsVolume;
+}
+
+/**
+ * Rounds a quantity/volume according to the configured decimals for its unit.
+ */
+function roundQuantity(val, unit = '', rulesData = currentWorksRules) {
+  if (val === null || val === undefined || isNaN(val)) return 0;
+  const decimals = getVolumeDecimals(unit, rulesData);
+  const factor = Math.pow(10, decimals);
+  return Math.round(Number(val) * factor) / factor;
+}
+
+/**
+ * Formats a volume number for UI display according to the configured decimals.
+ */
+function formatVolumeDisplay(val, unit = '', rulesData = currentWorksRules) {
+  if (val === null || val === undefined || isNaN(val)) return '0';
+  const decimals = getVolumeDecimals(unit, rulesData);
+  const num = Number(val);
+  return num.toLocaleString('ru-RU', {
+    minimumFractionDigits: Math.min(decimals, 2),
+    maximumFractionDigits: decimals
+  });
 }
 
 // Render the Settings tab content in Works Rules Modal
@@ -4398,8 +4434,8 @@ function saveSettingsFromUiToJson(showToastNotification = true) {
   syncCurrentRulesFromEditorIfValid();
 
   const numMode = document.getElementById('settingNumberingMode')?.value || 'иерархическая';
-  const decKm = parseInt(document.getElementById('settingDecimalsKm')?.value, 10) || 3;
-  const decVol = parseInt(document.getElementById('settingDecimalsVolume')?.value, 10) || 2;
+  const decKm = parseInt(document.getElementById('settingDecimalsKm')?.value, 10);
+  const decVol = parseInt(document.getElementById('settingDecimalsVolume')?.value, 10);
   const ggeVer = document.getElementById('settingGgeVersion')?.value || '3.01';
   const accLevel = document.getElementById('settingAccessLevel')?.value || 'коммерческая тайна';
   const softName = document.getElementById('settingSoftName')?.value || 'Программный комплекс "Строительный эксперт"  v7.3.1.7813';
@@ -4411,8 +4447,8 @@ function saveSettingsFromUiToJson(showToastNotification = true) {
     "УровеньДоступа": accLevel,
     "ПрограммныйКомплекс": softName,
     "ПлагинGGE": pluginVer,
-    "ОкруглениеКабелейКм": decKm,
-    "ОкруглениеОбъемов": decVol
+    "ОкруглениеКабелейКм": !isNaN(decKm) ? Math.max(0, Math.min(10, decKm)) : 3,
+    "ОкруглениеОбъемов": !isNaN(decVol) ? Math.max(0, Math.min(10, decVol)) : 2
   };
 
   if (!currentWorksRules || typeof currentWorksRules !== 'object') {
@@ -4432,8 +4468,10 @@ function saveSettingsFromUiToJson(showToastNotification = true) {
   currentWorksRules = newRulesObj;
   setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
 
-  // Sync with localStorage for quick export defaults
-  localStorage.setItem('gge_numbering_mode', numMode === 'сквозная' ? 'sequential' : 'hierarchical');
+  // Recalculate if data is currently loaded
+  if (currentData && typeof calculateVolumes === 'function') {
+    calculateVolumes();
+  }
 
   if (showToastNotification) {
     showToast('Параметры сохранены и синхронизированы в JSON', 'success', 'Настройки');
@@ -4455,6 +4493,11 @@ function resetDefaultSettings() {
   currentWorksRules["Настройки"] = defaultSettings;
   setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
   renderSettingsModalContent();
+
+  if (currentData && typeof calculateVolumes === 'function') {
+    calculateVolumes();
+  }
+
   showToast('Настройки сброшены к стандартным значениям', 'info', 'Сброс настроек');
 }
 
@@ -4621,7 +4664,10 @@ function getActiveTrenchSummary() {
 
 // Evaluate formula for a single trench segment (supports both ДЛИНА and pipe/cable count variables)
 function evaluateTrenchSegmentFormula(formula, length, cablesCount, seg = null) {
-  const clean = (formula || 'ДЛИНА').trim();
+  const clean = (formula || 'ДЛИНА').trim()
+    .replace(/[×✕✖·∗]/g, '*')
+    .replace(/÷/g, '/')
+    .replace(/[\u2212\u2013\u2014]/g, '-');
   const len = Number(length) || 0;
   const cab = Number(cablesCount) || 0;
   const countPipes = Number(seg && seg.countPipes !== undefined ? seg.countPipes : (seg && seg.lengthPipes ? 1 : 0)) || 0;
@@ -4630,12 +4676,12 @@ function evaluateTrenchSegmentFormula(formula, length, cablesCount, seg = null) 
 
   let expr = clean.replace(/,/g, '.')
     // Intersections
-    .replace(/(?:КОЛИЧЕСТВО|КОЛ[-_]?ВО|ЧИСЛО)[_\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]/gi, String(countIntersections))
+    .replace(/(?:КОЛИЧЕСТВО|ЧИСЛО)[_\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]/gi, String(countIntersections))
     .replace(/\bINTERSECTIONS[_\s]?COUNT\b/gi, String(countIntersections))
     .replace(/\bCOUNT[_\s]?INTERSECTIONS\b/gi, String(countIntersections))
     .replace(/\bПЕРЕСЕЧЕНИ[ЙЯЕ]\b/gi, String(countIntersections))
     // Pipe count
-    .replace(/(?:КОЛИЧЕСТВО|КОЛ[-_]?ВО|ЧИСЛО)[_\s]?ТРУБ[АЫ]?/gi, String(countPipes))
+    .replace(/(?:КОЛИЧЕСТВО|ЧИСЛО)[_\s]?ТРУБ[АЫ]?/gi, String(countPipes))
     .replace(/\bPIPES[_\s]?COUNT\b/gi, String(countPipes))
     .replace(/\bCOUNT[_\s]?PIPES\b/gi, String(countPipes))
     // Pipe length
@@ -4644,8 +4690,6 @@ function evaluateTrenchSegmentFormula(formula, length, cablesCount, seg = null) 
     .replace(/\bLENGTH[_\s]?PIPES\b/gi, String(lengthPipes))
     // Cable count
     .replace(/КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ/gi, String(cab))
-    .replace(/КОЛ[-_]?ВО[_\s]?КАБЕЛЕЙ/gi, String(cab))
-    .replace(/КОЛ_КАБЕЛЕЙ/gi, String(cab))
     .replace(/CABLES_COUNT/gi, String(cab))
     .replace(/CABLES/gi, String(cab))
     .replace(/КАБЕЛЕЙ/gi, String(cab))
@@ -4653,7 +4697,6 @@ function evaluateTrenchSegmentFormula(formula, length, cablesCount, seg = null) 
     .replace(/КАБЕЛИ/gi, String(cab))
     // Generic
     .replace(/\bКОЛИЧЕСТВО\b/gi, String(cab))
-    .replace(/\bКОЛ-ВО\b/gi, String(cab))
     .replace(/ДЛИНА/gi, String(len))
     .replace(/\bLENGTH\b/gi, String(len));
 
@@ -4683,7 +4726,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
     // Find all trench types in summary matching this rule
     const matchingTypes = [];
     for (const tName of Object.keys(trenchSummary)) {
-      if (matchesRule(tName, ruleName, rules)) {
+      if (matchesRule(tName, ruleName)) {
         matchingTypes.push(tName);
       }
     }
@@ -4720,7 +4763,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
         if (effectiveLength <= 0 && matchingSegments.length === 0) return;
 
         const formula = (work["Формула"] || "ДЛИНА").trim();
-        const hasCableVar = /(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|КОЛ[-_]?ВО[_\s]?КАБЕЛЕЙ|КОЛ_КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|\bКОЛИЧЕСТВО\b|\bКОЛ-ВО\b)/i.test(formula);
+        const hasCableVar = /(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|\bКОЛИЧЕСТВО\b)/i.test(formula);
         const hasPipeVar = /(?:ТРУБ|PIPES)/i.test(formula);
 
         let totalVolume = 0;
@@ -4730,7 +4773,8 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           const segVol = evaluateTrenchSegmentFormula(formula, segLen, segCables, seg);
           totalVolume += segVol;
         });
-        totalVolume = Math.round(totalVolume * 100) / 100;
+        const trenchWorkUnit = work["Единицы измерения"] || work.unit || '';
+        totalVolume = roundQuantity(totalVolume, trenchWorkUnit, rulesData);
 
         // Build formula display string for VOR
         let displayFormula = '';
@@ -4786,7 +4830,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
             const segCables = Number(seg.cablesCount) || 0;
             displayFormula = formula.replace(/\*/g, ' * ')
               .replace(/ДЛИНА/gi, `${segLen} ${unitSuffix}`)
-              .replace(/(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|КОЛ[-_]?ВО[_\s]?КАБЕЛЕЙ|КОЛ_КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|\bКОЛИЧЕСТВО\b|\bКОЛ-ВО\b)/gi, `${segCables} каб.`);
+              .replace(/(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|\bКОЛИЧЕСТВО\b)/gi, `${segCables} каб.`);
             if (condSuffix) displayFormula += condSuffix;
           } else if (matchingSegments.length <= 3) {
             // Detailed segment breakdown: "(100 м * 5 каб + 250 м * 6 каб)"
@@ -4899,7 +4943,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
       workItems.forEach(workItem => {
         const formula = workItem.formula || 'КОЛИЧЕСТВО';
         const rawVol = evaluateWorkFormula(formula, tierData.count);
-        const volume = Math.round(rawVol * 100) / 100;
+        const volume = roundQuantity(rawVol, workItem.unit || 'шт', rulesData);
         const showFormula = (workItem.showFormula !== undefined) ? workItem.showFormula : shouldShowFormula(workItem.rawItem || workItem);
         const formulaDisplay = showFormula ? buildCouplingWorkFormulaDisplay(formula, tierData, volume) : '';
 
@@ -4946,7 +4990,6 @@ function calculateWorksFromCables(cableSummary, rulesData) {
   rules.forEach(rule => {
     const ruleName = (rule["Название"] || rule.name || '').trim();
     if (!ruleName) return;
-    if (ruleName.toLowerCase().includes('муфт')) return; // Handled specifically above by couplings calculation
 
     const parsedWM = parseRuleWorksAndMaterials(rule);
     const template = (rule["Шаблон"] || rule.template || '').trim();
@@ -4960,7 +5003,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
         for (const [rName, rLen] of Object.entries(routingMap)) {
           const lVal = Number(rLen) || 0;
           if (lVal <= 0) continue;
-          if (matchesRule(rName, ruleName, rules)) {
+          if (matchesRule(rName, ruleName)) {
             matchedRoutingTypes.add((rName || '').trim());
             totLen += lVal;
             count++;
@@ -4990,7 +5033,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
         const effectiveLen = Number(rLen) || 0;
         if (effectiveLen <= 0) continue;
 
-        if (matchesRule(trimmedRName, ruleName, rules)) {
+        if (matchesRule(trimmedRName, ruleName)) {
           matchedRoutingTypes.add(trimmedRName);
 
           const cMeta = lookupCableInfo(cType, catalog);
@@ -5042,8 +5085,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
           const formula = work["Формула"] || work.formula || "ДЛИНА";
           const rawVal = evaluateWorkFormula(formula, totalOpticalLength);
-          const vol = isWorkSub ? Math.round(rawVal * 1000) / 1000 : Math.round(rawVal * 100) / 100;
           const unit = work["Единицы измерения"] || work.unit || 'м';
+          const vol = roundQuantity(rawVal, unit, rulesData);
           const workTitle = (work["Наименование"] || work.name || opticalPrimaryTitle).trim();
           const showFormula = shouldShowFormula(work);
           const formulaDisplay = showFormula ? buildWorkFormulaDisplay(formula, totalOpticalLength, opticalCables.length, unit) : '';
@@ -5086,14 +5129,15 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             const matShowFormula = shouldShowFormula(mat, showFormula);
             const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
 
+            const kmDecOpt = getVolumeDecimals('км', rulesData);
             if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
               // Expand material for each optical cable
               opticalCables.forEach(c => {
                 const cVol = (matUnit === 'км')
-                  ? Number((c.length / 1000).toFixed(3))
-                  : Math.round(evaluateWorkFormula(matFormula, c.length) * 100) / 100;
+                  ? roundQuantity(c.length / 1000, 'км', rulesData)
+                  : roundQuantity(evaluateWorkFormula(matFormula, c.length), matUnit, rulesData);
                 const cFormulaDisp = matShowFormula
-                  ? (matUnit === 'км' ? `${cVol.toFixed(3)} км (${Math.round(c.length)} м • ВОЛС)` : `${cVol} ${matUnit} (${Math.round(c.length)} м)`)
+                  ? (matUnit === 'км' ? `${cVol.toFixed(kmDecOpt)} км (${Math.round(c.length)} м • ВОЛС)` : `${cVol} ${matUnit} (${Math.round(c.length)} м)`)
                   : '';
                 calculatedWorks.push({
                   name: c.fullDescription || `Кабель ${c.type}`,
@@ -5118,7 +5162,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             } else {
               // Static item declared in work
               const matRawVal = evaluateWorkFormula(matFormula, totalOpticalLength);
-              const matVol = (matUnit === 'км') ? Math.round(matRawVal * 1000) / 1000 : Math.round(matRawVal * 100) / 100;
+              const matVol = roundQuantity(matRawVal, matUnit, rulesData);
               const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalOpticalLength, opticalCables.length, matUnit) : '';
               calculatedWorks.push({
                 name: matNameTpl,
@@ -5245,8 +5289,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
             const formula = work["Формула"] || work.formula || "ДЛИНА";
             const rawVal = evaluateWorkFormula(formula, totalTierLength);
-            const vol = isWorkSub ? Math.round(rawVal * 1000) / 1000 : Math.round(rawVal * 100) / 100;
             const unit = work["Единицы измерения"] || work.unit || 'м';
+            const vol = roundQuantity(rawVal, unit, rulesData);
             const workTitle = (work["Наименование"] || work.name || primaryWorkTitle).trim();
             const showFormula = shouldShowFormula(work);
             const formulaDisplay = showFormula ? buildWorkFormulaDisplay(formula, totalTierLength, tier.cables.length, unit) : '';
@@ -5288,14 +5332,15 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               const matShowFormula = shouldShowFormula(mat, showFormula);
               const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
 
+              const kmDecElec = getVolumeDecimals('км', rulesData);
               if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
                 // Expand material for each electrical cable in this tier
                 tier.cables.forEach(c => {
                   const cVol = (matUnit === 'км')
-                    ? Number((c.length / 1000).toFixed(3))
-                    : Math.round(evaluateWorkFormula(matFormula, c.length) * 100) / 100;
+                    ? roundQuantity(c.length / 1000, 'км', rulesData)
+                    : roundQuantity(evaluateWorkFormula(matFormula, c.length), matUnit, rulesData);
                   const cFormulaDisp = matShowFormula
-                    ? (matUnit === 'км' ? `${cVol.toFixed(3)} км (${Math.round(c.length)} м • масса 1 м: ${c.weight} кг)` : `${cVol} ${matUnit} (${Math.round(c.length)} м)`)
+                    ? (matUnit === 'км' ? `${cVol.toFixed(kmDecElec)} км (${Math.round(c.length)} м • масса 1 м: ${c.weight} кг)` : `${cVol} ${matUnit} (${Math.round(c.length)} м)`)
                     : '';
                   calculatedWorks.push({
                     name: c.fullDescription || `Кабель ${c.type}`,
@@ -5318,7 +5363,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               } else {
                 // Static item declared under this work
                 const matRawVal = evaluateWorkFormula(matFormula, totalTierLength);
-                const matVol = (matUnit === 'км') ? Math.round(matRawVal * 1000) / 1000 : Math.round(matRawVal * 100) / 100;
+                const matVol = roundQuantity(matRawVal, matUnit, rulesData);
                 const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalTierLength, tier.cables.length, matUnit) : '';
                 calculatedWorks.push({
                   name: matNameTpl,
@@ -5404,11 +5449,13 @@ function getEquipmentRules(rulesData) {
 
 function evaluateEquipmentFormula(formula, count) {
   if (!formula || typeof formula !== 'string') return count;
-  const expr = formula
+  const clean = formula.trim()
+    .replace(/[×✕✖·∗]/g, '*')
+    .replace(/÷/g, '/')
+    .replace(/[\u2212\u2013\u2014]/g, '-');
+  const expr = clean
     .replace(/,/g, '.')
     .replace(/\bКОЛИЧЕСТВО\b/gi, String(count))
-    .replace(/\bКОЛ-ВО\b/gi, String(count))
-    .replace(/\bКОЛ_ВО\b/gi, String(count))
     .replace(/\bQTY\b/gi, String(count))
     .replace(/\bCOUNT\b/gi, String(count))
     .replace(/\bШТ\b/gi, String(count))
@@ -5426,13 +5473,11 @@ function evaluateEquipmentFormula(formula, count) {
 }
 
 function buildEquipmentFormulaDisplay(formula, count, unit) {
-  if (!formula || formula.trim() === 'КОЛИЧЕСТВО' || formula.trim() === 'КОЛ-ВО' || formula.trim() === '1') {
+  if (!formula || formula.trim() === 'КОЛИЧЕСТВО' || formula.trim() === '1') {
     return `${count} ${unit || 'шт'}`;
   }
   const disp = formula
     .replace(/\bКОЛИЧЕСТВО\b/gi, `${count} шт`)
-    .replace(/\bКОЛ-ВО\b/gi, `${count} шт`)
-    .replace(/\bКОЛ_ВО\b/gi, `${count} шт`)
     .replace(/\bCOUNT\b/gi, `${count} шт`)
     .replace(/\bQTY\b/gi, `${count} шт`);
   return normalizeFormulaMathOperators(disp);
@@ -5521,10 +5566,10 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           determinedWorkType = 'материал';
         }
         const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
+        const unit = work["Единицы измерения"] || work.unit || 'шт';
         const formula = (work["Формула"] || work.formula || "КОЛИЧЕСТВО").trim();
         const rawVol = evaluateEquipmentFormula(formula, count);
-        const vol = Math.round(rawVol * 100) / 100;
-        const unit = work["Единицы измерения"] || work.unit || 'шт';
+        const vol = roundQuantity(rawVol, unit, rulesData);
         const workTitle = (work["Наименование"] || work.name || primaryWorkTitle).trim();
         const showFormula = shouldShowFormula(work);
         const formulaDisplay = showFormula ? buildEquipmentFormulaDisplay(formula, count, unit) : '';
@@ -5588,10 +5633,10 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           } else if (rawMatType === 'работа' || rawMatType === 'work') {
             determinedMatType = 'работа';
           }
+          const matUnit = mat["Единицы измерения"] || mat.unit || 'шт';
           const matFormula = (mat["Формула"] || mat.formula || "КОЛИЧЕСТВО").trim();
           const matRawVol = evaluateEquipmentFormula(matFormula, count);
-          const matVol = Math.round(matRawVol * 100) / 100;
-          const matUnit = mat["Единицы измерения"] || mat.unit || 'шт';
+          const matVol = roundQuantity(matRawVol, matUnit, rulesData);
           const matName = (mat["Наименование"] || mat.name || itemMark).trim();
           const matShowFormula = shouldShowFormula(mat, showFormula);
           const matFormulaDisp = matShowFormula ? buildEquipmentFormulaDisplay(matFormula, count, matUnit) : '';
@@ -5675,7 +5720,7 @@ function aggregateCalculatedWorks(rawWorksList) {
         type: item.type || 'работа',
         volume: 0,
         formulaParts: [],
-        showFormula: itemShowFormula,
+        showFormula: false,
         handles: new Set(),
         comments: new Set(),
         materialsMap: new Map(),
@@ -5690,11 +5735,8 @@ function aggregateCalculatedWorks(rawWorksList) {
     const group = workGroups.get(groupKey);
     group.volume += (Number(item.volume) || 0);
 
-    if (itemShowFormula === false) {
-      group.showFormula = false;
-    }
-
-    if (group.showFormula && itemShowFormula !== false) {
+    if (itemShowFormula !== false) {
+      group.showFormula = true;
       if (item.formulaDisplay && item.formulaDisplay.trim()) {
         group.formulaParts.push(item.formulaDisplay.trim());
       } else if (item.volume) {
@@ -5758,7 +5800,7 @@ function aggregateCalculatedWorks(rawWorksList) {
           type: item.type || determinedType,
           volume: 0,
           formulaParts: [],
-          showFormula: itemShowFormula,
+          showFormula: false,
           handles: new Set(),
           comments: new Set(),
           parentWorkName: targetGroup.name,
@@ -5774,11 +5816,8 @@ function aggregateCalculatedWorks(rawWorksList) {
       const matEntry = targetGroup.materialsMap.get(matKey);
       matEntry.volume += (Number(item.volume) || 0);
 
-      if (itemShowFormula === false) {
-        matEntry.showFormula = false;
-      }
-
-      if (matEntry.showFormula && itemShowFormula !== false) {
+      if (itemShowFormula !== false) {
+        matEntry.showFormula = true;
         if (item.formulaDisplay && item.formulaDisplay.trim()) {
           matEntry.formulaParts.push(item.formulaDisplay.trim());
         } else if (item.volume) {
@@ -5802,10 +5841,10 @@ function aggregateCalculatedWorks(rawWorksList) {
   let workIndex = 1;
 
   workGroups.forEach(work => {
-    const roundedWorkVol = Math.round(work.volume * 100) / 100;
+    const roundedWorkVol = roundQuantity(work.volume, work.unit);
 
     let finalWorkFormula = '';
-    if (work.showFormula === false) {
+    if (work.showFormula === false || work.formulaParts.length === 0) {
       finalWorkFormula = '';
     } else if (work.formulaParts.length > 1) {
       const uniqueParts = Array.from(new Set(work.formulaParts));
@@ -5827,8 +5866,8 @@ function aggregateCalculatedWorks(rawWorksList) {
       unit: work.unit,
       volume: roundedWorkVol,
       volumeFormatted: String(roundedWorkVol),
-      formulaDisplay: work.showFormula === false ? '' : finalWorkFormula,
-      showFormula: work.showFormula !== false,
+      formulaDisplay: finalWorkFormula,
+      showFormula: Boolean(finalWorkFormula),
       section: work.section,
       type: work.type || 'работа',
       isParentWork: true,
@@ -5845,12 +5884,10 @@ function aggregateCalculatedWorks(rawWorksList) {
 
     let matIndex = 1;
     work.materialsMap.forEach(mat => {
-      const roundedMatVol = (mat.unit === 'км') 
-        ? Number(mat.volume.toFixed(3)) 
-        : Math.round(mat.volume * 100) / 100;
+      const roundedMatVol = roundQuantity(mat.volume, mat.unit);
 
       let finalMatFormula = '';
-      if (mat.showFormula === false) {
+      if (mat.showFormula === false || mat.formulaParts.length === 0) {
         finalMatFormula = '';
       } else if (mat.formulaParts.length > 1) {
         const uniqueParts = Array.from(new Set(mat.formulaParts));
@@ -5868,8 +5905,8 @@ function aggregateCalculatedWorks(rawWorksList) {
         unit: mat.unit,
         volume: roundedMatVol,
         volumeFormatted: String(roundedMatVol),
-        formulaDisplay: mat.showFormula === false ? '' : finalMatFormula,
-        showFormula: mat.showFormula !== false,
+        formulaDisplay: finalMatFormula,
+        showFormula: Boolean(finalMatFormula),
         section: mat.section,
         type: mat.type || 'материал',
         isParentWork: false,
@@ -5895,12 +5932,13 @@ function aggregateCalculatedWorks(rawWorksList) {
     const rawType = (orphan.type || '').trim().toLowerCase();
     const isEquip = rawType === 'оборудование' || rawType === 'equipment';
     const isShowFormula = orphan.showFormula !== false && Boolean(orphan.formulaDisplay && orphan.formulaDisplay.trim());
+    const orphanVol = roundQuantity(orphan.volume, orphan.unit);
     result.push({
       itemNumber: `${workIndex}.${oIdx + 1}`,
       name: orphan.name,
       unit: orphan.unit,
-      volume: orphan.volume,
-      volumeFormatted: String(orphan.volume),
+      volume: orphanVol,
+      volumeFormatted: String(orphanVol),
       formulaDisplay: isShowFormula ? normalizeFormulaMathOperators(orphan.formulaDisplay || '') : '',
       showFormula: isShowFormula,
       section: orphan.section || 'Монтажные работы',
@@ -5964,21 +6002,11 @@ function escapeXml(unsafe) {
 }
 
 // Format numbers for GGE QuantityTakeoff XML
-function formatGgeQuantity(val) {
+function formatGgeQuantity(val, unit = '', rulesData = currentWorksRules) {
   if (val === null || val === undefined || isNaN(val)) return '0.00';
+  const decimals = getVolumeDecimals(unit, rulesData);
   const num = Number(val);
-  const str = num.toString();
-  const parts = str.split('.');
-  if (parts.length === 1) {
-    return num.toFixed(2);
-  }
-  if (parts[1].length === 1) {
-    return num.toFixed(2);
-  }
-  if (parts[1].length === 2) {
-    return num.toFixed(2);
-  }
-  return num.toFixed(3);
+  return num.toFixed(decimals);
 }
 
 // Generate GGE XML format (QuantityTakeoff-3_01.xsd) for Главгосэкспертиза
@@ -6032,7 +6060,7 @@ function generateVorGgeXml(worksData, currentFileName, numberingMode = null) {
       const typeXml = `\t\t\t\t<Type>${ggeType}</Type>\n`;
       const commentXml = work.comment ? `\t\t\t\t<Comment>${escapeXml(work.comment)}</Comment>\n` : '';
       const unitStr = escapeXml(work.unit || 'м');
-      const qtyStr = formatGgeQuantity(work.volume);
+      const qtyStr = formatGgeQuantity(work.volume, work.unit, currentWorksRules);
       const isShowFormula = work.showFormula !== false && Boolean(work.formulaDisplay && work.formulaDisplay.trim());
       const formulaRaw = isShowFormula ? work.formulaDisplay : '';
       const formulaStr = escapeXml(normalizeFormulaMathOperators(formulaRaw));
@@ -6159,7 +6187,7 @@ function generateVorWorkbook(worksData, currentFileName, numberingMode = 'hierar
 
     let secSequentialNum = 1;
     works.forEach((w, idx) => {
-      dataRowIndexes.push(aoa.length);
+      dataRowIndexes.push({ rowIndex: aoa.length, unit: w.unit });
       const isMaterial = w.isSubItem || w.type === 'материал';
       let numStr = '';
       if (numberingMode === 'sequential' || numberingMode === 'continuous') {
@@ -6202,12 +6230,14 @@ function generateVorWorkbook(worksData, currentFileName, numberingMode = 'hierar
 
   ws['!merges'] = merges;
 
-  // Format Volume column as numeric
-  dataRowIndexes.forEach(r => {
-    const cellAddr = XLSX.utils.encode_cell({ r, c: 3 });
+  // Format Volume column as numeric with precision based on unit settings
+  dataRowIndexes.forEach(({ rowIndex, unit }) => {
+    const cellAddr = XLSX.utils.encode_cell({ r: rowIndex, c: 3 });
     if (ws[cellAddr]) {
       ws[cellAddr].t = 'n';
-      ws[cellAddr].z = '#,##0.00';
+      const dec = getVolumeDecimals(unit, currentWorksRules);
+      const decFmt = dec > 0 ? ('.' + '0'.repeat(dec)) : '';
+      ws[cellAddr].z = `#,##0${decFmt}`;
     }
   });
 
@@ -6467,13 +6497,17 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
   if (couplingsMissing.length > 0) {
     let coupRows = '';
     couplingsMissing.forEach((cp, idx) => {
-      const typeStr = cp.type || cp.cableType || 'Кабель';
-      const reason = cp.reason || 'Не задана марка муфты или строительная длина';
+      const typeStr = cp.couplingType
+        ? `Муфта «${cp.couplingType}»`
+        : (cp.cable ? `Кабель «${cp.cable}»` : (cp.cableType || cp.type || 'Кабель'));
+      const reason = cp.reason || (cp.couplingsNeeded
+        ? `В справочнике кабелей не указан тип муфты (требуется ${cp.couplingsNeeded} шт.)`
+        : (cp.couplingType ? `Муфта отсутствует в справочнике муфт` : 'Не задана марка муфты или строительная длина'));
       coupRows += `
         <tr>
           <td class="text-center text-muted small">${idx + 1}</td>
           <td class="fw-bold text-dark cell-wrap">${escapeHtml(typeStr)}</td>
-          <td class="cell-wrap text-secondary small">${reason}</td>
+          <td class="cell-wrap text-secondary small">${escapeHtml(reason)}</td>
         </tr>
       `;
     });
@@ -6494,7 +6528,7 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
             <thead class="table-light sticky-top">
               <tr>
                 <th style="width: 35px;" class="text-center">№</th>
-                <th>Тип кабеля</th>
+                <th>Элемент (кабель / муфта)</th>
                 <th>Замечание</th>
               </tr>
             </thead>
@@ -7742,7 +7776,7 @@ function addMissingCablesToCatalog(missingList) {
   if (!missingList || missingList.length === 0) return;
 
   if (!currentWorksRules) {
-    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": [], "Монтажные работы": [] }));
+    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {} }));
   }
   if (!currentWorksRules["Справочник кабелей"] || typeof currentWorksRules["Справочник кабелей"] !== 'object') {
     const existingCat = (cachedDefaultRules && cachedDefaultRules["Справочник кабелей"]) ? cachedDefaultRules["Справочник кабелей"] : {};
@@ -7788,6 +7822,8 @@ function addMissingCablesToCatalog(missingList) {
   });
 
   openWorksRulesModal('editor');
+  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+  validateWorksJsonInput();
   showToast(
     `В раздел «Справочник кабелей» добавлены заготовки для ${addedCount} марок: ${addedTypes.join(', ')}. Укажите паспортные характеристики и нажмите «Применить и пересчитать».`,
     'info',
