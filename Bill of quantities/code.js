@@ -1502,16 +1502,39 @@ function readFileAsTextWithEncoding(file) {
 
 async function processFile(file) {
   const fileName = file.name;
-  currentFileName = fileName;
 
   if (fileName.toLowerCase().endsWith('.json')) {
     try {
       const fileText = await readFileAsTextWithEncoding(file);
       const json = JSON.parse(fileText);
+
+      // Check if uploaded JSON is a works rules / specifications file rather than cable schedule data
+      const isRulesFile = Boolean(
+        json && typeof json === 'object' && !Array.isArray(json) &&
+        (json["Строительные работы"] || json["Монтажные работы"] || json["Справочник кабелей"] || json["Справочник муфт"]) &&
+        !json.cables && !json.routingTypeBlocks
+      );
+
+      if (isRulesFile) {
+        currentWorksRules = json;
+        setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+        validateWorksJsonInput();
+        renderRulesModalContent();
+        const sections = getRulesSections(currentWorksRules);
+        let totalWays = 0;
+        sections.forEach(s => totalWays += s.rules.length);
+        showToast(`Сметные нормы успешно загружены из «${fileName}» (${totalWays} способов в ${sections.length} разд.). Выполнен автоматический перерасчет работ.`, 'success', 'Правила обновлены');
+        if (currentData) {
+          calculateVolumes({ refreshRawData: true });
+        }
+        return;
+      }
+
+      currentFileName = fileName;
       currentData = json;
       renderProcessedData(json, fileName);
       toggleRawColumnCollapse(false);
-      calculateVolumes();
+      calculateVolumes({ refreshRawData: false });
       showToast(`Файл "${fileName}" успешно загружен и рассчитан`, 'success', 'Успешно');
     } catch (err) {
       showToast(`Ошибка обработки JSON: ${err.message}`, 'error', 'Ошибка');
@@ -1533,7 +1556,7 @@ function loadSampleData() {
       currentData = data;
       renderProcessedData(data, 'data_export.json');
       toggleRawColumnCollapse(false);
-      calculateVolumes();
+      calculateVolumes({ refreshRawData: false });
       showToast('Пример "data_export.json" успешно загружен и рассчитан', 'success', 'Загружено');
     })
     .catch(err => {
@@ -1542,9 +1565,23 @@ function loadSampleData() {
 }
 
 // Render data inside the "Исходные данные" accordion
-function renderProcessedData(data, fileName) {
+function renderProcessedData(data, fileName, options = {}) {
   const container = document.getElementById('processedData');
   if (!container) return;
+
+  const preserveState = Boolean(options && options.preserveState);
+
+  // Preserve open/collapse states and filter value if requested
+  const savedCollapseStates = {};
+  if (preserveState) {
+    document.querySelectorAll('#processedData .accordion-collapse').forEach(el => {
+      if (el.id) {
+        savedCollapseStates[el.id] = el.classList.contains('show');
+      }
+    });
+  }
+  const searchInput = document.getElementById('tableFilterInput');
+  const savedFilter = (preserveState && searchInput && searchInput.value) ? searchInput.value : '';
 
   container.innerHTML = '';
 
@@ -1597,12 +1634,13 @@ function renderProcessedData(data, fileName) {
   if (dataToolbar) dataToolbar.classList.remove('d-none');
   const resetBtn = document.getElementById('resetDataBtn');
   if (resetBtn) resetBtn.classList.remove('d-none');
-  const searchInput = document.getElementById('tableFilterInput');
-  if (searchInput) searchInput.value = '';
-  const clearFilterBtn = document.getElementById('clearFilterBtn');
-  if (clearFilterBtn) clearFilterBtn.classList.add('d-none');
-  const badge = document.getElementById('filteredMatchBadge');
-  if (badge) badge.classList.add('d-none');
+  if (!preserveState && searchInput) {
+    searchInput.value = '';
+    const clearFilterBtn = document.getElementById('clearFilterBtn');
+    if (clearFilterBtn) clearFilterBtn.classList.add('d-none');
+    const badge = document.getElementById('filteredMatchBadge');
+    if (badge) badge.classList.add('d-none');
+  }
 
   // 1. Cables section
   if (data.cables && Array.isArray(data.cables)) {
@@ -1635,6 +1673,33 @@ function renderProcessedData(data, fileName) {
     }
   }
 
+  // Restore accordion collapse state and search filter if requested
+  if (preserveState) {
+    Object.entries(savedCollapseStates).forEach(([id, isShow]) => {
+      const el = document.getElementById(id);
+      const btn = document.querySelector(`[data-bs-target="#${id}"]`);
+      if (el) {
+        if (isShow) {
+          el.classList.add('show');
+          if (btn) {
+            btn.classList.remove('collapsed');
+            btn.setAttribute('aria-expanded', 'true');
+          }
+        } else {
+          el.classList.remove('show');
+          if (btn) {
+            btn.classList.add('collapsed');
+            btn.setAttribute('aria-expanded', 'false');
+          }
+        }
+      }
+    });
+    if (savedFilter && searchInput) {
+      searchInput.value = savedFilter;
+      filterTableRows(savedFilter);
+    }
+  }
+
   initTooltips();
 }
 
@@ -1649,6 +1714,7 @@ function createCablesAccordion(cables, totalLength) {
   const mismatchCount = cables.filter(c => Boolean(c.lengthMismatch)).length;
   let totalCouplingsCount = 0;
   const missingCouplingTypesSet = new Set();
+  const catalog = getCableCatalog(currentWorksRules);
 
   const tableWrapper = document.createElement('div');
   tableWrapper.className = 'table-responsive custom-table-scroll';
@@ -1722,7 +1788,7 @@ function createCablesAccordion(cables, totalLength) {
 
     // Coupling calculation and info lookup from catalog
     const effectiveType = normType || rawType;
-    const info = lookupCableInfo(effectiveType);
+    const info = lookupCableInfo(effectiveType, catalog);
     const cableLen = Number(c.length) || 0;
     const buildLen = Number(info.buildingLength) || 0;
     // Couplings needed: 0 if length <= buildingLength; otherwise div(length - 1, buildingLength)
@@ -2447,10 +2513,15 @@ function getActiveEquipmentSummary() {
 }
 
 // Calculate Cable Volumes & Trench/Routing Volumes & Equipment
-function calculateVolumes() {
+function calculateVolumes(options = {}) {
   if (!currentData) {
     showToast('Сначала загрузите исходные данные для расчета', 'error', 'Внимание');
     return;
+  }
+
+  // Refresh Column 1 (Исходные данные / rawCol) so that cable schedule couplings, badges and warnings reflect latest rules
+  if (options && options.refreshRawData !== false && currentFileName && currentData) {
+    renderProcessedData(currentData, currentFileName, { preserveState: true });
   }
 
   // 1. Calculate Cable summary with normalized cable types and routing types breakdown
@@ -5129,15 +5200,12 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             const matShowFormula = shouldShowFormula(mat, showFormula);
             const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
 
-            const kmDecOpt = getVolumeDecimals('км', rulesData);
             if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
               // Expand material for each optical cable
               opticalCables.forEach(c => {
-                const cVol = (matUnit === 'км')
-                  ? roundQuantity(c.length / 1000, 'км', rulesData)
-                  : roundQuantity(evaluateWorkFormula(matFormula, c.length), matUnit, rulesData);
+                const cVol = roundQuantity(evaluateWorkFormula(matFormula, c.length), matUnit, rulesData);
                 const cFormulaDisp = matShowFormula
-                  ? (matUnit === 'км' ? `${cVol.toFixed(kmDecOpt)} км (${Math.round(c.length)} м • ВОЛС)` : `${cVol} ${matUnit} (${Math.round(c.length)} м)`)
+                  ? (buildWorkFormulaDisplay(matFormula, c.length, 1, matUnit) + ' (ВОЛС)')
                   : '';
                 calculatedWorks.push({
                   name: c.fullDescription || `Кабель ${c.type}`,
@@ -5332,15 +5400,12 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               const matShowFormula = shouldShowFormula(mat, showFormula);
               const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
 
-              const kmDecElec = getVolumeDecimals('км', rulesData);
               if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
                 // Expand material for each electrical cable in this tier
                 tier.cables.forEach(c => {
-                  const cVol = (matUnit === 'км')
-                    ? roundQuantity(c.length / 1000, 'км', rulesData)
-                    : roundQuantity(evaluateWorkFormula(matFormula, c.length), matUnit, rulesData);
+                  const cVol = roundQuantity(evaluateWorkFormula(matFormula, c.length), matUnit, rulesData);
                   const cFormulaDisp = matShowFormula
-                    ? (matUnit === 'км' ? `${cVol.toFixed(kmDecElec)} км (${Math.round(c.length)} м • масса 1 м: ${c.weight} кг)` : `${cVol} ${matUnit} (${Math.round(c.length)} м)`)
+                    ? (buildWorkFormulaDisplay(matFormula, c.length, 1, matUnit) + (c.weight ? ` (масса 1 м: ${c.weight} кг)` : ''))
                     : '';
                   calculatedWorks.push({
                     name: c.fullDescription || `Кабель ${c.type}`,
