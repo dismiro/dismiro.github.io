@@ -520,14 +520,13 @@ function parseRuleWorksAndMaterials(rule) {
 
   const isOpticalItem = item => {
     if (!item || typeof item !== 'object') return false;
-    const cat = String(item["Категория"] || item.category || '').toLowerCase();
-    const nm = String(item["Наименование"] || item.name || '').toLowerCase();
-    return cat.includes('оптич') || nm.includes('оптическ') || cat.includes('волс') || nm.includes('волс');
+    const cat = String(item["Категория"] || item.category || '').trim().toLowerCase();
+    return cat === 'оптический кабель';
   };
 
   const isOpticalKey = k => {
-    const s = String(k || '').toLowerCase();
-    return s.includes('оптич') || s.includes('волс') || s.includes('optic');
+    const s = String(k || '').trim().toLowerCase();
+    return s === 'оптический' || s === 'оптический кабель';
   };
 
   let optical = null;
@@ -715,6 +714,34 @@ function parseCableTypeAndSymbol(str) {
   return { pairKey: '', symbol: s };
 }
 
+// Check if a cable type has category = "Оптический кабель" in the cable catalog
+function isCableCategoryOptical(rawType, catalog) {
+  if (!rawType) return false;
+  const cat = catalog || (typeof currentWorksRules === 'object' && currentWorksRules ? currentWorksRules["Справочник кабелей"] : null) || (typeof cachedDefaultRules === 'object' && cachedDefaultRules ? cachedDefaultRules["Справочник кабелей"] : null) || {};
+  const str = String(rawType).trim();
+  if (!str) return false;
+
+  const normStr = normalizeCableLookupKey(str);
+
+  for (const [secKey, secVal] of Object.entries(cat)) {
+    if (!secVal || typeof secVal !== 'object') continue;
+    const secCategory = String(secVal["Категория"] || '').trim();
+    const isSecOptical = secCategory.toLowerCase() === 'оптический кабель';
+
+    if (secVal["Тип"] && typeof secVal["Тип"] === 'object') {
+      for (const [sKey, sVal] of Object.entries(secVal["Тип"])) {
+        if (!sVal || typeof sVal !== 'object') continue;
+        const normKey = normalizeCableLookupKey(sKey);
+        if (normKey === normStr) {
+          const itemCat = String(sVal["Категория"] || (isSecOptical ? 'Оптический кабель' : '')).trim();
+          return itemCat.toLowerCase() === 'оптический кабель';
+        }
+      }
+    }
+  }
+  return false;
+}
+
 // Lookup cable weight, category and full description from catalog
 function lookupCableInfo(rawType, catalog) {
   const cat = catalog || getCableCatalog(currentWorksRules) || {};
@@ -733,65 +760,37 @@ function lookupCableInfo(rawType, catalog) {
     };
   }
 
-  const cleanStr = normalizeCableType(str);
+  const cleanStr = normalizeCableType(str, cat);
   const normStr = normalizeCableLookupKey(cleanStr);
   const rawNormStr = normalizeCableLookupKey(str);
 
-  // 1. Check dedicated optical cable category in catalog ("Оптический кабель" or category containing "оптич")
-  // User mandate: "проверка должна производится из справочника кабеля по отдельно выделенной категории кабеля"
+  // 1. Поиск прямого соответствия марки в справочнике кабелей (проверяем, объявлена ли категория "Оптический кабель")
   for (const [secKey, secVal] of Object.entries(cat)) {
     if (!secVal || typeof secVal !== 'object') continue;
-    const secName = String(secVal["Название"] || secKey || '').toLowerCase();
-    const secCategory = String(secVal["Категория"] || '').toLowerCase();
-    const isOpticalSection = secName.includes('оптич') || secCategory.includes('оптич') || secKey.toLowerCase().includes('оптич');
+    const secCategory = String(secVal["Категория"] || '').trim();
+    const isSecOptical = secCategory.toLowerCase() === 'оптический кабель';
 
     if (secVal["Тип"] && typeof secVal["Тип"] === 'object') {
       for (const [sKey, sVal] of Object.entries(secVal["Тип"])) {
         if (!sVal || typeof sVal !== 'object') continue;
-        const itemCategory = String(sVal["Категория"] || '').toLowerCase();
-        const isOpticalItem = isOpticalSection || itemCategory.includes('оптич');
-
-        if (!isOpticalItem) continue;
-
         const normKey = normalizeCableLookupKey(sKey);
         if (normStr === normKey || rawNormStr === normKey) {
+          const itemCat = String(sVal["Категория"] || (isSecOptical ? 'Оптический кабель' : '')).trim();
+          const isOptical = itemCat.toLowerCase() === 'оптический кабель';
+          const brandName = secVal["Название"] || (isOptical ? 'Оптический кабель' : secKey);
           return {
-            brand: secVal["Название"] || 'Оптический кабель',
+            brand: brandName,
             key: sKey,
-            weight: sVal["Вес"] || 0.28,
-            category: sVal["Категория"] || secVal["Категория"] || 'Оптический кабель',
-            isOptical: true,
-            fullDescription: sVal["Полное описание"] || `Кабель связи оптический ${str}`,
-            buildingLength: sVal["Строительная длина"] || 2000,
-            coupling: sVal["Муфта"] || 'МТОК-А1/216-1Т3-44',
+            weight: sVal["Вес"] || (isOptical ? 0.28 : 0.4),
+            category: isOptical ? 'Оптический кабель' : (itemCat || 'Электрический кабель'),
+            isOptical: isOptical,
+            fullDescription: sVal["Полное описание"] || (isOptical ? `Кабель связи оптический ${str}` : `Кабель ${str}`),
+            buildingLength: sVal["Строительная длина"] || (isOptical ? 2000 : 600),
+            coupling: sVal["Муфта"] || '',
             showFormula: shouldShowFormula(sVal),
             foundInCatalog: true
           };
         }
-      }
-    }
-  }
-
-  // 2. Check special and custom cables ("Особый кабель")
-  if (cat["Особый кабель"] && cat["Особый кабель"]["Тип"]) {
-    for (const [sKey, sVal] of Object.entries(cat["Особый кабель"]["Тип"])) {
-      if (!sVal || typeof sVal !== 'object') continue;
-      const normKey = normalizeCableLookupKey(sKey);
-      if (normStr === normKey || rawNormStr === normKey) {
-        const itemCat = String(sVal["Категория"] || '').toLowerCase();
-        const isOpt = itemCat.includes('оптич');
-        return {
-          brand: cat["Особый кабель"]["Название"] || 'Особый кабель',
-          key: sKey,
-          weight: sVal["Вес"] || 0.4,
-          category: isOpt ? 'Оптический кабель' : (sVal["Категория"] || 'Электрический кабель'),
-          isOptical: isOpt,
-          fullDescription: sVal["Полное описание"] || `Кабель ${str}`,
-          buildingLength: sVal["Строительная длина"] || 600,
-          coupling: sVal["Муфта"] || '',
-          showFormula: shouldShowFormula(sVal),
-          foundInCatalog: true
-        };
       }
     }
   }
@@ -826,13 +825,15 @@ function lookupCableInfo(rawType, catalog) {
   }
 
   if (entry) {
+    const itemCat = String(entry["Категория"] || '').trim();
+    const isOptical = itemCat.toLowerCase() === 'оптический кабель';
     const descPrefix = str.toLowerCase().startsWith('кабель') ? '' : 'Кабель ';
     return {
       brand: brandName,
       key: pairKey,
       weight: entry["Вес"] || 0.35,
-      category: entry["Категория"] || 'Электрический кабель',
-      isOptical: false,
+      category: isOptical ? 'Оптический кабель' : (entry["Категория"] || 'Электрический кабель'),
+      isOptical: isOptical,
       fullDescription: entry["Полное описание"] || `${descPrefix}${brandName ? brandName + ' ' : ''}${str}`.trim(),
       buildingLength: entry["Строительная длина"] || 300,
       coupling: entry["Муфта"] || '',
@@ -2579,18 +2580,13 @@ function resetDataToEmpty() {
  * 3. Буквенные индексы горючести/исполнения: «(А)» в «ВБШвнг(А)-LS» или «(A)» в «ТехноКИПКПнг(A)-HF»
  *    НЕ являются запасом жил/волокон и гарантированно сохраняются.
  */
-function normalizeCableType(typeStr) {
+function normalizeCableType(typeStr, catalog) {
   if (!typeStr || typeof typeStr !== 'string') return typeStr || 'Без типа';
   const str = typeStr.trim();
   if (!str) return 'Без типа';
 
-  // Оптические кабели (ОКБ, ОКЛ, ВОЛС, ДПС, марки с кН/kN, Сп- и т.д.):
-  // Все скобки с цифрами являются частью заводской номенклатуры и сохраняются.
-  const isOptical = /^(?:ОК|ВОЛС|ДП|ДТ|ТОС|ИКА|ЭКБ)/i.test(str) ||
-                    /(?:кН|кн|kN|kn)/i.test(str) ||
-                    /(?:Сп-|\/2\(|\(2,0\))/i.test(str);
-
-  if (isOptical) {
+  // Если у марки в справочнике категория "Оптический кабель" — сохраняем марку без изменений
+  if (isCableCategoryOptical(str, catalog)) {
     return str;
   }
 
@@ -4317,14 +4313,15 @@ function renderCableCatalogModalContent() {
     const groupObj = catalog[groupName];
     if (!groupObj || typeof groupObj !== 'object') return;
 
+    const isOptCategory = String(groupObj["Категория"] || groupName || '').trim().toLowerCase() === 'оптический кабель';
     // Filter by group category dropdown
-    if (catVal === 'optical' && !/оптическ|волс/i.test(groupName) && !/оптическ/i.test(groupObj["Категория"] || '')) {
+    if (catVal === 'optical' && !isOptCategory) {
       return;
     }
     if (catVal === 'special' && !/особ/i.test(groupName)) {
       return;
     }
-    if (catVal === 'signaling' && (/оптическ|волс|особ/i.test(groupName))) {
+    if (catVal === 'signaling' && (isOptCategory || /особ/i.test(groupName))) {
       return;
     }
 
@@ -4385,7 +4382,7 @@ function renderCableCatalogModalContent() {
 
   renderedGroups.forEach(g => {
     matchCount += g.marks.length;
-    const isOptGroup = /оптическ|волс/i.test(g.name) || /оптическ/i.test(g.category);
+    const isOptGroup = String(g.category || g.name || '').trim().toLowerCase() === 'оптический кабель';
 
     html += `
       <div class="card border shadow-sm mb-3">
@@ -4413,7 +4410,7 @@ function renderCableCatalogModalContent() {
 
     g.marks.forEach(m => {
       const d = m.data;
-      const isOptical = /оптическ|волс/i.test(d["Категория"] || '') || isOptGroup || /^(?:ОК|ВОЛС|ДПС|ТОС|ДПО|ОКБ|ОКЛ|ОКС)/i.test(m.mark);
+      const isOptical = String(d["Категория"] || g.category || '').trim().toLowerCase() === 'оптический кабель';
       const markBadge = isOptical 
         ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle fs-xs ms-1">Оптич.</span>`
         : '';
@@ -8312,7 +8309,7 @@ function addMissingCablesToCatalog(missingList) {
 
   missingList.forEach(m => {
     const typeName = m.type || m;
-    const isOpt = m.isOptical || /^(?:ОК|ВОЛС|ДПС|ТОС|ДПО|ОКБ|ОКЛ|ОКС)/i.test(typeName);
+    const isOpt = Boolean(m && typeof m === 'object' && m.isOptical);
     const targetSection = isOpt ? "Оптический кабель" : "Особый кабель";
 
     if (!currentWorksRules["Справочник кабелей"][targetSection]["Тип"][typeName]) {
