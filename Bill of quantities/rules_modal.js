@@ -378,7 +378,7 @@ function renderRulesModalContent() {
       let ruleSubCount = 0;
 
       // Render a work item along with any nested materials / equipment, with indent and '↳' prefix
-      const renderWorkWithSubItems = (w, wIdx) => {
+      const renderWorkWithSubItems = (w, wIdx, tierContext = null) => {
         if (typeof w === 'string') {
           ruleWorksCount++;
           return `
@@ -389,8 +389,8 @@ function renderRulesModalContent() {
         }
 
         ruleWorksCount++;
-        const threshold = isCableSec ? extractWeightThreshold(w) : null;
-        const isOver = isCableSec ? isOverWeightThreshold(w) : false;
+        const threshold = (tierContext && tierContext.threshold !== null) ? tierContext.threshold : null;
+        const isOver = tierContext ? tierContext.isOver : false;
         const tierBadge = threshold !== null 
           ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">до ${threshold} кг/м</span>`
           : (isOver ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">свыше</span>` : '');
@@ -442,23 +442,45 @@ function renderRulesModalContent() {
           const items = Array.isArray(itemsVal) ? itemsVal : (itemsVal ? [itemsVal] : []);
           const isOptKey = key.toLowerCase().includes('оптич') || key.toLowerCase().includes('волс');
           let groupTitle = `Ключ: "${escapeHtml(key)}"`;
+          let tierThreshold = null;
+          let tierIsOver = false;
+
           if (isEquipSec) {
             groupTitle = `Способ установки: «${escapeHtml(key)}»`;
           } else if (isOptKey) {
             groupTitle = `Оптический кабель (ключ "${escapeHtml(key)}")`;
           } else {
-            const numK = parseFloat(String(key).replace(',', '.'));
-            if (!isNaN(numK)) {
-              groupTitle = `Категория до ${numK} кг/м (ключ "${escapeHtml(key)}")`;
+            const cleanKey = String(key).trim().replace(',', '.');
+            const numK = parseFloat(cleanKey);
+            if (!isNaN(numK) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
+              tierThreshold = numK;
+              groupTitle = `Категория до ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`;
+            } else {
+              const matchDo = cleanKey.match(/(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
+              if (matchDo) {
+                tierThreshold = parseFloat(matchDo[1].replace(',', '.'));
+              }
+              if (/(?:свыше|более|от|>)\s*[:;]?\s*\d+/i.test(cleanKey)) {
+                tierIsOver = true;
+                const matchOver = cleanKey.match(/(?:свыше|более|от|>)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
+                if (matchOver) tierThreshold = parseFloat(matchOver[1].replace(',', '.'));
+              }
+              if (tierThreshold !== null) {
+                groupTitle = tierIsOver 
+                  ? `Категория свыше ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`
+                  : `Категория до ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`;
+              }
             }
           }
+
+          const tierContext = isCableSec ? { threshold: tierThreshold, isOver: tierIsOver } : null;
 
           let tierWorksCount = 0;
           let tierSubCount = 0;
           const groupItemsHtml = items.map((w, wIdx) => {
             const beforeWorks = ruleWorksCount;
             const beforeSubs = ruleSubCount;
-            const res = renderWorkWithSubItems(w, wIdx);
+            const res = renderWorkWithSubItems(w, wIdx, tierContext);
             tierWorksCount += (ruleWorksCount - beforeWorks);
             tierSubCount += (ruleSubCount - beforeSubs);
             return res;

@@ -518,15 +518,8 @@ function parseRuleWorksAndMaterials(rule) {
     return { optical: null, tiers: [], allItems: [], isObjectStructure: false, rawObj: {} };
   }
 
-  const isOpticalItem = item => {
-    if (!item || typeof item !== 'object') return false;
-    const cat = String(item["Категория"] || item.category || '').toLowerCase();
-    const nm = String(item["Наименование"] || item.name || '').toLowerCase();
-    return cat.includes('оптич') || nm.includes('оптическ') || cat.includes('волс') || nm.includes('волс');
-  };
-
   const isOpticalKey = k => {
-    const s = String(k || '').toLowerCase();
+    const s = String(k || '').toLowerCase().trim();
     return s.includes('оптич') || s.includes('волс') || s.includes('optic');
   };
 
@@ -538,7 +531,7 @@ function parseRuleWorksAndMaterials(rule) {
     const items = Array.isArray(itemsVal) ? itemsVal : (itemsVal ? [itemsVal] : []);
     items.forEach(it => allItems.push(it));
 
-    if (isOpticalKey(key) || items.some(isOpticalItem)) {
+    if (isOpticalKey(key)) {
       optical = {
         key,
         items,
@@ -548,7 +541,7 @@ function parseRuleWorksAndMaterials(rule) {
       let threshold = null;
       let isOver = false;
 
-      // 1. Try parsing key directly as a number or threshold
+      // Определение порога веса исключительно по ключу секции ("1", "2", "3", "до 1", "свыше 3" и т.д.)
       const cleanKey = String(key).trim().replace(',', '.');
       const numKey = parseFloat(cleanKey);
       if (!isNaN(numKey) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
@@ -563,20 +556,6 @@ function parseRuleWorksAndMaterials(rule) {
           const matchOver = cleanKey.match(/(?:свыше|более|от|>)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
           if (matchOver) threshold = parseFloat(matchOver[1].replace(',', '.'));
         }
-      }
-
-      // 2. If threshold not determined from key, check items inside this tier
-      if (threshold === null && items.length > 0) {
-        for (const it of items) {
-          const itTh = extractWeightThreshold(it);
-          if (itTh !== null) {
-            threshold = itTh;
-            break;
-          }
-        }
-      }
-      if (!isOver && items.some(it => isOverWeightThreshold(it))) {
-        isOver = true;
       }
 
       tiers.push({
@@ -1201,88 +1180,14 @@ function getActiveCouplingsSummary(rulesData) {
   };
 }
 
-// Extract numeric weight threshold (kg/m) from a work item
-// Supports explicit properties (МаксВес, maxWeight, вес, масса) and parsing from Наименование
-// Handles decimal comma or dot ("1,5" -> 1.5, "1.5" -> 1.5)
-// Handles "до 1", "до: 1", "до 1,5", "до: 1,5", "до 1.5 кг", "массой 1 м, кг; до 1,5"
-function extractWeightThreshold(work) {
-  if (!work || typeof work !== 'object') return null;
-
-  // 1. Try explicit properties
-  const propVal = work["МаксВес"] !== undefined ? work["МаксВес"] :
-                  (work.maxWeight !== undefined ? work.maxWeight :
-                  (work["вес"] !== undefined ? work["вес"] : work["масса"]));
-  let numProp = null;
-  if (propVal !== undefined && propVal !== null && propVal !== '') {
-    const s = String(propVal).trim().replace(',', '.');
-    const n = parseFloat(s);
-    if (!isNaN(n)) {
-      numProp = n;
-    }
-  }
-
-  // 2. Try parsing from name
-  const name = String(work["Наименование"] || work.name || '').trim();
-  let numFromName = null;
-
-  // Weight thresholds only apply to cable works or works mentioning mass/weight/kg
-  // Must NOT match distance expressions like "до 5 м", "до 10 м", "до 100 м" (перемещение грунта, бурение и т.д.)
-  const hasWeightContext = /(?:кабел|масс[аое]|вес[аое]|кг(?:\/м)?)/i.test(name);
-  if (hasWeightContext) {
-    // A: Look for "массой ... до:? X"
-    const matchMassDo = name.match(/масс[а-я0-9\s,;:]*?(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
-    // B: Look for "до:? X\s*кг"
-    const matchKgDo = name.match(/(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)\s*кг/i);
-    // C: In cable work: "до: X" where unit is NOT distance (м, км, см, мм) or machine power
-    let matchCableDo = null;
-    if (!matchMassDo && !matchKgDo && /кабел/i.test(name)) {
-      const matchCandidate = name.match(/(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)(?:\s*([а-яa-z]+))?/i);
-      if (matchCandidate) {
-        const trailingUnit = (matchCandidate[2] || '').toLowerCase();
-        if (!['м', 'км', 'см', 'мм', 'т', 'квт', 'л.с.', 'шт', 'чел'].includes(trailingUnit)) {
-          matchCableDo = matchCandidate;
-        }
-      }
-    }
-
-    const matchDo = matchMassDo || matchKgDo || matchCableDo;
-    if (matchDo) {
-      const rawVal = parseFloat(matchDo[1].replace(',', '.'));
-      if (!isNaN(rawVal)) {
-        numFromName = rawVal;
-      }
-    }
-  }
-
-  // If both exist, check if one was explicitly modified by user (e.g. non-standard or changed)
-  if (numFromName !== null && numProp !== null) {
-    if (numFromName === numProp) return numFromName;
-    const isStandard = v => v === 1 || v === 2 || v === 3;
-    if (!isStandard(numFromName) && isStandard(numProp)) return numFromName;
-    if (!isStandard(numProp) && isStandard(numFromName)) return numProp;
-    return numFromName;
-  }
-
-  if (numFromName !== null) return numFromName;
-  if (numProp !== null) return numProp;
-  return null;
-}
-
-// Check if work represents an "over threshold" category ("свыше 3 кг", "более 3", etc.)
-function isOverWeightThreshold(work) {
-  const name = String(work["Наименование"] || work.name || '').toLowerCase();
-  if (!/(?:кабел|масс|вес|кг)/i.test(name)) return false;
-  return /(?:свыше|более|от)\s*[:;]?\s*\d+/i.test(name);
-}
-
-// Weight tier categories: dynamically evaluated from rule, or fallback to standard 1, 2, 3, 6
+// Weight tier categories: dynamically evaluated from rule tiers, or fallback to standard 1, 2, 3, 6
 function getCableWeightTier(weight, rule) {
   const w = Number(weight) || 0.35;
   if (rule) {
-    const works = getRuleWorks(rule);
-    const thresholds = works
-      .map(extractWeightThreshold)
-      .filter(t => t !== null)
+    const parsedWM = parseRuleWorksAndMaterials(rule);
+    const thresholds = parsedWM.tiers
+      .map(t => t.threshold)
+      .filter(t => t !== null && !isNaN(t))
       .sort((a, b) => a - b);
     if (thresholds.length > 0) {
       for (const t of thresholds) {
@@ -1477,9 +1382,36 @@ function setupEventListeners() {
   // Setup Works Rules modal controls & JSON editor listeners
   setupWorksRulesListeners();
 
-  // Setup Export listeners (GGE XML & Excel)
-  if (typeof setupExportListeners === 'function') {
-    setupExportListeners();
+  const exportResultBtn = document.getElementById('exportResult');
+  if (exportResultBtn) {
+    exportResultBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      exportCalculationResults();
+    });
+  }
+
+  const exportVorExcelBtn = document.getElementById('exportVorExcel');
+  if (exportVorExcelBtn) {
+    exportVorExcelBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      exportVorExcel();
+    });
+  }
+
+  const exportVorBtn = document.getElementById('exportVorBtn');
+  if (exportVorBtn) {
+    exportVorBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      exportCalculationResults();
+    });
+  }
+
+  const exportVorExcelQuickBtn = document.getElementById('exportVorExcelQuickBtn');
+  if (exportVorExcelQuickBtn) {
+    exportVorExcelQuickBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      exportVorExcel();
+    });
   }
 
   // Works rules (JSON) event listeners
@@ -5384,3 +5316,4 @@ function aggregateCalculatedWorks(rawWorksList) {
 
   return result;
 }
+
