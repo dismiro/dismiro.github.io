@@ -1009,12 +1009,12 @@
 <div class="modal fade" id="ggeExportWarningsModal" tabindex="-1" aria-labelledby="ggeExportWarningsModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content border shadow">
-      <div class="modal-header py-2 px-3 bg-warning-subtle border-bottom d-flex align-items-center justify-content-between">
+      <div class="modal-header py-2 px-3 bg-light border-bottom d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center gap-2">
-          <i class='bx bx-error-circle text-warning fs-4'></i>
+          <i class='bx bx-error-circle text-primary fs-4'></i>
           <div>
-            <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="ggeExportWarningsModalLabel">Замечания перед формированием GGE</h5>
-            <small class="text-muted" style="font-size: 0.75rem;">Сводная информация о недостающих правилах и сметных нормах</small>
+            <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="ggeExportWarningsModalLabel">Замечания перед экспортом ВОР</h5>
+            <small class="text-muted" style="font-size: 0.75rem;" id="ggeExportWarningsModalSub">Сводная информация об ошибках формул, недостающих правилах и сметных нормах</small>
           </div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
@@ -1029,7 +1029,7 @@
           <i class='bx bx-slider-alt'></i> Настроить правила в JSON
         </button>
         <button type="button" class="btn btn-success btn-sm fw-bold shadow-sm d-inline-flex align-items-center gap-1" id="confirmProceedGgeDownloadBtn">
-          <i class='bx bx-download'></i> Все равно сформировать GGE
+          <i class='bx bx-download'></i> Все равно продолжить выгрузку
         </button>
       </div>
     </div>
@@ -1399,6 +1399,7 @@
 
 <script src="./code.js"></script>
 <script src="./rules_modal.js"></script>
+<script src="./export.js"></script>
 <script src="../assets/js/xlsx.full.min.js"></script>
 </body>
 </html>
