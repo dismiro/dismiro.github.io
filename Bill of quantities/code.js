@@ -3282,7 +3282,7 @@ function renderInstallationWorks(cableWorksCalc) {
       ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1 font-monospace" style="font-size: 0.7rem;" title="Оборудование: ${escapeHtml(w.equipmentType || w.mark)}${w.method ? ` (${escapeHtml(w.method)})` : ''}"><i class='bx bx-cube me-0_5'></i>${escapeHtml(w.equipmentType || w.mark)}</span>`
       : '';
 
-    const volumeStr = formatVolumeDisplay(w.volume, w.unit, currentWorksRules);
+    const volumeStr = formatVolumeDisplay(w.volume, w, currentWorksRules);
 
     const commentHtml = w.comment
       ? `<div class="text-muted small mt-0_5" style="font-size: 0.74rem; font-weight: normal;"><i class='bx bx-detail me-1 opacity-75'></i>${escapeHtml(w.comment)}</div>`
@@ -3579,7 +3579,7 @@ function renderConstructionWorks(worksCalc) {
           ${nameDisplay}${tagBadge}
         </td>
         <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
-        <td class="text-end font-monospace fw-bold text-success">${formatVolumeDisplay(w.volume, w.unit, currentWorksRules)}</td>
+        <td class="text-end font-monospace fw-bold text-success">${formatVolumeDisplay(w.volume, w, currentWorksRules)}</td>
         <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${(w.showFormula !== false && w.formulaDisplay) ? escapeHtml(w.formulaDisplay) : '<span class="text-muted opacity-50">-</span>'}</td>
       </tr>
     `;
@@ -3824,57 +3824,92 @@ function renderCouplingsResult(couplingsSummary) {
 // (Works rules modal and CodeMirror editor are extracted into rules_modal.js)
 // --------------------------------------------------------------------------
 
+/**
+ * Helper to extract an explicit individual rounding number from a work or material rule item.
+ */
+function extractItemDecimals(item) {
+  if (!item || typeof item !== 'object') return undefined;
+  const val = item["Округление"] !== undefined ? item["Округление"] : item.decimals;
+  if (val !== undefined && val !== null && !isNaN(Number(val))) {
+    return Math.max(0, Math.min(10, Math.floor(Number(val))));
+  }
+  return undefined;
+}
+
 function getRulesSettings(rulesData) {
   const raw = (rulesData && typeof rulesData === 'object')
-    ? (rulesData["Настройки"] || rulesData["settings"] || rulesData["Параметры"] || {})
+    ? (rulesData["Настройки"] || {})
     : {};
 
-  const numModeRaw = String(raw["ТипНумерации"] || raw["НумерацияВОР"] || raw["numberingMode"] || raw["нумерация"] || 'иерархическая').trim().toLowerCase();
-  const isSeq = numModeRaw.includes('сквозн') || numModeRaw.includes('seq') || numModeRaw.includes('cont');
+  const numModeRaw = String(raw["ТипНумерации"] || 'иерархическая').trim().toLowerCase();
+  const isSeq = numModeRaw.includes('сквозн');
 
-  const decKmRaw = raw["ОкруглениеКабелейКм"] !== undefined ? raw["ОкруглениеКабелейКм"] : (raw["decimalsKm"] !== undefined ? raw["decimalsKm"] : 3);
-  const decVolRaw = raw["ОкруглениеОбъемов"] !== undefined ? raw["ОкруглениеОбъемов"] : (raw["decimalsVolume"] !== undefined ? raw["decimalsVolume"] : 2);
+  const decWorksRaw = raw["ОкруглениеРабот"] !== undefined ? raw["ОкруглениеРабот"] : 2;
+  const decMatsRaw = raw["ОкруглениеМатериалов"] !== undefined ? raw["ОкруглениеМатериалов"] : 3;
 
-  const decimalsKm = (!isNaN(Number(decKmRaw)) && Number(decKmRaw) >= 0) ? Math.min(10, Math.floor(Number(decKmRaw))) : 3;
-  const decimalsVolume = (!isNaN(Number(decVolRaw)) && Number(decVolRaw) >= 0) ? Math.min(10, Math.floor(Number(decVolRaw))) : 2;
+  const decimalsWorks = (!isNaN(Number(decWorksRaw)) && Number(decWorksRaw) >= 0) ? Math.min(10, Math.floor(Number(decWorksRaw))) : 2;
+  const decimalsMaterials = (!isNaN(Number(decMatsRaw)) && Number(decMatsRaw) >= 0) ? Math.min(10, Math.floor(Number(decMatsRaw))) : 3;
 
   return {
     numberingMode: isSeq ? 'сквозная' : 'иерархическая',
-    ggeVersion: String(raw["ВерсияGGE"] || raw["ВерсияСхемыGGE"] || raw["ggeVersion"] || '3.01').trim(),
-    accessLevel: String(raw["УровеньДоступа"] || raw["accessLevel"] || 'коммерческая тайна').trim(),
-    softName: String(raw["ПрограммныйКомплекс"] || raw["softName"] || 'Программный комплекс "Строительный эксперт"  v7.3.1.7813').trim(),
-    pluginVersion: String(raw["ПлагинGGE"] || raw["pluginVersion"] || 'Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13').trim(),
-    decimalsKm: decimalsKm,
-    decimalsVolume: decimalsVolume,
+    ggeVersion: String(raw["ВерсияGGE"] || '3.01').trim(),
+    accessLevel: String(raw["УровеньДоступа"] || 'коммерческая тайна').trim(),
+    softName: String(raw["ПрограммныйКомплекс"] || 'Программный комплекс "Строительный эксперт"  v7.3.1.7813').trim(),
+    pluginVersion: String(raw["ПлагинGGE"] || 'Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13').trim(),
+    decimalsWorks: decimalsWorks,
+    decimalsMaterials: decimalsMaterials,
     raw: raw
   };
 }
 
 /**
- * Returns the configured decimal precision for a given unit based on Settings rules.
+ * Returns the decimal precision for a specific item, work, or material based on:
+ * 1. Individual rule override (item["Округление"] or item.decimals)
+ * 2. Settings defaults: "ОкруглениеРабот" for works, "ОкруглениеМатериалов" for materials and equipment
  */
-function getVolumeDecimals(unit, rulesData = currentWorksRules) {
+function getItemDecimals(itemOrType, rulesData = currentWorksRules) {
   const settings = getRulesSettings(rulesData);
-  const isKm = String(unit || '').trim().toLowerCase() === 'км';
-  return isKm ? settings.decimalsKm : settings.decimalsVolume;
+
+  if (itemOrType && typeof itemOrType === 'object') {
+    const explicit = extractItemDecimals(itemOrType);
+    if (explicit !== undefined) {
+      return explicit;
+    }
+    const rawType = String(itemOrType["Тип"] || itemOrType.type || '').trim().toLowerCase();
+    const isMaterialOrEquip = rawType === 'материал' || rawType === 'material' ||
+                              rawType === 'оборудование' || rawType === 'equipment' ||
+                              itemOrType.isSubItem === true;
+    return isMaterialOrEquip ? settings.decimalsMaterials : settings.decimalsWorks;
+  }
+
+  const str = String(itemOrType || '').trim().toLowerCase();
+  if (str === 'материал' || str === 'material' || str === 'оборудование' || str === 'equipment') {
+    return settings.decimalsMaterials;
+  }
+  if (str === 'работа' || str === 'work') {
+    return settings.decimalsWorks;
+  }
+
+  return settings.decimalsWorks;
 }
 
 /**
- * Rounds a quantity/volume according to the configured decimals for its unit.
+ * Rounds a quantity/volume according to the configured decimals (individual rule or default group).
  */
-function roundQuantity(val, unit = '', rulesData = currentWorksRules) {
-  if (val === null || val === undefined || isNaN(val)) return 0;
-  const decimals = getVolumeDecimals(unit, rulesData);
-  const factor = Math.pow(10, decimals);
-  return Math.round(Number(val) * factor) / factor;
+function roundQuantity(val, itemOrType = 'работа', rulesData = currentWorksRules) {
+  if (val === null || val === undefined || isNaN(Number(val))) return 0;
+  const decimals = getItemDecimals(itemOrType, rulesData);
+  const n = Number(val);
+  // Using exponential notation avoids float precision issues (e.g. 1.005 * 100 = 100.49999999999999)
+  return Number(Math.round(Number(n + 'e' + decimals)) + 'e-' + decimals);
 }
 
 /**
  * Formats a volume number for UI display according to the configured decimals.
  */
-function formatVolumeDisplay(val, unit = '', rulesData = currentWorksRules) {
+function formatVolumeDisplay(val, itemOrType = 'работа', rulesData = currentWorksRules) {
   if (val === null || val === undefined || isNaN(val)) return '0';
-  const decimals = getVolumeDecimals(unit, rulesData);
+  const decimals = getItemDecimals(itemOrType, rulesData);
   const num = Number(val);
   return num.toLocaleString('ru-RU', {
     minimumFractionDigits: Math.min(decimals, 2),
@@ -4050,7 +4085,6 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
         const hasPipeVar = /(?:ТРУБ|PIPES)/i.test(formula);
 
         const trenchWorkUnit = work["Единицы измерения"] || work.unit || '';
-        totalVolume = roundQuantity(totalVolume, trenchWorkUnit, rulesData);
 
         // Build formula display string for VOR
         let displayFormula = '';
@@ -4090,7 +4124,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
               const pCount = matchingSegments[0].countPipes || 1;
               displayFormula = `${totalIntersections} перес. * ${pCount} шт. * ${pLen} м`;
             } else {
-              displayFormula = `${formula.replace(/\*/g, ' * ')} по ${matchingSegments.length} блокам (всего ${totalVolume} м)`;
+              displayFormula = `${formula.replace(/\*/g, ' * ')} по ${matchingSegments.length} блокам (всего ${formatVolumeDisplay(totalVolume, trenchWorkUnit, rulesData)} м)`;
             }
           }
           if (condSuffix) displayFormula += condSuffix;
@@ -4140,6 +4174,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           name: work["Наименование"] || work.name || '',
           unit: work["Единицы измерения"] || work.unit || '',
           volume: totalVolume,
+          decimals: extractItemDecimals(work),
           formulaDisplay: showFormula ? displayFormula : '',
           showFormula: showFormula,
           rawFormulaDisplay: displayFormula,
@@ -4224,15 +4259,15 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           return; // Skip this coupling item!
         }
         const rawVol = evalRes.value;
-        const volume = roundQuantity(rawVol, workItem.unit || 'шт', rulesData);
         const showFormula = (workItem.showFormula !== undefined) ? workItem.showFormula : shouldShowFormula(workItem.rawItem || workItem);
-        const formulaDisplay = showFormula ? buildCouplingWorkFormulaDisplay(formula, tierData, volume) : '';
+        const formulaDisplay = showFormula ? buildCouplingWorkFormulaDisplay(formula, tierData, rawVol) : '';
 
         calculatedWorks.push({
           name: workItem.name,
           unit: workItem.unit || 'шт',
-          volume: volume,
-          volumeFormatted: String(volume),
+          volume: rawVol,
+          volumeFormatted: String(rawVol),
+          decimals: extractItemDecimals(workItem.rawItem || workItem),
           formula: formula,
           formulaDisplay: formulaDisplay,
           showFormula: showFormula,
@@ -4253,6 +4288,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           unit: coupling.unit || 'шт',
           volume: coupling.count,
           volumeFormatted: String(coupling.count),
+          decimals: extractItemDecimals(coupling),
           formula: 'КОЛИЧЕСТВО',
           formulaDisplay: showFormula ? `${coupling.count} шт` : '',
           showFormula: showFormula,
@@ -4347,7 +4383,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
     // 1. Process OPTICAL cables separately
     if (opticalCables.length > 0) {
       opticalCables.sort((a, b) => (b.length || 0) - (a.length || 0));
-      const totalOpticalLength = Math.round(opticalCables.reduce((sum, c) => sum + c.length, 0) * 100) / 100;
+      const totalOpticalLength = opticalCables.reduce((sum, c) => sum + (Number(c.length) || 0), 0);
 
       if (parsedWM.optical && Array.isArray(parsedWM.optical.items) && parsedWM.optical.items.length > 0) {
         const optItems = parsedWM.optical.items;
@@ -4383,13 +4419,13 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           } else {
             const rawVal = evalRes.value;
             const unit = work["Единицы измерения"] || work.unit || 'м';
-            const vol = roundQuantity(rawVal, unit, rulesData);
             const formulaDisplay = workShowFormula ? buildWorkFormulaDisplay(formula, totalOpticalLength, opticalCables.length, unit) : '';
 
             calculatedWorks.push({
               name: workTitle,
               unit: unit,
-              volume: vol,
+              volume: rawVal,
+              decimals: extractItemDecimals(work),
               formulaDisplay: formulaDisplay,
               showFormula: workShowFormula,
               ruleName: ruleName,
@@ -4439,7 +4475,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               }
 
               opticalCables.forEach(c => {
-                const cVol = roundQuantity(evaluateWorkFormula(matFormula, c.length), matUnit, rulesData);
+                const cVol = evaluateWorkFormula(matFormula, c.length);
                 const cFormulaDisp = matShowFormula
                   ? (buildWorkFormulaDisplay(matFormula, c.length, 1, matUnit) + ' (ВОЛС)')
                   : '';
@@ -4447,6 +4483,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                   name: c.fullDescription || `Кабель ${c.type}`,
                   unit: matUnit,
                   volume: cVol,
+                  decimals: extractItemDecimals(mat),
                   formulaDisplay: cFormulaDisp,
                   showFormula: matShowFormula,
                   ruleName: ruleName,
@@ -4477,12 +4514,12 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                 return; // Skip this material!
               }
               const matRawVal = matEvalRes.value;
-              const matVol = roundQuantity(matRawVal, matUnit, rulesData);
               const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalOpticalLength, opticalCables.length, matUnit) : '';
               calculatedWorks.push({
                 name: matNameTpl,
                 unit: matUnit,
-                volume: matVol,
+                volume: matRawVal,
+                decimals: extractItemDecimals(mat),
                 formulaDisplay: matFormulaDisp,
                 showFormula: matShowFormula,
                 ruleName: ruleName,
@@ -4568,7 +4605,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           // Sort cables in this tier by length descending
           tier.cables.sort((a, b) => (b.length || 0) - (a.length || 0));
 
-          const totalTierLength = Math.round(tier.cables.reduce((sum, c) => sum + c.length, 0) * 100) / 100;
+          const totalTierLength = tier.cables.reduce((sum, c) => sum + (Number(c.length) || 0), 0);
 
           const tierItems = (Array.isArray(tier.items) && tier.items.length > 0)
             ? tier.items
@@ -4621,13 +4658,13 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             } else {
               const rawVal = evalRes.value;
               const unit = work["Единицы измерения"] || work.unit || 'м';
-              const vol = roundQuantity(rawVal, unit, rulesData);
               const formulaDisplay = workShowFormula ? buildWorkFormulaDisplay(formula, totalTierLength, tier.cables.length, unit) : '';
 
               calculatedWorks.push({
                 name: workTitle,
                 unit: unit,
-                volume: vol,
+                volume: rawVal,
+                decimals: extractItemDecimals(work),
                 formulaDisplay: formulaDisplay,
                 showFormula: workShowFormula,
                 ruleName: ruleName,
@@ -4676,7 +4713,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                 }
 
                 tier.cables.forEach(c => {
-                  const cVol = roundQuantity(evaluateWorkFormula(matFormula, c.length), matUnit, rulesData);
+                  const cVol = evaluateWorkFormula(matFormula, c.length);
                   const cFormulaDisp = matShowFormula
                     ? (buildWorkFormulaDisplay(matFormula, c.length, 1, matUnit) + (c.weight ? ` (масса 1 м: ${c.weight} кг)` : ''))
                     : '';
@@ -4684,6 +4721,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                     name: c.fullDescription || `Кабель ${c.type}`,
                     unit: matUnit,
                     volume: cVol,
+                    decimals: extractItemDecimals(mat),
                     formulaDisplay: cFormulaDisp,
                     showFormula: matShowFormula,
                     ruleName: ruleName,
@@ -4712,12 +4750,12 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                   return; // Skip this material!
                 }
                 const matRawVal = matEvalRes.value;
-                const matVol = roundQuantity(matRawVal, matUnit, rulesData);
                 const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalTierLength, tier.cables.length, matUnit) : '';
                 calculatedWorks.push({
                   name: matNameTpl,
                   unit: matUnit,
-                  volume: matVol,
+                  volume: matRawVal,
+                  decimals: extractItemDecimals(mat),
                   formulaDisplay: matFormulaDisp,
                   showFormula: matShowFormula,
                   ruleName: ruleName,
@@ -4818,7 +4856,9 @@ function buildEquipmentFormulaDisplay(formula, count, unit) {
 
 // Calculate works based on equipment summary and rules JSON ("Оборудование")
 function calculateWorksFromEquipment(equipmentSummary, rulesData) {
-  const eqDict = getEquipmentRulesDict(rulesData);
+  const eqDict = (typeof getEquipmentRulesDict === 'function')
+    ? getEquipmentRulesDict(rulesData)
+    : (rulesData && rulesData["Оборудование"] && typeof rulesData["Оборудование"] === 'object' && !Array.isArray(rulesData["Оборудование"]) ? rulesData["Оборудование"] : {});
   const calculatedWorks = [];
   const missingInRules = [];
   const formulaErrors = [];
@@ -4919,14 +4959,14 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           // Skip this work item!
         } else {
           const rawVol = evalRes.value;
-          const vol = roundQuantity(rawVol, unit, rulesData);
           const formulaDisplay = workShowFormula ? buildEquipmentFormulaDisplay(formula, count, unit) : '';
 
           calculatedWorks.push({
             name: workTitle,
             unit: unit,
-            volume: vol,
-            volumeFormatted: String(vol),
+            volume: rawVol,
+            volumeFormatted: String(rawVol),
+            decimals: extractItemDecimals(work),
             formula: formula,
             formulaDisplay: formulaDisplay,
             showFormula: workShowFormula,
@@ -5000,15 +5040,15 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           }
 
           const matRawVol = matEvalRes.value;
-          const matVol = roundQuantity(matRawVol, matUnit, rulesData);
           const matShowFormula = shouldShowFormula(mat, workShowFormula);
           const matFormulaDisp = matShowFormula ? buildEquipmentFormulaDisplay(matFormula, count, matUnit) : '';
 
           calculatedWorks.push({
             name: matName,
             unit: matUnit,
-            volume: matVol,
-            volumeFormatted: String(matVol),
+            volume: matRawVol,
+            volumeFormatted: String(matRawVol),
+            decimals: extractItemDecimals(mat),
             formula: matFormula,
             formulaDisplay: matFormulaDisp,
             showFormula: matShowFormula,
@@ -5081,6 +5121,7 @@ function aggregateCalculatedWorks(rawWorksList) {
         unit: unit,
         section: section,
         type: item.type || 'работа',
+        decimals: item.decimals !== undefined ? item.decimals : undefined,
         volume: 0,
         formulaParts: [],
         showFormula: false,
@@ -5097,6 +5138,9 @@ function aggregateCalculatedWorks(rawWorksList) {
 
     const group = workGroups.get(groupKey);
     group.volume += (Number(item.volume) || 0);
+    if (group.decimals === undefined && item.decimals !== undefined) {
+      group.decimals = item.decimals;
+    }
 
     if (itemShowFormula !== false) {
       group.showFormula = true;
@@ -5161,6 +5205,7 @@ function aggregateCalculatedWorks(rawWorksList) {
           unit: matUnit,
           section: section,
           type: item.type || determinedType,
+          decimals: item.decimals !== undefined ? item.decimals : undefined,
           volume: 0,
           formulaParts: [],
           showFormula: false,
@@ -5178,6 +5223,9 @@ function aggregateCalculatedWorks(rawWorksList) {
 
       const matEntry = targetGroup.materialsMap.get(matKey);
       matEntry.volume += (Number(item.volume) || 0);
+      if (matEntry.decimals === undefined && item.decimals !== undefined) {
+        matEntry.decimals = item.decimals;
+      }
 
       if (itemShowFormula !== false) {
         matEntry.showFormula = true;
@@ -5204,7 +5252,7 @@ function aggregateCalculatedWorks(rawWorksList) {
   let workIndex = 1;
 
   workGroups.forEach(work => {
-    const roundedWorkVol = roundQuantity(work.volume, work.unit);
+    const roundedWorkVol = roundQuantity(work.volume, work);
 
     let finalWorkFormula = '';
     if (work.showFormula === false || work.formulaParts.length === 0) {
@@ -5229,6 +5277,7 @@ function aggregateCalculatedWorks(rawWorksList) {
       unit: work.unit,
       volume: roundedWorkVol,
       volumeFormatted: String(roundedWorkVol),
+      decimals: work.decimals,
       formulaDisplay: finalWorkFormula,
       showFormula: Boolean(finalWorkFormula),
       section: work.section,
@@ -5247,7 +5296,7 @@ function aggregateCalculatedWorks(rawWorksList) {
 
     let matIndex = 1;
     work.materialsMap.forEach(mat => {
-      const roundedMatVol = roundQuantity(mat.volume, mat.unit);
+      const roundedMatVol = roundQuantity(mat.volume, mat);
 
       let finalMatFormula = '';
       if (mat.showFormula === false || mat.formulaParts.length === 0) {
@@ -5268,6 +5317,7 @@ function aggregateCalculatedWorks(rawWorksList) {
         unit: mat.unit,
         volume: roundedMatVol,
         volumeFormatted: String(roundedMatVol),
+        decimals: mat.decimals,
         formulaDisplay: finalMatFormula,
         showFormula: Boolean(finalMatFormula),
         section: mat.section,
@@ -5295,13 +5345,14 @@ function aggregateCalculatedWorks(rawWorksList) {
     const rawType = (orphan.type || '').trim().toLowerCase();
     const isEquip = rawType === 'оборудование' || rawType === 'equipment';
     const isShowFormula = orphan.showFormula !== false && Boolean(orphan.formulaDisplay && orphan.formulaDisplay.trim());
-    const orphanVol = roundQuantity(orphan.volume, orphan.unit);
+    const orphanVol = roundQuantity(orphan.volume, orphan);
     result.push({
       itemNumber: `${workIndex}.${oIdx + 1}`,
       name: orphan.name,
       unit: orphan.unit,
       volume: orphanVol,
       volumeFormatted: String(orphanVol),
+      decimals: orphan.decimals,
       formulaDisplay: isShowFormula ? normalizeFormulaMathOperators(orphan.formulaDisplay || '') : '',
       showFormula: isShowFormula,
       section: orphan.section || 'Монтажные работы',

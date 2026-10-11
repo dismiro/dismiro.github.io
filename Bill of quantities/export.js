@@ -53,9 +53,9 @@ function escapeXml(unsafe) {
 }
 
 // Format numbers for GGE QuantityTakeoff XML
-function formatGgeQuantity(val, unit = '', rulesData = currentWorksRules) {
+function formatGgeQuantity(val, itemOrType = 'работа', rulesData = currentWorksRules) {
   if (val === null || val === undefined || isNaN(val)) return '0.00';
-  const decimals = getVolumeDecimals(unit, rulesData);
+  const decimals = getItemDecimals(itemOrType, rulesData);
   const num = Number(val);
   return num.toFixed(decimals);
 }
@@ -111,7 +111,7 @@ function generateVorGgeXml(worksData, currentFileName, numberingMode = null) {
       const typeXml = `\t\t\t\t<Type>${ggeType}</Type>\n`;
       const commentXml = work.comment ? `\t\t\t\t<Comment>${escapeXml(work.comment)}</Comment>\n` : '';
       const unitStr = escapeXml(work.unit || 'м');
-      const qtyStr = formatGgeQuantity(work.volume, work.unit, currentWorksRules);
+      const qtyStr = formatGgeQuantity(work.volume, work, currentWorksRules);
       const isShowFormula = work.showFormula !== false && Boolean(work.formulaDisplay && work.formulaDisplay.trim());
       const formulaRaw = isShowFormula ? work.formulaDisplay : '';
       const formulaStr = escapeXml(normalizeFormulaMathOperators(formulaRaw));
@@ -238,7 +238,7 @@ function generateVorWorkbook(worksData, currentFileName, numberingMode = 'hierar
 
     let secSequentialNum = 1;
     works.forEach((w, idx) => {
-      dataRowIndexes.push({ rowIndex: aoa.length, unit: w.unit });
+      dataRowIndexes.push({ rowIndex: aoa.length, unit: w.unit, work: w });
       const isMaterial = w.isSubItem || w.type === 'материал';
       let numStr = '';
       if (numberingMode === 'sequential' || numberingMode === 'continuous') {
@@ -281,12 +281,12 @@ function generateVorWorkbook(worksData, currentFileName, numberingMode = 'hierar
 
   ws['!merges'] = merges;
 
-  // Format Volume column as numeric with precision based on unit settings
-  dataRowIndexes.forEach(({ rowIndex, unit }) => {
+  // Format Volume column as numeric with precision based on work/material settings
+  dataRowIndexes.forEach(({ rowIndex, work, unit }) => {
     const cellAddr = XLSX.utils.encode_cell({ r: rowIndex, c: 3 });
     if (ws[cellAddr]) {
       ws[cellAddr].t = 'n';
-      const dec = getVolumeDecimals(unit, currentWorksRules);
+      const dec = getItemDecimals(work || unit, currentWorksRules);
       const decFmt = dec > 0 ? ('.' + '0'.repeat(dec)) : '';
       ws[cellAddr].z = `#,##0${decFmt}`;
     }

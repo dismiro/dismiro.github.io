@@ -228,6 +228,13 @@ function renderModalWorkItemHtml(w, wIdx, options = {}) {
     ? `<span class="badge bg-light text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы включено"><i class="bx bx-show me-0_5"></i>в формулах</span>`
     : `<span class="badge bg-secondary-subtle text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы отключено («ОтображатьФормулу»: false)"><i class="bx bx-hide me-0_5"></i>без формулы</span>`;
 
+  const explicitDec = (w["Округление"] !== undefined && w["Округление"] !== null && !isNaN(Number(w["Округление"])))
+    ? Number(w["Округление"])
+    : null;
+  const roundingBadge = (explicitDec !== null)
+    ? `<span class="badge bg-light text-primary border ms-1" style="font-size: 0.68rem;" title="Индивидуальное округление правила"><i class="bx bx-target-lock me-0_5"></i>округление: ${explicitDec} зн.</span>`
+    : '';
+
   const extraBadges = options.extraBadges || '';
   const isSub = Boolean(options.isSub);
   const prefix = isSub ? `<span class="text-muted me-1 fw-bold">↳</span>${options.parentIdx !== undefined ? (options.parentIdx + 1) + '.' : ''}${wIdx + 1}. ` : `${wIdx + 1}. `;
@@ -244,7 +251,7 @@ function renderModalWorkItemHtml(w, wIdx, options = {}) {
       <div class="d-flex align-items-center gap-1 text-muted fs-xs flex-wrap">
         <span class="fw-medium">Формула:</span>
         <code class="px-1 py-0 bg-body-tertiary border rounded text-primary">${escapeHtml(formula)}</code>
-        ${formulaDispBadge}
+        ${formulaDispBadge}${roundingBadge}
         ${section ? `<span class="badge bg-light text-secondary border ms-1" style="font-size: 0.68rem;">Раздел: ${escapeHtml(section)}</span>` : ''}
         <span class="badge ${typeBadgeClass} ms-auto"><i class='bx ${typeIcon} me-0_5'></i>${escapeHtml(typeTitle)}</span>
       </div>
@@ -958,11 +965,11 @@ function renderSettingsModalContent() {
   const numSelect = document.getElementById('settingNumberingMode');
   if (numSelect) numSelect.value = settings.numberingMode;
 
-  const decKmInput = document.getElementById('settingDecimalsKm');
-  if (decKmInput) decKmInput.value = settings.decimalsKm;
+  const decWorksInput = document.getElementById('settingDecimalsWorks');
+  if (decWorksInput) decWorksInput.value = settings.decimalsWorks;
 
-  const decVolInput = document.getElementById('settingDecimalsVolume');
-  if (decVolInput) decVolInput.value = settings.decimalsVolume;
+  const decMatsInput = document.getElementById('settingDecimalsMaterials');
+  if (decMatsInput) decMatsInput.value = settings.decimalsMaterials;
 
   const ggeVerInput = document.getElementById('settingGgeVersion');
   if (ggeVerInput) ggeVerInput.value = settings.ggeVersion;
@@ -982,8 +989,8 @@ function saveSettingsFromUiToJson(showToastNotification = true) {
   syncCurrentRulesFromEditorIfValid();
 
   const numMode = document.getElementById('settingNumberingMode')?.value || 'иерархическая';
-  const decKm = parseInt(document.getElementById('settingDecimalsKm')?.value, 10);
-  const decVol = parseInt(document.getElementById('settingDecimalsVolume')?.value, 10);
+  const decWorks = parseInt(document.getElementById('settingDecimalsWorks')?.value, 10);
+  const decMats = parseInt(document.getElementById('settingDecimalsMaterials')?.value, 10);
   const ggeVer = document.getElementById('settingGgeVersion')?.value || '3.01';
   const accLevel = document.getElementById('settingAccessLevel')?.value || 'коммерческая тайна';
   const softName = document.getElementById('settingSoftName')?.value || 'Программный комплекс "Строительный эксперт"  v7.3.1.7813';
@@ -995,8 +1002,8 @@ function saveSettingsFromUiToJson(showToastNotification = true) {
     "УровеньДоступа": accLevel,
     "ПрограммныйКомплекс": softName,
     "ПлагинGGE": pluginVer,
-    "ОкруглениеКабелейКм": !isNaN(decKm) ? Math.max(0, Math.min(10, decKm)) : 3,
-    "ОкруглениеОбъемов": !isNaN(decVol) ? Math.max(0, Math.min(10, decVol)) : 2
+    "ОкруглениеРабот": !isNaN(decWorks) ? Math.max(0, Math.min(10, decWorks)) : 2,
+    "ОкруглениеМатериалов": !isNaN(decMats) ? Math.max(0, Math.min(10, decMats)) : 3
   };
 
   if (!currentWorksRules || typeof currentWorksRules !== 'object') {
@@ -1008,7 +1015,7 @@ function saveSettingsFromUiToJson(showToastNotification = true) {
     "Настройки": updatedSettings
   };
   for (const [k, v] of Object.entries(currentWorksRules)) {
-    if (k !== "Настройки" && k !== "settings" && k !== "Параметры") {
+    if (k !== "Настройки") {
       newRulesObj[k] = v;
     }
   }
@@ -1034,8 +1041,8 @@ function resetDefaultSettings() {
     "УровеньДоступа": "коммерческая тайна",
     "ПрограммныйКомплекс": "Программный комплекс \"Строительный эксперт\"  v7.3.1.7813",
     "ПлагинGGE": "Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13",
-    "ОкруглениеКабелейКм": 3,
-    "ОкруглениеОбъемов": 2
+    "ОкруглениеРабот": 2,
+    "ОкруглениеМатериалов": 3
   };
 
   currentWorksRules["Настройки"] = defaultSettings;
@@ -1851,7 +1858,7 @@ function setupWorksRulesListeners() {
   // Auto-sync settings inputs on change
   [
     'settingNumberingMode',
-    'settingDecimalsKm', 'settingDecimalsVolume',
+    'settingDecimalsWorks', 'settingDecimalsMaterials',
     'settingGgeVersion', 'settingAccessLevel',
     'settingSoftName', 'settingPluginVersion'
   ].forEach(id => {
