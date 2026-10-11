@@ -659,7 +659,7 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
     couplingsMissing.forEach((cp, idx) => {
       const typeStr = cp.couplingType
         ? `Муфта «${cp.couplingType}»`
-        : (cp.cable ? `Кабель «${cp.cable}»` : (cp.cableType || cp.type || 'Кабель'));
+        : (cp.cable ? `Кабель «${cp.cable}»` : (cp.cableType ? `Кабель (${cp.cableType})` : 'Кабель'));
       const reason = cp.reason || (cp.couplingsNeeded
         ? `В справочнике кабелей не указан тип муфты (требуется ${cp.couplingsNeeded} шт.)`
         : (cp.couplingType ? `Муфта отсутствует в справочнике муфт` : 'Не задана марка муфты или строительная длина'));

@@ -203,9 +203,9 @@ function validateAndEvaluateFormula(formula, dataCtx, domain = 'cable', context 
     const seg = (typeof dataCtx === 'object' && dataCtx !== null) ? dataCtx : {};
     const len = Number(seg.length !== undefined ? seg.length : baseValue) || 0;
     const cab = Number(seg.cablesCount !== undefined ? seg.cablesCount : (seg.count !== undefined ? seg.count : 0)) || 0;
-    const countPipes = Number(seg.countPipes !== undefined ? seg.countPipes : (seg.lengthPipes ? 1 : 0)) || 0;
-    const lengthPipes = Number(seg.lengthPipes !== undefined && seg.lengthPipes > 0 ? seg.lengthPipes : len) || 0;
-    const countIntersections = Number(seg.countIntersections !== undefined && seg.countIntersections > 0 ? seg.countIntersections : (seg.countPipes || seg.lengthPipes ? 1 : 0)) || 0;
+    const countPipes = Number(seg.countPipes !== undefined ? seg.countPipes : 0) || 0;
+    const lengthPipes = Number(seg.lengthPipes !== undefined ? seg.lengthPipes : 0) || 0;
+    const countIntersections = Number(seg.countIntersections !== undefined ? seg.countIntersections : (countPipes > 0 ? 1 : 0)) || 0;
 
     // Intersections
     expr = replaceToken(expr, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]', countIntersections);
@@ -1087,7 +1087,7 @@ function getActiveCouplingsSummary(rulesData) {
       if (!cTypeKey) {
         // Missing coupling configuration for cable
         missingCouplings.push({
-          cable: c.cable || c.type,
+          cable: c.cable || '',
           cableType: c.type,
           rawCableType: c.rawType,
           length: c.length,
@@ -1108,7 +1108,7 @@ function getActiveCouplingsSummary(rulesData) {
         item.count += count;
         item.cableTypes.add(c.type);
         item.cables.push({
-          cable: c.cable || c.type,
+          cable: c.cable || '',
           type: c.type,
           rawType: c.rawType,
           length: c.length,
@@ -1765,21 +1765,11 @@ function renderProcessedData(data, fileName, options = {}) {
 
   const equipmentList = (data.TracksideEquipment && Array.isArray(data.TracksideEquipment))
     ? data.TracksideEquipment
-    : (data.tracksideEquipment && Array.isArray(data.tracksideEquipment))
-    ? data.tracksideEquipment
-    : (data.equipment && Array.isArray(data.equipment))
-    ? data.equipment
-    : (data.Equipment && Array.isArray(data.Equipment))
-    ? data.Equipment
-    : (data['Оборудование'] && Array.isArray(data['Оборудование']))
-    ? data['Оборудование']
-    : (data['Напольное оборудование'] && Array.isArray(data['Напольное оборудование']))
-    ? data['Напольное оборудование']
     : [];
 
   let totalEquipmentCount = 0;
   if (equipmentList.length > 0) {
-    totalEquipmentCount = equipmentList.reduce((acc, eq) => acc + (Number(eq.countEquipment || eq.count || eq.qty || (eq.handles ? eq.handles.length : 1)) || 1), 0);
+    totalEquipmentCount = equipmentList.reduce((acc, eq) => acc + (Number(eq.countEquipment) || 1), 0);
   }
 
   // Activate header controls toolbar and reset button
@@ -1901,18 +1891,8 @@ function createCablesAccordion(cables, totalLength) {
     // Formatting routing type: render each routing type as a multi-line badge
     let routingHtml = '<span class="text-muted">-</span>';
     let routingSumLength = 0;
-    let rawRouting = c['routing type'] || c.routingType || c.routing_type || c['способы прокладки'] || c['способ прокладки'];
-    if (typeof rawRouting === 'string' && rawRouting.trim()) {
-      rawRouting = { [rawRouting.trim()]: [c.length || 0] };
-    } else if (Array.isArray(rawRouting)) {
-      const conv = {};
-      rawRouting.forEach(item => {
-        if (typeof item === 'string') conv[item.trim()] = [c.length || 0];
-        else if (item && typeof item === 'object') Object.assign(conv, item);
-      });
-      rawRouting = conv;
-    }
-    if (rawRouting && typeof rawRouting === 'object') {
+    const rawRouting = c['routing type'] || c.routingType;
+    if (rawRouting && typeof rawRouting === 'object' && !Array.isArray(rawRouting)) {
       const entries = Object.entries(rawRouting);
       if (entries.length > 0) {
         routingHtml = `<div class="d-flex flex-wrap gap-1 cell-wrap py-0_5">` + 
@@ -2120,17 +2100,16 @@ function createRoutingAccordion(blocks, totalLength) {
       containedHtml = `<span class="cell-wrap">${escapeHtml(String(b.contained))}</span>`;
     }
 
-    const isPipeType = b.type && b.type.toLowerCase().includes('труб');
-    const pCount = b.countPipes !== undefined ? Number(b.countPipes) : (isPipeType ? 1 : 0);
-    const pLen = b.lengthPipes !== undefined ? Number(b.lengthPipes) : (isPipeType ? (Number(b.length) || 0) : 0);
+    const pCount = b.countPipes !== undefined ? Number(b.countPipes) : 0;
+    const pLen = b.lengthPipes !== undefined ? Number(b.lengthPipes) : 0;
 
     let typeBadge = '';
     if (pCount > 0 && pLen > 0) {
       typeBadge += `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 600;" title="Трубы: ${pCount} шт. * ${pLen} м"><i class='bx bx-cylinder me-0_5'></i>${pCount}шт*${pLen}м</span>`;
     } else if (pCount > 0) {
       typeBadge += `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 600;" title="Трубы: ${pCount} шт."><i class='bx bx-cylinder me-0_5'></i>${pCount}шт</span>`;
-    } else if (isPipeType) {
-      typeBadge += `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 600;" title="Трубы: 1 шт. * ${b.length || 0} м"><i class='bx bx-cylinder me-0_5'></i>1шт*${b.length || 0}м</span>`;
+    } else if (pLen > 0) {
+      typeBadge += `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1" style="font-size: 0.68rem; font-weight: 600;" title="Трубы: длина ${pLen} м"><i class='bx bx-cylinder me-0_5'></i>${pLen}м</span>`;
     }
 
     if (b.countIntersections) {
@@ -2209,10 +2188,10 @@ function createEquipmentAccordion(equipmentList, totalCount) {
     if (!eq) return;
     const row = document.createElement('tr');
 
-    const mark = (eq.EquipmentType || eq.equipmentType || eq.mark || eq.marka || eq.type || eq['Марка'] || 'Без марки').trim();
-    const method = (eq.InstallationMethod || eq.installationMethod || eq.method || eq['Способ установки'] || 'Не указано').trim();
-    const count = Number(eq.countEquipment || eq.count || eq.qty || (eq.handles ? eq.handles.length : 1)) || 1;
-    const handles = Array.isArray(eq.handles) ? eq.handles : (eq.handles ? [eq.handles] : (eq.handle ? [eq.handle] : []));
+    const mark = (eq.EquipmentType || 'Без марки').trim();
+    const method = (eq.InstallationMethod || 'Не указано').trim();
+    const count = Number(eq.countEquipment) || 1;
+    const handles = Array.isArray(eq.handles) ? eq.handles : [];
 
     let handlesHtml = '<span class="text-muted">-</span>';
     if (handles.length > 0) {
@@ -2572,32 +2551,23 @@ function getActiveCableSummary() {
       grandTotalCableCount += 1;
       grandTotalCableLength += length;
 
-      let rawRt = c['routing type'] || c.routingType || c.routing_type || c['способы прокладки'] || c['способ прокладки'] || c.way || {};
-      if (typeof rawRt === 'string' && rawRt.trim()) {
-        rawRt = { [rawRt.trim()]: [length] };
-      } else if (Array.isArray(rawRt)) {
-        const conv = {};
-        rawRt.forEach(item => {
-          if (typeof item === 'string') conv[item.trim()] = [length];
-          else if (item && typeof item === 'object') Object.assign(conv, item);
-        });
-        rawRt = conv;
-      }
-
+      const rawRt = c['routing type'] || c.routingType;
       let hasRouting = false;
-      const rtEntries = Object.entries(rawRt);
-      for (const [rName, lengths] of rtEntries) {
-        const trimmedName = (rName || '').trim();
-        if (!trimmedName) continue;
-        const arr = Array.isArray(lengths) ? lengths : [lengths];
-        let sum = arr.reduce((acc, val) => acc + (Number(val) || 0), 0);
-        if (sum === 0 && rtEntries.length === 1 && length > 0) {
-          sum = length;
-        }
-        if (sum > 0) {
-          hasRouting = true;
-          cableSummary[type].routingTypes[trimmedName] = (cableSummary[type].routingTypes[trimmedName] || 0) + sum;
-          grandRoutingSummary[trimmedName] = (grandRoutingSummary[trimmedName] || 0) + sum;
+      if (rawRt && typeof rawRt === 'object' && !Array.isArray(rawRt)) {
+        const rtEntries = Object.entries(rawRt);
+        for (const [rName, lengths] of rtEntries) {
+          const trimmedName = (rName || '').trim();
+          if (!trimmedName) continue;
+          const arr = Array.isArray(lengths) ? lengths : [lengths];
+          let sum = arr.reduce((acc, val) => acc + (Number(val) || 0), 0);
+          if (sum === 0 && rtEntries.length === 1 && length > 0) {
+            sum = length;
+          }
+          if (sum > 0) {
+            hasRouting = true;
+            cableSummary[type].routingTypes[trimmedName] = (cableSummary[type].routingTypes[trimmedName] || 0) + sum;
+            grandRoutingSummary[trimmedName] = (grandRoutingSummary[trimmedName] || 0) + sum;
+          }
         }
       }
 
@@ -2627,24 +2597,14 @@ function getActiveEquipmentSummary() {
   if (currentData) {
     const rawList = (currentData.TracksideEquipment && Array.isArray(currentData.TracksideEquipment))
       ? currentData.TracksideEquipment
-      : (currentData.tracksideEquipment && Array.isArray(currentData.tracksideEquipment))
-      ? currentData.tracksideEquipment
-      : (currentData.equipment && Array.isArray(currentData.equipment))
-      ? currentData.equipment
-      : (currentData.Equipment && Array.isArray(currentData.Equipment))
-      ? currentData.Equipment
-      : (currentData['Оборудование'] && Array.isArray(currentData['Оборудование']))
-      ? currentData['Оборудование']
-      : (currentData['Напольное оборудование'] && Array.isArray(currentData['Напольное оборудование']))
-      ? currentData['Напольное оборудование']
       : [];
 
     rawList.forEach(eq => {
       if (!eq) return;
-      const mark = (eq.EquipmentType || eq.equipmentType || eq.mark || eq.marka || eq.type || eq['Марка'] || 'Без марки').trim();
-      const method = (eq.InstallationMethod || eq.installationMethod || eq.method || eq['Способ установки'] || 'Не указано').trim();
-      const count = Number(eq.countEquipment || eq.count || eq.qty || (eq.handles ? eq.handles.length : 1)) || 1;
-      const handles = Array.isArray(eq.handles) ? eq.handles : (eq.handles ? [eq.handles] : (eq.handle ? [eq.handle] : []));
+      const mark = (eq.EquipmentType || 'Без марки').trim();
+      const method = (eq.InstallationMethod || 'Не указано').trim();
+      const count = Number(eq.countEquipment) || 1;
+      const handles = Array.isArray(eq.handles) ? eq.handles : [];
 
       const key = `${mark}____${method}`;
       if (!summary[key]) {
@@ -3665,8 +3625,9 @@ function renderCouplingsResult(couplingsSummary) {
     const missingItemsList = [];
     if (couplingsSummary.missingCouplings && couplingsSummary.missingCouplings.length > 0) {
       couplingsSummary.missingCouplings.forEach(mc => {
+        const label = mc.cable ? `Кабель «${escapeHtml(mc.cable)}» (${escapeHtml(mc.cableType)})` : `Кабель (${escapeHtml(mc.cableType)})`;
         missingItemsList.push(
-          `<li><strong>Кабель «${escapeHtml(mc.cable)}» (${escapeHtml(mc.cableType)})</strong>: длина ${Math.round(mc.length)} м, требуется ${mc.couplingsNeeded} муфт, но тип муфты не указан в справочнике кабелей.</li>`
+          `<li><strong>${label}</strong>: длина ${Math.round(mc.length)} м, требуется ${mc.couplingsNeeded} муфт, но тип муфты не указан в справочнике кабелей.</li>`
         );
       });
     }
@@ -3935,19 +3896,9 @@ function getActiveTrenchSummary() {
       if (!b) return;
       const type = (b.type || 'Без типа').trim();
       const length = Number(b.length) || 0;
-      let countPipes = Number(b.countPipes) || 0;
-      let lengthPipes = Number(b.lengthPipes) || 0;
-      const countIntersections = Number(b.countIntersections) || 0;
-
-      const isPipeType = type.toLowerCase().includes('труб');
-      if (isPipeType && countPipes === 0 && lengthPipes === 0) {
-        countPipes = 1;
-        lengthPipes = length;
-      } else if (isPipeType && countPipes === 0) {
-        countPipes = 1;
-      } else if (countPipes > 0 && lengthPipes === 0) {
-        lengthPipes = length;
-      }
+      const countPipes = Number(b.countPipes) || 0;
+      const lengthPipes = Number(b.lengthPipes) || 0;
+      const countIntersections = Number(b.countIntersections !== undefined ? b.countIntersections : (countPipes > 0 ? 1 : 0)) || 0;
 
       let cablesCount = Number(b.cablesCount) || 0;
       if (cablesCount === 0 && Array.isArray(b.contained)) {
@@ -3958,8 +3909,9 @@ function getActiveTrenchSummary() {
       }
       summary[type].totalLength += length;
       summary[type].count += 1;
-      summary[type].totalPipesCount += countPipes;
-      summary[type].totalPipesLength += (countPipes * lengthPipes);
+      summary[type].totalPipesCount += (countPipes * countIntersections);
+      // Суммарный метраж труб считается строго по формуле: countPipes * lengthPipes * countIntersections
+      summary[type].totalPipesLength += (countPipes * lengthPipes * countIntersections);
       summary[type].segments.push({
         handle: b.handle || '',
         length,
@@ -3974,6 +3926,35 @@ function getActiveTrenchSummary() {
   }
 
   return summary;
+}
+
+// Format a user formula for a specific trench segment substituting parameter tokens with their formatted values
+function formatSegmentFormulaWithTokens(formulaStr, seg, unitSuffix = 'м') {
+  let disp = (formulaStr || 'ДЛИНА').replace(/,/g, '.').replace(/\*/g, ' * ');
+
+  function replaceTokenInDisp(str, tokenRegex, valStr) {
+    const pattern = new RegExp('(^|[^a-zA-Z0-9а-яА-ЯёЁ_])(?:' + tokenRegex + ')([^a-zA-Z0-9а-яА-ЯёЁ_]|$)', 'gi');
+    return str.replace(pattern, (match, p1, p2) => p1 + valStr + (p2 !== undefined ? p2 : ''));
+  }
+
+  const countPipes = Number(seg.countPipes !== undefined ? seg.countPipes : 0) || 0;
+  const lengthPipes = Number(seg.lengthPipes !== undefined ? seg.lengthPipes : 0) || 0;
+  const countIntersections = Number(seg.countIntersections !== undefined ? seg.countIntersections : (countPipes > 0 ? 1 : 0)) || 0;
+  const segLen = Number(seg.length !== undefined ? seg.length : 0) || 0;
+  const cab = Number(seg.cablesCount !== undefined ? seg.cablesCount : (seg.count !== undefined ? seg.count : 0)) || 0;
+
+  // Intersections
+  disp = replaceTokenInDisp(disp, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]|INTERSECTIONS[_\\s]?COUNT|COUNT[_\\s]?INTERSECTIONS|ПЕРЕСЕЧЕНИ[ЙЯЕ]', `${countIntersections} перес.`);
+  // Pipe length
+  disp = replaceTokenInDisp(disp, 'ДЛИН[АЫ][_\\s]?ТРУБ[АЫ]?|PIPES[_\\s]?LENGTH|LENGTH[_\\s]?PIPES', `${lengthPipes} м`);
+  // Pipe count
+  disp = replaceTokenInDisp(disp, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ТРУБ[АЫ]?|PIPES[_\\s]?COUNT|COUNT[_\\s]?PIPES|ТРУБ[АЫ]?', `${countPipes} шт.`);
+  // Cable count
+  disp = replaceTokenInDisp(disp, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ|CABLES_COUNT|CABLES|КАБЕЛЕ[ЙЯИ]', `${cab} каб.`);
+  // Generic length
+  disp = replaceTokenInDisp(disp, 'ДЛИНА|LENGTH', `${segLen} ${unitSuffix}`);
+
+  return disp.replace(/\s+/g, ' ').trim();
 }
 
 // Evaluate formula for a single trench segment (supports both ДЛИНА and pipe/cable count variables)
@@ -4059,7 +4040,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
         };
 
         // Validate formula on matching segments: if invalid, notify & skip this work/material
-        const sampleSeg = matchingSegments[0] || { length: effectiveLength, cablesCount: 1, countPipes: 1, lengthPipes: effectiveLength, countIntersections: 1 };
+        const sampleSeg = matchingSegments[0] || { length: effectiveLength, cablesCount: 1, countPipes: 1, lengthPipes: 1, countIntersections: 1 };
         const checkRes = validateAndEvaluateFormula(formula, sampleSeg, 'trench', trenchContext);
         if (!checkRes.valid) {
           formulaErrors.push(checkRes.errorInfo);
@@ -4093,34 +4074,23 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
         const condSuffix = conditionNote ? ` (${conditionNote})` : '';
 
         if (hasPipeVar) {
-          const hasInterVar = /(?:ПЕРЕСЕЧЕНИ|INTERSECTIONS)/i.test(formula);
           if (matchingSegments.length === 1) {
-            const seg = matchingSegments[0];
-            const pInter = seg.countIntersections > 0 ? seg.countIntersections : 1;
-            const pCount = seg.countPipes || 1;
-            const pLen = seg.lengthPipes || seg.length || 0;
-            displayFormula = hasInterVar && pInter > 1
-              ? `${pInter} перес. * ${pCount} шт. * ${pLen} м`
-              : (hasInterVar ? `${pInter} * ${pCount} шт. * ${pLen} м` : `${pCount} шт. * ${pLen} м`);
+            displayFormula = formatSegmentFormulaWithTokens(formula, matchingSegments[0], unitSuffix);
           } else if (matchingSegments.length <= 5) {
-            displayFormula = matchingSegments.map(s => {
-              const pInter = s.countIntersections > 0 ? s.countIntersections : 1;
-              const pCount = s.countPipes || 1;
-              const pLen = s.lengthPipes || s.length || 0;
-              return hasInterVar && pInter > 1
-                ? `${pInter} перес. * ${pCount} шт. * ${pLen} м`
-                : (hasInterVar ? `${pInter} * ${pCount} шт. * ${pLen} м` : `${pCount} шт. * ${pLen} м`);
-            }).join(' + ');
+            displayFormula = matchingSegments.map(s => formatSegmentFormulaWithTokens(formula, s, unitSuffix)).join(' + ');
           } else {
+            const hasInterVar = /(?:ПЕРЕСЕЧЕНИ|INTERSECTIONS)/i.test(formula);
             const totalIntersections = matchingSegments.reduce((sum, s) => sum + (s.countIntersections > 0 ? s.countIntersections : 1), 0);
             const totalPipes = matchingSegments.reduce((sum, s) => sum + (s.countPipes || 1), 0);
-            const allSameLen = matchingSegments.every(s => (s.lengthPipes || s.length) === (matchingSegments[0].lengthPipes || matchingSegments[0].length));
+            const allSameLen = matchingSegments.every(s => (Number(s.lengthPipes) || 0) === (Number(matchingSegments[0].lengthPipes) || 0));
             const allOneInter = matchingSegments.every(s => (s.countIntersections || 1) === 1);
-            if (allSameLen && allOneInter && !hasInterVar) {
-              const pLen = matchingSegments[0].lengthPipes || matchingSegments[0].length || 0;
+            const isStandardFormula = /^КОЛИЧЕСТВО_ПЕРЕСЕЧЕНИЙ\*КОЛИЧЕСТВО_ТРУБ\*ДЛИНА_ТРУБ$/i.test(formula.replace(/\s+/g, ''));
+
+            if (isStandardFormula && allSameLen && allOneInter && !hasInterVar) {
+              const pLen = Number(matchingSegments[0].lengthPipes) || 0;
               displayFormula = `${totalPipes} шт. * ${pLen} м`;
-            } else if (allSameLen && hasInterVar) {
-              const pLen = matchingSegments[0].lengthPipes || matchingSegments[0].length || 0;
+            } else if (isStandardFormula && allSameLen && hasInterVar) {
+              const pLen = Number(matchingSegments[0].lengthPipes) || 0;
               const pCount = matchingSegments[0].countPipes || 1;
               displayFormula = `${totalIntersections} перес. * ${pCount} шт. * ${pLen} м`;
             } else {
