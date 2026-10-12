@@ -1401,56 +1401,8 @@ function setupEventListeners() {
     });
   }
 
-  // Setup Works Rules modal controls & JSON editor listeners
+  // Setup Works Rules modal controls & JSON editor listeners (in rules_modal.js)
   setupWorksRulesListeners();
-
-  const exportResultBtn = document.getElementById('exportResult');
-  if (exportResultBtn) {
-    exportResultBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      exportCalculationResults();
-    });
-  }
-
-  const exportVorExcelBtn = document.getElementById('exportVorExcel');
-  if (exportVorExcelBtn) {
-    exportVorExcelBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      exportVorExcel();
-    });
-  }
-
-  const exportVorBtn = document.getElementById('exportVorBtn');
-  if (exportVorBtn) {
-    exportVorBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      exportCalculationResults();
-    });
-  }
-
-  const exportVorExcelQuickBtn = document.getElementById('exportVorExcelQuickBtn');
-  if (exportVorExcelQuickBtn) {
-    exportVorExcelQuickBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      exportVorExcel();
-    });
-  }
-
-  // Works rules (JSON) event listeners
-  const rulesFileInput = document.getElementById('rulesFileInput');
-  if (rulesFileInput) {
-    rulesFileInput.addEventListener('change', handleRulesFileInput);
-  }
-
-  const resetRulesBtn = document.getElementById('resetRulesBtn');
-  if (resetRulesBtn) {
-    resetRulesBtn.addEventListener('click', resetWorksRules);
-  }
-
-  const downloadRulesBtn = document.getElementById('downloadRulesBtn');
-  if (downloadRulesBtn) {
-    downloadRulesBtn.addEventListener('click', downloadWorksRules);
-  }
 
   const rulesModalEl = document.getElementById('worksRulesModal');
   if (rulesModalEl) {
