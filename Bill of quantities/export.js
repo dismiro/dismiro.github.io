@@ -329,6 +329,7 @@ function collectAllGgeWarnings(calcData) {
     ...(couplingsSummary.missingCouplings || []),
     ...(couplingsSummary.missingInCatalog || [])
   ];
+  const couplingsExceeded = couplingsSummary.exceededTierCouplings || [];
 
   // Collect formula errors from calculation and from window.lastFormulaErrors, deduplicating them
   const rawFormulaErrors = [
@@ -346,7 +347,7 @@ function collectAllGgeWarnings(calcData) {
     }
   });
 
-  const totalCount = trenchMissing.length + cableMissing.length + equipmentMissing.length + cableMissingInCatalog.length + couplingsMissing.length + formulaErrors.length;
+  const totalCount = trenchMissing.length + cableMissing.length + equipmentMissing.length + cableMissingInCatalog.length + couplingsMissing.length + couplingsExceeded.length + formulaErrors.length;
 
   return {
     hasWarnings: totalCount > 0,
@@ -358,6 +359,7 @@ function collectAllGgeWarnings(calcData) {
     equipmentMissing,
     cableMissingInCatalog,
     couplingsMissing,
+    couplingsExceeded,
     calcData
   };
 }
@@ -382,7 +384,8 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
     cableMissing = [],
     equipmentMissing = [],
     cableMissingInCatalog = [],
-    couplingsMissing = []
+    couplingsMissing = [],
+    couplingsExceeded = []
   } = warningsInfo;
 
   const hasFormulaErrors = formulaErrors.length > 0;
@@ -699,6 +702,57 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
     `;
   }
 
+  // 6. Couplings exceeding maximum installation tier
+  if (couplingsExceeded.length > 0) {
+    let excRows = '';
+    couplingsExceeded.forEach((ec, idx) => {
+      excRows += `
+        <tr>
+          <td class="text-center text-dark small fw-medium">${idx + 1}</td>
+          <td class="fw-bold text-dark cell-wrap">
+            <div>Муфта «${escapeHtml(ec.couplingType)}»</div>
+            <div class="text-muted small">${escapeHtml(ec.fullName || '')}</div>
+          </td>
+          <td class="text-center font-monospace fw-semibold">${ec.maxCores} жил</td>
+          <td class="text-center">
+            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-monospace">до ${ec.assignedTier} жил</span>
+          </td>
+          <td class="text-center font-monospace">${ec.count} шт</td>
+          <td class="cell-wrap text-dark small fw-medium">${escapeHtml(ec.reason)}</td>
+        </tr>
+      `;
+    });
+
+    bodyHtml += `
+      <div class="card mb-3 border-warning-subtle shadow-none">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark"><i class='bx bx-git-merge me-1'></i>Превышение группы муфт</span>
+            <span class="fw-semibold small">Емкость превышает максимальную сметную группу правил (${couplingsExceeded.length} поз.)</span>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnOpenCouplingRulesFromModal">
+            <i class='bx bx-plus-circle'></i> Добавить нормы в JSON правил
+          </button>
+        </div>
+        <div class="table-responsive" style="max-height: 220px;">
+          <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.82rem;">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 35px;" class="text-center">№</th>
+                <th>Марка муфты</th>
+                <th style="width: 90px;" class="text-center">Емкость</th>
+                <th style="width: 130px;" class="text-center">Принята группа</th>
+                <th style="width: 70px;" class="text-center">Кол-во</th>
+                <th>Обоснование замечания</th>
+              </tr>
+            </thead>
+            <tbody>${excRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
   bodyEl.innerHTML = bodyHtml;
 
   // Bind Quick Add buttons in modal
@@ -750,6 +804,15 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
   const btnCp = bodyEl.querySelector('#btnOpenCouplingsFromModal');
   if (btnCp) {
     btnCp.addEventListener('click', () => {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) modalInstance.hide();
+      openWorksRulesModal('couplings');
+    });
+  }
+
+  const btnCpRules = bodyEl.querySelector('#btnOpenCouplingRulesFromModal');
+  if (btnCpRules) {
+    btnCpRules.addEventListener('click', () => {
       const modalInstance = bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
       openWorksRulesModal('couplings');

@@ -1119,6 +1119,7 @@ function getActiveCouplingsSummary(rulesData) {
   });
 
   const availableTiers = getCouplingRuleTiers(rules);
+  const maxAvailableTier = availableTiers.length > 0 ? Math.max(...availableTiers) : 61;
   const tiers = {};
   availableTiers.forEach(t => {
     tiers[t] = {
@@ -1128,6 +1129,8 @@ function getActiveCouplingsSummary(rulesData) {
       couplings: []
     };
   });
+
+  const exceededTierCouplings = [];
 
   couplingsMap.forEach((cData, cTypeKey) => {
     const cInfo = lookupCouplingInfo(cTypeKey, couplingCatalog);
@@ -1139,6 +1142,21 @@ function getActiveCouplingsSummary(rulesData) {
         reason: `Муфта «${cTypeKey}» отсутствует в «Справочнике муфт» (используется для кабелей: ${Array.from(cData.cableTypes).join(', ')}, ${cData.count} шт.)`
       });
     }
+
+    const coresCount = Number(cInfo.maxCores) || 0;
+    const isTierExceeded = coresCount > maxAvailableTier;
+    if (isTierExceeded) {
+      exceededTierCouplings.push({
+        couplingType: cTypeKey,
+        fullName: cInfo.fullName,
+        maxCores: coresCount,
+        assignedTier: maxAvailableTier,
+        count: cData.count,
+        usedInCables: Array.from(cData.cableTypes),
+        reason: `Муфта «${cTypeKey}» (емкость: ${coresCount} жил) превышает максимальную сметную группу норм (до ${maxAvailableTier} жил). Начислена предельная расценка до ${maxAvailableTier} жил (${cData.count} шт.)`
+      });
+    }
+
     const tier = getCouplingInstallationTier(cInfo.maxCores, rules);
     if (!tiers[tier]) {
       tiers[tier] = {
@@ -1156,6 +1174,8 @@ function getActiveCouplingsSummary(rulesData) {
       unit: cInfo.unit || 'шт',
       count: cData.count,
       tier: tier,
+      isTierExceeded,
+      maxAvailableTier,
       cableTypes: Array.from(cData.cableTypes),
       cables: cData.cables,
       showFormula: cInfo.showFormula,
@@ -1176,7 +1196,9 @@ function getActiveCouplingsSummary(rulesData) {
     couplingsList: Array.from(couplingsMap.values()),
     missingCouplings,
     missingInCatalog,
-    hasMissingInfo: missingCouplings.length > 0 || missingInCatalog.length > 0
+    exceededTierCouplings,
+    maxAvailableTier,
+    hasMissingInfo: missingCouplings.length > 0 || missingInCatalog.length > 0 || exceededTierCouplings.length > 0
   };
 }
 
@@ -2704,7 +2726,7 @@ function calculateVolumes(options = {}) {
   const trenchMissingCount = (trenchWorksCalc && trenchWorksCalc.missingInRules) ? trenchWorksCalc.missingInRules.length : 0;
   const equipmentMissingCount = (equipmentWorksCalc && equipmentWorksCalc.missingInRules) ? equipmentWorksCalc.missingInRules.length : 0;
   const couplingMissingCount = couplingsSummary.hasMissingInfo
-    ? ((couplingsSummary.missingCouplings || []).length + (couplingsSummary.missingInCatalog || []).length)
+    ? ((couplingsSummary.missingCouplings || []).length + (couplingsSummary.missingInCatalog || []).length + (couplingsSummary.exceededTierCouplings || []).length)
     : 0;
 
   const allFormulaErrors = [
@@ -3610,7 +3632,7 @@ function renderCouplingsResult(couplingsSummary) {
   const couplingMissingBadge = document.getElementById('couplingMissingBadge');
   if (couplingMissingBadge) {
     if (couplingsSummary.hasMissingInfo) {
-      const missingTotal = (couplingsSummary.missingCouplings || []).length + (couplingsSummary.missingInCatalog || []).length;
+      const missingTotal = (couplingsSummary.missingCouplings || []).length + (couplingsSummary.missingInCatalog || []).length + (couplingsSummary.exceededTierCouplings || []).length;
       couplingMissingBadge.classList.remove('d-none');
       couplingMissingBadge.innerHTML = `<i class='bx bx-error-circle me-1'></i>Неполные данные (${missingTotal})`;
       couplingMissingBadge.onclick = () => openWorksRulesModal('couplings');
@@ -3638,6 +3660,13 @@ function renderCouplingsResult(couplingsSummary) {
         );
       });
     }
+    if (couplingsSummary.exceededTierCouplings && couplingsSummary.exceededTierCouplings.length > 0) {
+      couplingsSummary.exceededTierCouplings.forEach(ec => {
+        missingItemsList.push(
+          `<li><strong>Муфта «${escapeHtml(ec.couplingType)}»</strong> (${ec.count} шт, емкость: ${ec.maxCores} жил): превышает максимальную группу сметных норм (до ${ec.assignedTier} жил). Начислена предельная расценка группы до ${ec.assignedTier} жил.</li>`
+        );
+      });
+    }
 
     missingAlertHtml = `
       <div class="alert alert-warning py-2 px-3 small mb-2 border-warning shadow-sm">
@@ -3648,12 +3677,9 @@ function renderCouplingsResult(couplingsSummary) {
               <div class="fw-bold text-dark mb-1">
                 Внимание: неполная информация о соединительных муфтах (${missingItemsList.length} поз.)
               </div>
-              <ul class="mb-1 ps-3 text-muted" style="font-size: 0.8rem; line-height: 1.35;">
+              <ul class="mb-0 ps-3 text-muted" style="font-size: 0.8rem; line-height: 1.35;">
                 ${missingItemsList.join('')}
               </ul>
-              <div class="text-muted" style="font-size: 0.75rem;">
-                Рекомендуется добавить отсутствующие марки муфт в «Справочник муфт» или указать муфты в справочнике кабелей для точного формирования сметных норм.
-              </div>
             </div>
           </div>
           <button type="button" class="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('couplings')">
@@ -3737,8 +3763,9 @@ function renderCouplingsResult(couplingsSummary) {
         <td class="cell-wrap">
           <div class="fw-bold text-dark font-monospace" style="font-size: 0.88rem;">${escapeHtml(coupling.couplingType)}${missingWarning}</div>
           <div class="text-muted small mt-0_5" style="font-size: 0.75rem; line-height: 1.35;">${escapeHtml(coupling.fullName)}</div>
-          <div class="mt-1">
+          <div class="mt-1 d-flex align-items-center gap-1 flex-wrap">
             <span class="badge bg-info-subtle text-info-emphasis border" style="font-size: 0.68rem;">группа монтажа до ${coupling.tier || getCouplingInstallationTier(coupling.maxCores)} жил</span>
+            ${coupling.isTierExceeded ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="font-size: 0.66rem;" title="Емкость муфты (${coupling.maxCores} жил) превышает максимальную сметную группу (до ${coupling.maxAvailableTier} жил). Начислена предельная расценка."><i class="bx bx-error-circle me-0_5"></i>превышает макс. группу норм (${coupling.maxCores} > ${coupling.maxAvailableTier} жил)</span>` : ''}
           </div>
         </td>
         <td class="text-center align-middle">
