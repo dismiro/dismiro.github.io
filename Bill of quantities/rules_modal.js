@@ -30,18 +30,30 @@ function setWorksJsonEditorValue(val) {
   }
 }
 
-// Helper to safely parse and synchronize currentWorksRules from the editor if valid
-function syncCurrentRulesFromEditorIfValid() {
+// Draft rules object currently active within the modal editor
+let modalDraftRules = null;
+
+// Get current working draft rules from CodeMirror editor without modifying global currentWorksRules
+function getDraftRulesFromEditor() {
   try {
     const val = getWorksJsonEditorValue();
-    if (!val) return;
+    if (!val) {
+      return modalDraftRules || currentWorksRules || cachedDefaultRules || {};
+    }
     const parsed = JSON.parse(val);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      currentWorksRules = parsed;
+      modalDraftRules = parsed;
+      return parsed;
     }
   } catch {
     // ignore syntax error while user is actively typing in JSON
   }
+  return modalDraftRules || currentWorksRules || cachedDefaultRules || {};
+}
+
+// Backward compatible helper: updates internal modal draft cache only, NEVER overwrites global currentWorksRules
+function syncCurrentRulesFromEditorIfValid() {
+  return getDraftRulesFromEditor();
 }
 
 // Initialize rules on page load from external works_rules.json
@@ -53,7 +65,8 @@ async function initWorksRules() {
       if (data && typeof data === 'object') {
         cachedDefaultRules = JSON.parse(JSON.stringify(data));
         currentWorksRules = JSON.parse(JSON.stringify(data));
-        renderRulesModalContent();
+        modalDraftRules = JSON.parse(JSON.stringify(data));
+        renderRulesModalContent(currentWorksRules);
         if (currentData) {
           calculateVolumes();
         }
@@ -65,7 +78,7 @@ async function initWorksRules() {
   }
 }
 
-// Upload custom rules JSON
+// Upload custom rules JSON into editor draft (requires clicking Apply & Recalculate to commit)
 async function handleRulesFileInput(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -78,22 +91,17 @@ async function handleRulesFileInput(e) {
       return;
     }
 
-    currentWorksRules = parsed;
+    modalDraftRules = parsed;
 
-    // Synchronize editor textarea and CodeMirror if modal exists
-    setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+    // Synchronize editor textarea and CodeMirror
+    setWorksJsonEditorValue(JSON.stringify(parsed, null, 2));
     validateWorksJsonInput();
 
-    renderRulesModalContent();
-    const sections = getRulesSections(currentWorksRules);
+    renderRulesModalContent(parsed);
+    const sections = getRulesSections(parsed);
     let totalWays = 0;
     sections.forEach(s => totalWays += s.rules.length);
-    showToast(`Сметные нормы успешно загружены из «${file.name}» (${totalWays} способов в ${sections.length} разд.). Выполнен автоматический перерасчет работ.`, 'success', 'Перерасчет выполнен');
-
-    // Refresh calculation if data is loaded
-    if (currentData) {
-      calculateVolumes();
-    }
+    showToast(`Сметные нормы из «${file.name}» загружены в редактор (${totalWays} способов в ${sections.length} разд.). Нажмите «Применить и пересчитать», чтобы активировать их.`, 'info', 'Файл загружен в редактор');
   } catch (err) {
     showToast('Ошибка синтаксиса JSON: ' + err.message, 'error', 'Ошибка файла');
   } finally {
@@ -101,29 +109,30 @@ async function handleRulesFileInput(e) {
   }
 }
 
-// Reset rules to standard works_rules.json
+// Reset rules in editor draft to standard works_rules.json (requires clicking Apply & Recalculate to commit)
 async function resetWorksRules() {
+  let defaultData = null;
   try {
     const res = await fetch('./works_rules.json?t=' + Date.now());
     if (res.ok) {
       const data = await res.json();
       cachedDefaultRules = JSON.parse(JSON.stringify(data));
-      currentWorksRules = JSON.parse(JSON.stringify(data));
+      defaultData = JSON.parse(JSON.stringify(data));
     } else if (cachedDefaultRules) {
-      currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules));
+      defaultData = JSON.parse(JSON.stringify(cachedDefaultRules));
     }
   } catch (err) {
     if (cachedDefaultRules) {
-      currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules));
+      defaultData = JSON.parse(JSON.stringify(cachedDefaultRules));
     }
   }
 
-  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
-  validateWorksJsonInput();
-  renderRulesModalContent();
-  showToast('Сметные нормы сброшены к стандартному файлу works_rules.json. Выполнен перерасчет работ.', 'info', 'Сброс правил');
-  if (currentData) {
-    calculateVolumes();
+  if (defaultData) {
+    modalDraftRules = defaultData;
+    setWorksJsonEditorValue(JSON.stringify(defaultData, null, 2));
+    validateWorksJsonInput();
+    renderRulesModalContent(defaultData);
+    showToast('Стандартные нормы загружены в редактор. Нажмите «Применить и пересчитать», чтобы активировать их.', 'info', 'Сброс в редакторе');
   }
 }
 
@@ -261,19 +270,20 @@ function renderModalWorkItemHtml(w, wIdx, options = {}) {
 }
 
 // Render rules modal cards, cable catalog, couplings, equipment and settings tabs
-function renderRulesModalContent() {
+function renderRulesModalContent(rulesObj = null) {
   const container = document.getElementById('rulesListContainer');
   const countBadge = document.getElementById('worksRulesCountBadge');
+  const rules = rulesObj || getDraftRulesFromEditor();
   
   // Render cables, couplings, equipment and settings tabs content
-  renderCableCatalogModalContent();
-  renderCouplingCatalogModalContent();
-  renderEquipmentCatalogModalContent();
-  renderSettingsModalContent();
+  renderCableCatalogModalContent(rules);
+  renderCouplingCatalogModalContent(rules);
+  renderEquipmentCatalogModalContent(rules);
+  renderSettingsModalContent(rules);
 
   if (!container) return;
 
-  const sections = getRulesSections(currentWorksRules);
+  const sections = getRulesSections(rules);
   let totalRulesCount = 0;
   let totalWorksCount = 0;
 
@@ -582,13 +592,14 @@ function renderRulesModalContent() {
 }
 
 // Render Cable Catalog Tab Content
-function renderCableCatalogModalContent() {
+function renderCableCatalogModalContent(rulesObj = null) {
   const container = document.getElementById('cableCatalogContainer');
   const tabBadge = document.getElementById('tabWorksCablesCountBadge');
   if (!container) return;
 
-  // Extract catalog from current rules or default
-  const catalog = getCableCatalog(currentWorksRules) || {};
+  const rules = rulesObj || getDraftRulesFromEditor();
+  // Extract catalog from draft rules or default
+  const catalog = getCableCatalog(rules) || {};
   const groups = Object.keys(catalog);
 
   // Search filter query
@@ -775,12 +786,13 @@ function getEquipmentItemWorksObject(item) {
   return {};
 }
 
-function renderEquipmentCatalogModalContent() {
+function renderEquipmentCatalogModalContent(rulesObj = null) {
   const container = document.getElementById('equipmentCatalogContainer');
   const tabBadge = document.getElementById('tabWorksEquipmentCountBadge');
   if (!container) return;
 
-  const equipmentList = getEquipmentRulesList(currentWorksRules);
+  const rules = rulesObj || getDraftRulesFromEditor();
+  const equipmentList = getEquipmentRulesList(rules);
   const totalEquipmentCount = equipmentList.length;
 
   if (tabBadge) {
@@ -958,9 +970,9 @@ function renderEquipmentCatalogModalContent() {
 // --------------------------------------------------------------------------
 
 // Render the Settings tab content in Works Rules Modal
-function renderSettingsModalContent() {
-  syncCurrentRulesFromEditorIfValid();
-  const settings = getRulesSettings(currentWorksRules);
+function renderSettingsModalContent(rulesObj = null) {
+  const rules = rulesObj || getDraftRulesFromEditor();
+  const settings = getRulesSettings(rules);
 
   const numSelect = document.getElementById('settingNumberingMode');
   if (numSelect) numSelect.value = settings.numberingMode;
@@ -984,9 +996,9 @@ function renderSettingsModalContent() {
   if (pluginVerInput) pluginVerInput.value = settings.pluginVersion;
 }
 
-// Save settings from UI form into currentWorksRules["Настройки"] and CodeMirror editor
+// Save settings from UI form into draft JSON and CodeMirror editor (without applying to active rules)
 function saveSettingsFromUiToJson(showToastNotification = true) {
-  syncCurrentRulesFromEditorIfValid();
+  const currentDraft = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
 
   const numMode = document.getElementById('settingNumberingMode')?.value || 'иерархическая';
   const decWorks = parseInt(document.getElementById('settingDecimalsWorks')?.value, 10);
@@ -1006,34 +1018,26 @@ function saveSettingsFromUiToJson(showToastNotification = true) {
     "ОкруглениеМатериалов": !isNaN(decMats) ? Math.max(0, Math.min(10, decMats)) : 3
   };
 
-  if (!currentWorksRules || typeof currentWorksRules !== 'object') {
-    currentWorksRules = {};
-  }
-
   // Preserve order with Настройки at top
-  const newRulesObj = {
+  const newDraftObj = {
     "Настройки": updatedSettings
   };
-  for (const [k, v] of Object.entries(currentWorksRules)) {
+  for (const [k, v] of Object.entries(currentDraft)) {
     if (k !== "Настройки") {
-      newRulesObj[k] = v;
+      newDraftObj[k] = v;
     }
   }
 
-  currentWorksRules = newRulesObj;
-  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
-
-  // Recalculate if data is currently loaded
-  if (currentData && typeof calculateVolumes === 'function') {
-    calculateVolumes();
-  }
+  modalDraftRules = newDraftObj;
+  setWorksJsonEditorValue(JSON.stringify(newDraftObj, null, 2));
+  validateWorksJsonInput();
 
   if (showToastNotification) {
-    showToast('Параметры сохранены и синхронизированы в JSON', 'success', 'Настройки');
+    showToast('Параметры обновлены в редакторе JSON. Нажмите «Применить и пересчитать», чтобы применить изменения.', 'info', 'Настройки');
   }
 }
 
-// Reset settings to defaults
+// Reset settings in draft editor to defaults (without applying to active rules)
 function resetDefaultSettings() {
   const defaultSettings = {
     "ТипНумерации": "иерархическая",
@@ -1045,27 +1049,35 @@ function resetDefaultSettings() {
     "ОкруглениеМатериалов": 3
   };
 
-  currentWorksRules["Настройки"] = defaultSettings;
-  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
-  renderSettingsModalContent();
-
-  if (currentData && typeof calculateVolumes === 'function') {
-    calculateVolumes();
+  const currentDraft = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
+  const newDraftObj = {
+    "Настройки": defaultSettings
+  };
+  for (const [k, v] of Object.entries(currentDraft)) {
+    if (k !== "Настройки") {
+      newDraftObj[k] = v;
+    }
   }
 
-  showToast('Настройки сброшены к стандартным значениям', 'info', 'Сброс настроек');
+  modalDraftRules = newDraftObj;
+  setWorksJsonEditorValue(JSON.stringify(newDraftObj, null, 2));
+  validateWorksJsonInput();
+  renderSettingsModalContent(newDraftObj);
+
+  showToast('Настройки в редакторе сброшены к стандартным значениям. Нажмите «Применить и пересчитать», чтобы применить их.', 'info', 'Сброс настроек');
 }
 
 // --------------------------------------------------------------------------
 // RENDER COUPLING CATALOG TAB IN WORKS RULES MODAL
 // --------------------------------------------------------------------------
 
-function renderCouplingCatalogModalContent() {
+function renderCouplingCatalogModalContent(rulesObj = null) {
   const container = document.getElementById('couplingCatalogContainer');
   const tabBadge = document.getElementById('tabWorksCouplingsCountBadge');
   if (!container) return;
 
-  const catalog = getCouplingCatalog(currentWorksRules) || {};
+  const rules = rulesObj || getDraftRulesFromEditor();
+  const catalog = getCouplingCatalog(rules) || {};
   const entries = Object.entries(catalog);
   const totalCouplingsCount = entries.length;
 
@@ -1349,14 +1361,16 @@ function openWorksRulesModal(activeTab = 'editor') {
 
   try {
     initWorksJsonCodeMirror();
-    setWorksJsonEditorValue(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} }, null, 2));
+    const activeRulesCopy = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} }));
+    modalDraftRules = activeRulesCopy;
+    setWorksJsonEditorValue(JSON.stringify(activeRulesCopy, null, 2));
     validateWorksJsonInput();
   } catch (err) {
     console.warn('Editor sync warning:', err);
   }
 
   try {
-    renderRulesModalContent();
+    renderRulesModalContent(modalDraftRules);
   } catch (err) {
     console.warn('Modal content render warning:', err);
   }
@@ -1618,14 +1632,13 @@ function setupWorksRulesListeners() {
       }
       currentObj[targetKey][sampleRuleName] = sample;
 
-      currentWorksRules = currentObj;
-
+      modalDraftRules = currentObj;
       setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
       validateWorksJsonInput();
 
       highlightAndScrollToJsonNode(sampleRuleName, false);
 
-      showToast(`Шаблон нового способа «${sampleRuleName}» добавлен в раздел «${targetKey}». Отредактируйте параметры и примените.`, 'success', 'Способ добавлен', 6000);
+      showToast(`Шаблон нового способа «${sampleRuleName}» добавлен в раздел «${targetKey}». Отредактируйте параметры и нажмите «Применить и пересчитать».`, 'success', 'Способ добавлен', 6000);
     } catch (err) {
       showToast('Ошибка при добавлении шаблона: ' + err.message, 'error', 'Ошибка');
     }
@@ -1723,14 +1736,13 @@ function setupWorksRulesListeners() {
         "Полное описание": `${defaultDesc} ${sampleMark}`
       };
 
-      currentWorksRules = currentObj;
-
+      modalDraftRules = currentObj;
       setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
       validateWorksJsonInput();
 
       highlightAndScrollToJsonNode(sampleMark, true);
 
-      showToast(`Шаблон кабеля «${sampleMark}» добавлен в «Справочник кабелей» (категория: «${targetCategoryName}»). Отредактируйте параметры и примените.`, 'success', 'Шаблон кабеля добавлен', 6000);
+      showToast(`Шаблон кабеля «${sampleMark}» добавлен в «Справочник кабелей» (категория: «${targetCategoryName}»). Отредактируйте параметры и нажмите «Применить и пересчитать».`, 'success', 'Шаблон кабеля добавлен', 6000);
     } catch (err) {
       showToast('Ошибка при добавлении шаблона кабеля: ' + err.message, 'error', 'Ошибка');
     }
@@ -1789,49 +1801,44 @@ function setupWorksRulesListeners() {
         "Единицы измерения": "шт"
       };
 
-      currentWorksRules = currentObj;
-
+      modalDraftRules = currentObj;
       setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
       validateWorksJsonInput();
 
       highlightAndScrollToJsonNode(sampleMark, true);
 
-      showToast(`Шаблон муфты «${sampleMark}» добавлен в «Справочник муфт». Отредактируйте параметры и примените.`, 'success', 'Шаблон муфты добавлен', 6000);
+      showToast(`Шаблон муфты «${sampleMark}» добавлен в «Справочник муфт». Отредактируйте параметры и нажмите «Применить и пересчитать».`, 'success', 'Шаблон муфты добавлен', 6000);
     } catch (err) {
       showToast('Ошибка при добавлении шаблона муфты: ' + err.message, 'error', 'Ошибка');
     }
   };
 
-  // Tab show listeners to auto-refresh visual tabs with latest JSON data
+  // Tab show listeners to auto-refresh visual tabs with latest JSON data (without modifying current active rules)
   const cardsTabBtn = document.getElementById('tabWorksCardsBtn');
   if (cardsTabBtn) {
     cardsTabBtn.addEventListener('shown.bs.tab', () => {
-      syncCurrentRulesFromEditorIfValid();
-      renderRulesModalContent();
+      renderRulesModalContent(getDraftRulesFromEditor());
     });
   }
 
   const cablesTabBtn = document.getElementById('tabWorksCablesBtn');
   if (cablesTabBtn) {
     cablesTabBtn.addEventListener('shown.bs.tab', () => {
-      syncCurrentRulesFromEditorIfValid();
-      renderCableCatalogModalContent();
+      renderCableCatalogModalContent(getDraftRulesFromEditor());
     });
   }
 
   const couplingsTabBtn = document.getElementById('tabWorksCouplingsBtn');
   if (couplingsTabBtn) {
     couplingsTabBtn.addEventListener('shown.bs.tab', () => {
-      syncCurrentRulesFromEditorIfValid();
-      renderCouplingCatalogModalContent();
+      renderCouplingCatalogModalContent(getDraftRulesFromEditor());
     });
   }
 
   const equipmentTabBtn = document.getElementById('tabWorksEquipmentBtn');
   if (equipmentTabBtn) {
     equipmentTabBtn.addEventListener('shown.bs.tab', () => {
-      syncCurrentRulesFromEditorIfValid();
-      renderEquipmentCatalogModalContent();
+      renderEquipmentCatalogModalContent(getDraftRulesFromEditor());
     });
   }
 
@@ -1839,8 +1846,7 @@ function setupWorksRulesListeners() {
   const settingsTabBtn = document.getElementById('tabWorksSettingsBtn');
   if (settingsTabBtn) {
     settingsTabBtn.addEventListener('shown.bs.tab', () => {
-      syncCurrentRulesFromEditorIfValid();
-      renderSettingsModalContent();
+      renderSettingsModalContent(getDraftRulesFromEditor());
     });
   }
 
@@ -1915,14 +1921,13 @@ function setupWorksRulesListeners() {
         }
       };
 
-      currentWorksRules = currentObj;
-
+      modalDraftRules = currentObj;
       setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
       validateWorksJsonInput();
 
       highlightAndScrollToJsonNode(sampleMark, true);
 
-      showToast(`Шаблон оборудования «${sampleMark}» добавлен в раздел «Оборудование». Отредактируйте параметры и примените.`, 'success', 'Оборудование добавлено', 6000);
+      showToast(`Шаблон оборудования «${sampleMark}» добавлен в раздел «Оборудование». Отредактируйте параметры и нажмите «Применить и пересчитать».`, 'success', 'Оборудование добавлено', 6000);
     } catch (err) {
       showToast('Ошибка при добавлении оборудования: ' + err.message, 'error', 'Ошибка');
     }
@@ -1999,8 +2004,10 @@ function setupWorksRulesListeners() {
         }
 
         currentWorksRules = parsed;
+        window.currentWorksRules = currentWorksRules;
+        modalDraftRules = JSON.parse(JSON.stringify(parsed));
 
-        renderRulesModalContent();
+        renderRulesModalContent(currentWorksRules);
 
         // Recalculate volumes if data is loaded
         if (currentData) {
@@ -2024,23 +2031,22 @@ function setupWorksRulesListeners() {
 }
 
 // Add missing trench types to rules and open editor
+// Add missing trench types to draft rules and open editor
 function addMissingTrenchTypesToRules(missingList) {
   if (!missingList || missingList.length === 0) return;
 
-  if (!currentWorksRules) {
-    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": {} }));
-  }
-  if (!currentWorksRules["Строительные работы"] || typeof currentWorksRules["Строительные работы"] !== 'object' || Array.isArray(currentWorksRules["Строительные работы"])) {
-    currentWorksRules["Строительные работы"] = {};
+  const draftObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || { "Строительные работы": {} }));
+  if (!draftObj["Строительные работы"] || typeof draftObj["Строительные работы"] !== 'object' || Array.isArray(draftObj["Строительные работы"])) {
+    draftObj["Строительные работы"] = {};
   }
 
   let addedCount = 0;
   missingList.forEach(m => {
     const typeName = (typeof m === 'object' ? (m.ruleName || m.type) : m) || '';
     if (!typeName) return;
-    const existingKey = Object.keys(currentWorksRules["Строительные работы"]).find(k => matchesRule(typeName, k));
+    const existingKey = Object.keys(draftObj["Строительные работы"]).find(k => matchesRule(typeName, k));
     if (!existingKey) {
-      currentWorksRules["Строительные работы"][typeName] = {
+      draftObj["Строительные работы"][typeName] = {
         "Работы": [
           {
             "Наименование": `Разработка грунта в траншеях (${typeName})`,
@@ -2064,21 +2070,20 @@ function addMissingTrenchTypesToRules(missingList) {
     }
   });
 
+  modalDraftRules = draftObj;
   openWorksRulesModal('editor');
-  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+  setWorksJsonEditorValue(JSON.stringify(draftObj, null, 2));
   validateWorksJsonInput();
   showToast(`Добавлено способов прокладки в раздел «Строительные работы»: ${addedCount}. Отредактируйте формулы и нажмите «Применить и пересчитать».`, 'info', 'Правила дополнены');
 }
 
-// Add missing cable routing types or missing work items to "Монтажные работы" in rules and open editor
+// Add missing cable routing types or missing work items to "Монтажные работы" in draft rules and open editor
 function addMissingCableWaysToRules(missingList) {
   if (!missingList || missingList.length === 0) return;
 
-  if (!currentWorksRules) {
-    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {} }));
-  }
-  if (!currentWorksRules["Монтажные работы"] || typeof currentWorksRules["Монтажные работы"] !== 'object' || Array.isArray(currentWorksRules["Монтажные работы"])) {
-    currentWorksRules["Монтажные работы"] = {};
+  const draftObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {} }));
+  if (!draftObj["Монтажные работы"] || typeof draftObj["Монтажные работы"] !== 'object' || Array.isArray(draftObj["Монтажные работы"])) {
+    draftObj["Монтажные работы"] = {};
   }
 
   const createDefaultMrObj = (typeName) => ({
@@ -2128,15 +2133,15 @@ function addMissingCableWaysToRules(missingList) {
   missingList.forEach(m => {
     const typeName = (typeof m === 'object' ? (m.ruleName || m.type) : m) || '';
     if (!typeName) return;
-    const existingKey = Object.keys(currentWorksRules["Монтажные работы"]).find(k => matchesRule(typeName, k));
+    const existingKey = Object.keys(draftObj["Монтажные работы"]).find(k => matchesRule(typeName, k));
     if (!existingKey) {
-      currentWorksRules["Монтажные работы"][typeName] = {
+      draftObj["Монтажные работы"][typeName] = {
         "Шаблон": `Прокладка кабеля массой 1 м, кг, до: {масса} (${typeName})`,
         "Работы": createDefaultMrObj(typeName)
       };
       addedCount++;
     } else {
-      const targetRule = currentWorksRules["Монтажные работы"][existingKey];
+      const targetRule = draftObj["Монтажные работы"][existingKey];
       if (!targetRule["Работы"] || typeof targetRule["Работы"] !== 'object') {
         targetRule["Работы"] = createDefaultMrObj(existingKey);
         addedCount++;
@@ -2176,34 +2181,33 @@ function addMissingCableWaysToRules(missingList) {
     }
   });
 
+  modalDraftRules = draftObj;
   openWorksRulesModal('editor');
-  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+  setWorksJsonEditorValue(JSON.stringify(draftObj, null, 2));
   validateWorksJsonInput();
   showToast(`Добавлено позиций в раздел «Монтажные работы»: ${addedCount}. Отредактируйте наименования/формулы и нажмите «Применить и пересчитать».`, 'info', 'Правила дополнены');
 }
 
-// Add missing cable types to "Справочник кабелей" in rules and open editor
+// Add missing cable types to "Справочник кабелей" in draft rules and open editor
 function addMissingCablesToCatalog(missingList) {
   if (!missingList || missingList.length === 0) return;
 
-  if (!currentWorksRules) {
-    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {} }));
-  }
-  if (!currentWorksRules["Справочник кабелей"] || typeof currentWorksRules["Справочник кабелей"] !== 'object') {
+  const draftObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {} }));
+  if (!draftObj["Справочник кабелей"] || typeof draftObj["Справочник кабелей"] !== 'object') {
     const existingCat = (cachedDefaultRules && cachedDefaultRules["Справочник кабелей"]) ? cachedDefaultRules["Справочник кабелей"] : {};
-    currentWorksRules["Справочник кабелей"] = JSON.parse(JSON.stringify(existingCat));
+    draftObj["Справочник кабелей"] = JSON.parse(JSON.stringify(existingCat));
   }
-  if (!currentWorksRules["Справочник кабелей"]["Особый кабель"]) {
-    currentWorksRules["Справочник кабелей"]["Особый кабель"] = { "Название": "Особый кабель", "Тип": {} };
+  if (!draftObj["Справочник кабелей"]["Особый кабель"]) {
+    draftObj["Справочник кабелей"]["Особый кабель"] = { "Название": "Особый кабель", "Тип": {} };
   }
-  if (!currentWorksRules["Справочник кабелей"]["Особый кабель"]["Тип"] || typeof currentWorksRules["Справочник кабелей"]["Особый кабель"]["Тип"] !== 'object') {
-    currentWorksRules["Справочник кабелей"]["Особый кабель"]["Тип"] = {};
+  if (!draftObj["Справочник кабелей"]["Особый кабель"]["Тип"] || typeof draftObj["Справочник кабелей"]["Особый кабель"]["Тип"] !== 'object') {
+    draftObj["Справочник кабелей"]["Особый кабель"]["Тип"] = {};
   }
-  if (!currentWorksRules["Справочник кабелей"]["Оптический кабель"]) {
-    currentWorksRules["Справочник кабелей"]["Оптический кабель"] = { "Название": "Оптический кабель", "Категория": "Оптический кабель", "Тип": {} };
+  if (!draftObj["Справочник кабелей"]["Оптический кабель"]) {
+    draftObj["Справочник кабелей"]["Оптический кабель"] = { "Название": "Оптический кабель", "Категория": "Оптический кабель", "Тип": {} };
   }
-  if (!currentWorksRules["Справочник кабелей"]["Оптический кабель"]["Тип"] || typeof currentWorksRules["Справочник кабелей"]["Оптический кабель"]["Тип"] !== 'object') {
-    currentWorksRules["Справочник кабелей"]["Оптический кабель"]["Тип"] = {};
+  if (!draftObj["Справочник кабелей"]["Оптический кабель"]["Тип"] || typeof draftObj["Справочник кабелей"]["Оптический кабель"]["Тип"] !== 'object') {
+    draftObj["Справочник кабелей"]["Оптический кабель"]["Тип"] = {};
   }
 
   let addedCount = 0;
@@ -2214,8 +2218,8 @@ function addMissingCablesToCatalog(missingList) {
     const isOpt = Boolean(m && typeof m === 'object' && m.isOptical);
     const targetSection = isOpt ? "Оптический кабель" : "Особый кабель";
 
-    if (!currentWorksRules["Справочник кабелей"][targetSection]["Тип"][typeName]) {
-      currentWorksRules["Справочник кабелей"][targetSection]["Тип"][typeName] = isOpt ? {
+    if (!draftObj["Справочник кабелей"][targetSection]["Тип"][typeName]) {
+      draftObj["Справочник кабелей"][targetSection]["Тип"][typeName] = isOpt ? {
         "Строительная длина": 2000,
         "Муфта": "МТОК-А1/216-1Т3-44",
         "Вес": 0.28,
@@ -2232,8 +2236,9 @@ function addMissingCablesToCatalog(missingList) {
     }
   });
 
+  modalDraftRules = draftObj;
   openWorksRulesModal('editor');
-  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+  setWorksJsonEditorValue(JSON.stringify(draftObj, null, 2));
   validateWorksJsonInput();
   showToast(
     `В раздел «Справочник кабелей» добавлены заготовки для ${addedCount} марок: ${addedTypes.join(', ')}. Укажите паспортные характеристики и нажмите «Применить и пересчитать».`,
@@ -2243,18 +2248,16 @@ function addMissingCablesToCatalog(missingList) {
   );
 }
 
-// Add missing equipment items to "Оборудование" section in rules and open editor
+// Add missing equipment items to "Оборудование" section in draft rules and open editor
 function addMissingEquipmentToRules(missingList) {
   if (!missingList || missingList.length === 0) {
     showToast('Нет недостающих позиций оборудования для добавления', 'info', 'Правила');
     return;
   }
 
-  if (!currentWorksRules) {
-    currentWorksRules = JSON.parse(JSON.stringify(cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} }));
-  }
-  if (!currentWorksRules["Оборудование"] || typeof currentWorksRules["Оборудование"] !== 'object' || Array.isArray(currentWorksRules["Оборудование"])) {
-    currentWorksRules["Оборудование"] = {};
+  const draftObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} }));
+  if (!draftObj["Оборудование"] || typeof draftObj["Оборудование"] !== 'object' || Array.isArray(draftObj["Оборудование"])) {
+    draftObj["Оборудование"] = {};
   }
 
   let addedCount = 0;
@@ -2283,11 +2286,11 @@ function addMissingEquipmentToRules(missingList) {
       }
     ];
 
-    let existingEntry = currentWorksRules["Оборудование"][mark];
+    let existingEntry = draftObj["Оборудование"][mark];
     if (!existingEntry) {
-      const foundKey = Object.keys(currentWorksRules["Оборудование"]).find(k => k.trim().toLowerCase() === mark.toLowerCase());
+      const foundKey = Object.keys(draftObj["Оборудование"]).find(k => k.trim().toLowerCase() === mark.toLowerCase());
       if (foundKey) {
-        existingEntry = currentWorksRules["Оборудование"][foundKey];
+        existingEntry = draftObj["Оборудование"][foundKey];
       }
     }
 
@@ -2301,7 +2304,7 @@ function addMissingEquipmentToRules(missingList) {
         addedMarks.push(`${mark} [${method}]`);
       }
     } else {
-      currentWorksRules["Оборудование"][mark] = {
+      draftObj["Оборудование"][mark] = {
         "Работы": {
           [method]: newWorksForMethod
         }
@@ -2311,15 +2314,16 @@ function addMissingEquipmentToRules(missingList) {
     }
   });
 
+  modalDraftRules = draftObj;
   openWorksRulesModal('editor');
-  setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+  setWorksJsonEditorValue(JSON.stringify(draftObj, null, 2));
   validateWorksJsonInput();
   if (addedMarks.length > 0) {
     const firstMark = addedMarks[0].split(' ')[0];
     highlightAndScrollToJsonNode(firstMark, true);
   }
   showToast(
-    `В раздел «Оборудование» добавлены заготовки для ${addedCount} позиций: ${addedMarks.join(', ')}. Скорректируйте наименования/формулы и сохраните JSON.`,
+    `В раздел «Оборудование» добавлены заготовки для ${addedCount} позиций: ${addedMarks.join(', ')}. Скорректируйте наименования/формулы и нажмите «Применить и пересчитать».`,
     'info',
     'Раздел оборудования дополнен',
     8000
