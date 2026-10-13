@@ -20,7 +20,8 @@ function getRuleWorks(rule) {
               ...mat,
               "Тип": mat["Тип"] || mat.type || "материал",
               "Раздел": mat["Раздел"] || item["Раздел"] || rule["Раздел"],
-              parentWorkName: item["Наименование"]
+              parentWorkName: item["Наименование"],
+              parentWorkUnit: item["Единицы измерения"] || item.unit || ''
             });
           }
         });
@@ -30,7 +31,8 @@ function getRuleWorks(rule) {
               ...eq,
               "Тип": eq["Тип"] || eq.type || "оборудование",
               "Раздел": eq["Раздел"] || item["Раздел"] || rule["Раздел"],
-              parentWorkName: item["Наименование"]
+              parentWorkName: item["Наименование"],
+              parentWorkUnit: item["Единицы измерения"] || item.unit || ''
             });
           }
         });
@@ -54,6 +56,7 @@ function getRuleWorks(rule) {
                   "Тип": mat["Тип"] || mat.type || "материал",
                   "Раздел": mat["Раздел"] || item["Раздел"] || rule["Раздел"],
                   parentWorkName: item["Наименование"],
+                  parentWorkUnit: item["Единицы измерения"] || item.unit || '',
                   _tierKey: tierKey
                 });
               }
@@ -65,6 +68,7 @@ function getRuleWorks(rule) {
                   "Тип": eq["Тип"] || eq.type || "оборудование",
                   "Раздел": eq["Раздел"] || item["Раздел"] || rule["Раздел"],
                   parentWorkName: item["Наименование"],
+                  parentWorkUnit: item["Единицы измерения"] || item.unit || '',
                   _tierKey: tierKey
                 });
               }
@@ -4118,6 +4122,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           return t !== 'материал' && t !== 'оборудование';
         }) || works[0];
         const primaryTrenchWorkTitle = primaryTrenchWork ? (primaryTrenchWork["Наименование"] || primaryTrenchWork.name || ruleName).trim() : ruleName;
+        const primaryTrenchWorkUnit = primaryTrenchWork ? (primaryTrenchWork["Единицы измерения"] || primaryTrenchWork.unit || '').trim() : '';
 
         calculatedWorks.push({
           name: work["Наименование"] || work.name || '',
@@ -4136,6 +4141,8 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           section: targetSection,
           type: determinedWorkType,
           parentWorkName: work.parentWorkName || ((isSubWork && primaryTrenchWork !== work) ? primaryTrenchWorkTitle : undefined),
+          parentWorkUnit: work.parentWorkUnit || ((isSubWork && primaryTrenchWork !== work) ? primaryTrenchWorkUnit : undefined),
+          parentWorkSection: work.parentWorkSection || ((isSubWork && primaryTrenchWork !== work) ? (primaryTrenchWork["Раздел"] || primaryTrenchWork.section || targetSection) : targetSection),
           comment: work["Комментарий"] || work.comment || ''
         });
       });
@@ -4230,6 +4237,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 
       // 2. Following material lines for each coupling type
       const primaryWorkName = workItems[0] ? workItems[0].name : null;
+      const primaryWorkUnit = workItems[0] ? workItems[0].unit : null;
       tierData.couplings.forEach(coupling => {
         const showFormula = (coupling.showFormula !== undefined) ? coupling.showFormula : shouldShowFormula(coupling);
         calculatedWorks.push({
@@ -4246,6 +4254,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           section: sectionName,
           type: 'материал',
           parentWorkName: primaryWorkName,
+          parentWorkUnit: primaryWorkUnit,
+          parentWorkSection: sectionName,
           comment: `Кабели: ${coupling.cableTypes.join(', ')}`
         });
       });
@@ -4338,6 +4348,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
         const optItems = parsedWM.optical.items;
         const primaryWork = optItems.find(w => (w["Тип"] || w.type) !== 'материал') || optItems[0];
         const opticalPrimaryTitle = (primaryWork["Наименование"] || primaryWork.name || `Прокладка оптического кабеля (${ruleName})`).trim();
+        const opticalPrimaryUnit = (primaryWork["Единицы измерения"] || primaryWork.unit || 'м').trim();
 
         // Apply all works and their declared materials/equipment from the optical rules list
         optItems.forEach(work => {
@@ -4385,6 +4396,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               section: targetSection,
               type: determinedWorkType,
               parentWorkName: (isWorkSub && primaryWork !== work) ? opticalPrimaryTitle : undefined,
+              parentWorkUnit: (isWorkSub && primaryWork !== work) ? opticalPrimaryUnit : undefined,
+              parentWorkSection: (isWorkSub && primaryWork !== work) ? targetSection : undefined,
               cablesCount: opticalCables.length,
               comment: work["Комментарий"] || work.comment || ''
             });
@@ -4446,6 +4459,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                   section: matSection,
                   type: determinedMatType,
                   parentWorkName: workTitle,
+                  parentWorkUnit: (work["Единицы измерения"] || work.unit || 'м'),
+                  parentWorkSection: targetSection,
                   comment: mat["Комментарий"] || ''
                 });
               });
@@ -4477,6 +4492,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                 section: matSection,
                 type: determinedMatType,
                 parentWorkName: workTitle,
+                parentWorkUnit: (work["Единицы измерения"] || work.unit || 'м'),
+                parentWorkSection: targetSection,
                 comment: mat["Комментарий"] || ''
               });
             }
@@ -4569,6 +4586,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 
           const primaryWork = tierItems.find(w => (w["Тип"] || w.type) !== 'материал') || tierItems[0];
           let primaryWorkTitle = (primaryWork["Наименование"] || primaryWork.name || '').trim();
+          const primaryWorkUnit = (primaryWork["Единицы измерения"] || primaryWork.unit || 'м').trim();
           if (!primaryWorkTitle && template && (template.includes('{масса}') || template.includes('{вес}'))) {
             primaryWorkTitle = template.replace(/\{масса\}|\{вес\}/gi, String(tier.threshold || '')).trim();
           }
@@ -4623,6 +4641,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                 section: targetSection,
                 type: determinedWorkType,
                 parentWorkName: (isWorkSub && primaryWork !== work) ? primaryWorkTitle : undefined,
+                parentWorkUnit: (isWorkSub && primaryWork !== work) ? primaryWorkUnit : undefined,
+                parentWorkSection: (isWorkSub && primaryWork !== work) ? targetSection : undefined,
                 cablesCount: tier.cables.length,
                 comment: work["Комментарий"] || work.comment || ''
               });
@@ -4682,6 +4702,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                     section: matSection,
                     type: determinedMatType,
                     parentWorkName: workTitle,
+                    parentWorkUnit: (work["Единицы измерения"] || work.unit || 'м'),
+                    parentWorkSection: targetSection,
                     comment: mat["Комментарий"] || ''
                   });
                 });
@@ -4714,6 +4736,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                   section: matSection,
                   type: determinedMatType,
                   parentWorkName: workTitle,
+                  parentWorkUnit: (work["Единицы измерения"] || work.unit || 'м'),
+                  parentWorkSection: targetSection,
                   comment: mat["Комментарий"] || ''
                 });
               }
@@ -4857,6 +4881,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
         return t !== 'материал' && t !== 'оборудование';
       }) || ruleWorks[0];
       const primaryWorkTitle = (typeof primaryWork === 'string' ? primaryWork : (primaryWork["Наименование"] || primaryWork.name || `Монтаж оборудования ${itemMark}`)).trim();
+      const primaryWorkUnit = (typeof primaryWork === 'string' ? 'шт' : (primaryWork["Единицы измерения"] || primaryWork.unit || 'шт')).trim();
 
       ruleWorks.forEach(work => {
         if (typeof work === 'string') {
@@ -4874,6 +4899,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
             section: 'Монтажные работы',
             type: 'работа',
             parentWorkName: undefined,
+            parentWorkUnit: undefined,
             count: count,
             handles: handles,
             comment: handles.length > 0 ? `handle: ${handles.join(', ')}` : ''
@@ -4925,6 +4951,8 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
             section: targetSection,
             type: determinedWorkType,
             parentWorkName: (isWorkSub && primaryWork !== work) ? primaryWorkTitle : undefined,
+            parentWorkUnit: (isWorkSub && primaryWork !== work) ? primaryWorkUnit : undefined,
+            parentWorkSection: (isWorkSub && primaryWork !== work) ? targetSection : undefined,
             count: count,
             handles: handles,
             comment: work["Комментарий"] || work.comment || (handles.length > 0 ? `handle: ${handles.join(', ')}` : '')
@@ -4955,6 +4983,8 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
               section: targetSection,
               type: 'материал',
               parentWorkName: workTitle,
+              parentWorkUnit: unit,
+              parentWorkSection: targetSection,
               count: count,
               handles: handles,
               comment: ''
@@ -5007,6 +5037,8 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
             section: matSection,
             type: determinedMatType,
             parentWorkName: workTitle,
+            parentWorkUnit: unit,
+            parentWorkSection: targetSection,
             count: count,
             handles: handles,
             comment: mat["Комментарий"] || mat.comment || ''
@@ -5109,35 +5141,25 @@ function aggregateCalculatedWorks(rawWorksList) {
     }
   });
 
-  // Pass 2: Attach sub-items (materials or equipment) to their parent work group
+  // Pass 2: Attach sub-items (materials or equipment) to their parent work group strictly by (Section + Name + Unit)
   subItems.forEach(item => {
-    const section = (item.section || 'Монтажные работы').trim();
+    const itemSection = (item.section || 'Монтажные работы').trim();
+    const parentSection = (item.parentWorkSection || item.section || 'Монтажные работы').trim();
     const parentName = (item.parentWorkName || '').trim();
+    const parentUnit = (item.parentWorkUnit || '').trim();
     const matName = (item.name || '').trim();
     const matUnit = (item.unit || 'м').trim();
 
     let targetGroup = null;
-    if (parentName) {
+    // Strict match: Section + Name + Unit of parent work must all match
+    if (parentName && parentUnit && parentSection) {
       for (const grp of workGroups.values()) {
-        if (grp.section.toLowerCase() === section.toLowerCase() && grp.name.toLowerCase() === parentName.toLowerCase()) {
+        if (grp.section.toLowerCase() === parentSection.toLowerCase() &&
+            grp.name.toLowerCase() === parentName.toLowerCase() &&
+            grp.unit.toLowerCase() === parentUnit.toLowerCase()) {
           targetGroup = grp;
           break;
         }
-      }
-      if (!targetGroup) {
-        for (const grp of workGroups.values()) {
-          if (grp.name.toLowerCase() === parentName.toLowerCase()) {
-            targetGroup = grp;
-            break;
-          }
-        }
-      }
-    }
-
-    if (!targetGroup) {
-      const lastGroup = Array.from(workGroups.values()).reverse().find(g => g.section.toLowerCase() === section.toLowerCase());
-      if (lastGroup) {
-        targetGroup = lastGroup;
       }
     }
 
@@ -5152,7 +5174,7 @@ function aggregateCalculatedWorks(rawWorksList) {
         targetGroup.materialsMap.set(matKey, {
           name: matName,
           unit: matUnit,
-          section: section,
+          section: itemSection,
           type: item.type || determinedType,
           decimals: item.decimals !== undefined ? item.decimals : undefined,
           volume: 0,
@@ -5161,6 +5183,8 @@ function aggregateCalculatedWorks(rawWorksList) {
           handles: new Set(),
           comments: new Set(),
           parentWorkName: targetGroup.name,
+          parentWorkUnit: targetGroup.unit,
+          parentWorkSection: targetGroup.section,
           isOptical: !!item.isOptical,
           foundInCatalog: item.foundInCatalog !== undefined ? item.foundInCatalog : true,
           trenchType: item.trenchType,
@@ -5274,6 +5298,8 @@ function aggregateCalculatedWorks(rawWorksList) {
         isParentWork: false,
         isSubItem: true,
         parentWorkName: work.name,
+        parentWorkUnit: work.unit,
+        parentWorkSection: work.section,
         parentNumber: `${workIndex}`,
         handles: Array.from(mat.handles),
         comment: Array.from(mat.comments).join('; '),
@@ -5309,6 +5335,8 @@ function aggregateCalculatedWorks(rawWorksList) {
       isParentWork: false,
       isSubItem: true,
       parentWorkName: orphan.parentWorkName || (isEquip ? 'Прочее оборудование' : 'Прочие материалы'),
+      parentWorkUnit: orphan.parentWorkUnit || '',
+      parentWorkSection: orphan.parentWorkSection || '',
       handles: orphan.handles || [],
       comment: orphan.comment || ''
     });
