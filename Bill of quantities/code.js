@@ -410,24 +410,46 @@ function shouldShowFormula(item, fallbackValue = true) {
 }
 
 // Build display string for coupling installation work formula
-function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume) {
+function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume, unit = 'шт') {
+  const u = (unit || 'шт').trim();
   const clean = (formula || 'КОЛИЧЕСТВО').trim();
   const rawCount = tierData.count || 0;
   const upper = clean.toUpperCase();
 
   if (upper === 'КОЛИЧЕСТВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
     if (tierData.couplings && tierData.couplings.length > 1) {
-      return normalizeFormulaMathOperators(tierData.couplings.map(c => `${c.count} шт`).join(' + ') + ` = ${rawCount} шт`);
+      return normalizeFormulaMathOperators(tierData.couplings.map(c => `${c.count} ${u}`).join(' + ') + ` = ${rawCount} ${u}`);
     }
-    return `${rawCount} шт`;
+    return `${rawCount} ${u}`;
   }
 
   let disp = clean.replace(/,/g, '.').replace(/\*/g, ' * ');
-  disp = disp.replace(/КОЛИЧЕСТВО_МУФТ/gi, `${rawCount} шт`)
-             .replace(/КОЛИЧЕСТВО/gi, `${rawCount} шт`)
-             .replace(/ДЛИНА/gi, `${rawCount} шт`);
+  disp = disp.replace(/КОЛИЧЕСТВО_МУФТ/gi, `${rawCount} ${u}`)
+             .replace(/КОЛИЧЕСТВО/gi, `${rawCount} ${u}`)
+             .replace(/ДЛИНА/gi, `${rawCount} ${u}`);
   if (calculatedVolume !== undefined && calculatedVolume !== rawCount) {
-    disp += ` = ${calculatedVolume} шт`;
+    disp += ` = ${calculatedVolume} ${u}`;
+  }
+  return normalizeFormulaMathOperators(disp);
+}
+
+// Build display string for individual coupling material formula
+function buildCouplingSingleItemFormulaDisplay(formula, count, calculatedVolume, unit = 'шт') {
+  const u = (unit || 'шт').trim();
+  const clean = (formula || 'КОЛИЧЕСТВО').trim();
+  const rawCount = Number(count) || 0;
+  const upper = clean.toUpperCase();
+
+  if (upper === 'КОЛИЧЕСТВО' || upper === 'КОЛИЧЕСТВО_МУФТ') {
+    return `${rawCount} ${u}`;
+  }
+
+  let disp = clean.replace(/,/g, '.').replace(/\*/g, ' * ');
+  disp = disp.replace(/КОЛИЧЕСТВО_МУФТ/gi, `${rawCount} ${u}`)
+             .replace(/КОЛИЧЕСТВО/gi, `${rawCount} ${u}`)
+             .replace(/ДЛИНА/gi, `${rawCount} ${u}`);
+  if (calculatedVolume !== undefined && calculatedVolume !== rawCount) {
+    disp += ` = ${calculatedVolume} ${u}`;
   }
   return normalizeFormulaMathOperators(disp);
 }
@@ -1015,12 +1037,23 @@ function getCouplingInstallationWorkItems(tier, rulesData) {
       const wm = r["Работы"] || r["Работы и материалы"] || {};
       const tierKey = String(tier);
       let tierItems = null;
-      if (wm && typeof wm === 'object' && wm[tierKey] !== undefined) {
-        tierItems = Array.isArray(wm[tierKey]) ? wm[tierKey] : [wm[tierKey]];
+      if (wm && typeof wm === 'object') {
+        if (wm[tierKey] !== undefined) {
+          tierItems = wm[tierKey];
+        } else {
+          for (const [k, val] of Object.entries(wm)) {
+            const num = parseFloat(String(k).trim().replace(',', '.'));
+            if (!isNaN(num) && num === tier) {
+              tierItems = val;
+              break;
+            }
+          }
+        }
       }
 
-      if (tierItems && tierItems.length > 0) {
-        tierItems.forEach(it => {
+      if (tierItems) {
+        const arr = Array.isArray(tierItems) ? tierItems : [tierItems];
+        arr.forEach(it => {
           if (!it || typeof it !== 'object') return;
           foundItems.push({
             name: it["Наименование"] || it.name || '',
@@ -1029,7 +1062,8 @@ function getCouplingInstallationWorkItems(tier, rulesData) {
             formula: it["Формула"] || it.formula || 'КОЛИЧЕСТВО',
             maxCores: it["МаксЖил"] || it["Количество жил"] || it.maxCores || tier,
             showFormula: shouldShowFormula(it),
-            rawItem: it
+            rawItem: it,
+            ruleRaw: r
           });
         });
         if (foundItems.length > 0) break;
@@ -1045,7 +1079,8 @@ function getCouplingInstallationWorkItems(tier, rulesData) {
       formula: 'КОЛИЧЕСТВО',
       maxCores: tier,
       showFormula: true,
-      rawItem: null
+      rawItem: null,
+      ruleRaw: null
     });
   }
   return foundItems;
@@ -4200,7 +4235,6 @@ function calculateWorksFromCables(cableSummary, rulesData) {
     if (tierData && tierData.count > 0) {
       const workItems = getCouplingInstallationWorkItems(tier, rulesData);
       
-      // 1. Add all defined work/material items from rules array for this tier
       workItems.forEach(workItem => {
         const formula = workItem.formula || 'КОЛИЧЕСТВО';
         const evalRes = validateAndEvaluateFormula(formula, tierData.count, 'coupling', {
@@ -4215,8 +4249,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           return; // Skip this coupling item!
         }
         const rawVol = evalRes.value;
-        const showFormula = (workItem.showFormula !== undefined) ? workItem.showFormula : shouldShowFormula(workItem.rawItem || workItem);
-        const formulaDisplay = showFormula ? buildCouplingWorkFormulaDisplay(formula, tierData, rawVol) : '';
+        const workShowFormula = (workItem.showFormula !== undefined) ? workItem.showFormula : shouldShowFormula(workItem.rawItem || workItem);
+        const formulaDisplay = workShowFormula ? buildCouplingWorkFormulaDisplay(formula, tierData, rawVol, workItem.unit || 'шт') : '';
 
         calculatedWorks.push({
           name: workItem.name,
@@ -4226,38 +4260,179 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           decimals: extractItemDecimals(workItem.rawItem || workItem),
           formula: formula,
           formulaDisplay: formulaDisplay,
-          showFormula: showFormula,
+          showFormula: workShowFormula,
           tier: tier,
           section: sectionName,
           type: workItem.type || 'работа',
           parentWorkName: null,
           comment: `Установка соединительных муфт (до ${tier} жил)`
         });
-      });
 
-      // 2. Following material lines for each coupling type
-      const primaryWorkName = workItems[0] ? workItems[0].name : null;
-      const primaryWorkUnit = workItems[0] ? workItems[0].unit : null;
-      tierData.couplings.forEach(coupling => {
-        const showFormula = (coupling.showFormula !== undefined) ? coupling.showFormula : shouldShowFormula(coupling);
-        calculatedWorks.push({
-          name: coupling.fullName,
-          unit: coupling.unit || 'шт',
-          volume: coupling.count,
-          volumeFormatted: String(coupling.count),
-          decimals: extractItemDecimals(coupling),
-          formula: 'КОЛИЧЕСТВО',
-          formulaDisplay: showFormula ? `${coupling.count} шт` : '',
-          showFormula: showFormula,
-          tier: tier,
-          maxCores: coupling.maxCores,
-          section: sectionName,
-          type: 'материал',
-          parentWorkName: primaryWorkName,
-          parentWorkUnit: primaryWorkUnit,
-          parentWorkSection: sectionName,
-          comment: `Кабели: ${coupling.cableTypes.join(', ')}`
-        });
+        // Process materials and equipment declared under this work
+        const declaredSubItems = [
+          ...(Array.isArray(workItem.rawItem?.["Материалы"]) ? workItem.rawItem["Материалы"] : (workItem.rawItem?.["Материалы"] && typeof workItem.rawItem["Материалы"] === 'object' ? [workItem.rawItem["Материалы"]] : [])),
+          ...(Array.isArray(workItem.rawItem?.["Оборудование"]) ? workItem.rawItem["Оборудование"] : (workItem.rawItem?.["Оборудование"] && typeof workItem.rawItem["Оборудование"] === 'object' ? [workItem.rawItem["Оборудование"]] : []))
+        ];
+
+        // Also check rule level if workItem has none
+        if (declaredSubItems.length === 0 && workItem.ruleRaw) {
+          const ruleSub = [
+            ...(Array.isArray(workItem.ruleRaw["Материалы"]) ? workItem.ruleRaw["Материалы"] : []),
+            ...(Array.isArray(workItem.ruleRaw["Оборудование"]) ? workItem.ruleRaw["Оборудование"] : [])
+          ];
+          ruleSub.forEach(s => declaredSubItems.push(s));
+        }
+
+        const isCouplingBrandTemplate = (name) => /\{ *(?:МАРКА[ _-]МУФТЫ|МУФТА|МАРКА) *\}/i.test(name || '');
+        const hasCouplingBrandTemplate = declaredSubItems.some(it => isCouplingBrandTemplate(it["Наименование"] || it.name));
+
+        if (declaredSubItems.length > 0) {
+          declaredSubItems.forEach(mat => {
+            const rawMatType = (mat["Тип"] || mat.type || (Array.isArray(workItem.rawItem?.["Оборудование"]) && workItem.rawItem["Оборудование"].includes(mat) ? 'оборудование' : 'материал')).trim().toLowerCase();
+            let determinedMatType = 'материал';
+            if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
+              determinedMatType = 'оборудование';
+            } else if (rawMatType === 'работа' || rawMatType === 'work') {
+              determinedMatType = 'работа';
+            }
+
+            const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_МУФТЫ}').trim();
+            const matUnit = mat["Единицы измерения"] || mat.unit || 'шт';
+            const matFormula = mat["Формула"] || mat.formula || 'КОЛИЧЕСТВО';
+            const matShowFormula = shouldShowFormula(mat, workShowFormula);
+            const matSection = (mat["Раздел"] || mat.section || sectionName).trim();
+
+            if (isCouplingBrandTemplate(matNameTpl)) {
+              // Expand coupling brand template for each actual coupling type in this tier
+              tierData.couplings.forEach(coupling => {
+                let finalMatName = '';
+                if (/^\{ *(?:МАРКА[ _-]МУФТЫ|МУФТА|МАРКА) *\}$/i.test(matNameTpl)) {
+                  finalMatName = coupling.fullName || coupling.name || coupling.couplingType || matNameTpl;
+                } else {
+                  finalMatName = matNameTpl.replace(/\{ *(?:МАРКА[ _-]МУФТЫ|МУФТА|МАРКА) *\}/gi, coupling.fullName || coupling.name || coupling.couplingType);
+                }
+
+                const couplingMatUnit = mat["Единицы измерения"] || mat.unit || coupling.unit || 'шт';
+                const matEvalRes = validateAndEvaluateFormula(matFormula, coupling.count, 'coupling', {
+                  name: finalMatName,
+                  type: determinedMatType,
+                  section: matSection,
+                  ruleName: `Установка муфт (до ${tier} жил)`,
+                  formula: matFormula
+                });
+                if (!matEvalRes.valid) {
+                  formulaErrors.push(matEvalRes.errorInfo);
+                  return;
+                }
+                const matRawVal = matEvalRes.value;
+                const matFormulaDisp = matShowFormula ? buildCouplingSingleItemFormulaDisplay(matFormula, coupling.count, matRawVal, couplingMatUnit) : '';
+
+                calculatedWorks.push({
+                  name: finalMatName,
+                  unit: couplingMatUnit,
+                  volume: matRawVal,
+                  volumeFormatted: String(matRawVal),
+                  decimals: extractItemDecimals(mat),
+                  formula: matFormula,
+                  formulaDisplay: matFormulaDisp,
+                  showFormula: matShowFormula,
+                  tier: tier,
+                  maxCores: coupling.maxCores,
+                  section: matSection,
+                  type: determinedMatType,
+                  parentWorkName: workItem.name,
+                  parentWorkUnit: workItem.unit || 'шт',
+                  parentWorkSection: sectionName,
+                  comment: `Кабели: ${(coupling.cableTypes || []).join(', ')}`,
+                  foundInCatalog: coupling.foundInCatalog !== undefined ? coupling.foundInCatalog : true
+                });
+              });
+            } else {
+              // Static accompanying material/equipment declared under coupling work
+              const matEvalRes = validateAndEvaluateFormula(matFormula, tierData.count, 'coupling', {
+                name: matNameTpl,
+                type: determinedMatType,
+                section: matSection,
+                ruleName: `Установка муфт (до ${tier} жил)`,
+                formula: matFormula
+              });
+              if (!matEvalRes.valid) {
+                formulaErrors.push(matEvalRes.errorInfo);
+                return;
+              }
+              const matRawVal = matEvalRes.value;
+              const matFormulaDisp = matShowFormula ? buildCouplingWorkFormulaDisplay(matFormula, tierData, matRawVal, matUnit) : '';
+
+              calculatedWorks.push({
+                name: matNameTpl,
+                unit: matUnit,
+                volume: matRawVal,
+                volumeFormatted: String(matRawVal),
+                decimals: extractItemDecimals(mat),
+                formula: matFormula,
+                formulaDisplay: matFormulaDisp,
+                showFormula: matShowFormula,
+                tier: tier,
+                section: matSection,
+                type: determinedMatType,
+                parentWorkName: workItem.name,
+                parentWorkUnit: workItem.unit || 'шт',
+                parentWorkSection: sectionName,
+                comment: mat["Комментарий"] || `Установка соединительных муфт (до ${tier} жил)`
+              });
+            }
+          });
+
+          // If the engineer added materials but did not include {МАРКА_МУФТЫ}, ensure couplings are still generated
+          if (!hasCouplingBrandTemplate) {
+            tierData.couplings.forEach(coupling => {
+              const showFormula = (coupling.showFormula !== undefined) ? coupling.showFormula : shouldShowFormula(coupling);
+              calculatedWorks.push({
+                name: coupling.fullName,
+                unit: coupling.unit || 'шт',
+                volume: coupling.count,
+                volumeFormatted: String(coupling.count),
+                decimals: extractItemDecimals(coupling),
+                formula: 'КОЛИЧЕСТВО',
+                formulaDisplay: showFormula ? `${coupling.count} ${coupling.unit || 'шт'}` : '',
+                showFormula: showFormula,
+                tier: tier,
+                maxCores: coupling.maxCores,
+                section: sectionName,
+                type: 'материал',
+                parentWorkName: workItem.name,
+                parentWorkUnit: workItem.unit || 'шт',
+                parentWorkSection: sectionName,
+                comment: `Кабели: ${(coupling.cableTypes || []).join(', ')}`,
+                foundInCatalog: coupling.foundInCatalog !== undefined ? coupling.foundInCatalog : true
+              });
+            });
+          }
+        } else {
+          // Fallback: if rule has no declared materials, generate coupling lines directly
+          tierData.couplings.forEach(coupling => {
+            const showFormula = (coupling.showFormula !== undefined) ? coupling.showFormula : shouldShowFormula(coupling);
+            calculatedWorks.push({
+              name: coupling.fullName,
+              unit: coupling.unit || 'шт',
+              volume: coupling.count,
+              volumeFormatted: String(coupling.count),
+              decimals: extractItemDecimals(coupling),
+              formula: 'КОЛИЧЕСТВО',
+              formulaDisplay: showFormula ? `${coupling.count} ${coupling.unit || 'шт'}` : '',
+              showFormula: showFormula,
+              tier: tier,
+              maxCores: coupling.maxCores,
+              section: sectionName,
+              type: 'материал',
+              parentWorkName: workItem.name,
+              parentWorkUnit: workItem.unit || 'шт',
+              parentWorkSection: sectionName,
+              comment: `Кабели: ${(coupling.cableTypes || []).join(', ')}`,
+              foundInCatalog: coupling.foundInCatalog !== undefined ? coupling.foundInCatalog : true
+            });
+          });
+        }
       });
     }
   });
