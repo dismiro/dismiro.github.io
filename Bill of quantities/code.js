@@ -14,14 +14,18 @@ function getRuleWorks(rule) {
         list.push(item);
         const mats = Array.isArray(item["Материалы"]) ? item["Материалы"] : [];
         const equips = Array.isArray(item["Оборудование"]) ? item["Оборудование"] : [];
+        const parentSection = item["Раздел"] || rule["Раздел"] || '';
+        const parentCondition = item["Условие"] !== undefined ? item["Условие"] : item["condition"];
         mats.forEach(mat => {
           if (mat && typeof mat === 'object') {
             list.push({
               ...mat,
               "Тип": mat["Тип"] || mat.type || "материал",
-              "Раздел": mat["Раздел"] || item["Раздел"] || rule["Раздел"],
-              parentWorkName: item["Наименование"],
-              parentWorkUnit: item["Единицы измерения"] || item.unit || ''
+              "Раздел": mat["Раздел"] || parentSection,
+              "Условие": mat["Условие"] !== undefined ? mat["Условие"] : parentCondition,
+              parentWorkName: mat.parentWorkName || item["Наименование"],
+              parentWorkUnit: mat.parentWorkUnit || item["Единицы измерения"] || item.unit || '',
+              parentWorkSection: mat.parentWorkSection || parentSection
             });
           }
         });
@@ -30,9 +34,11 @@ function getRuleWorks(rule) {
             list.push({
               ...eq,
               "Тип": eq["Тип"] || eq.type || "оборудование",
-              "Раздел": eq["Раздел"] || item["Раздел"] || rule["Раздел"],
-              parentWorkName: item["Наименование"],
-              parentWorkUnit: item["Единицы измерения"] || item.unit || ''
+              "Раздел": eq["Раздел"] || parentSection,
+              "Условие": eq["Условие"] !== undefined ? eq["Условие"] : parentCondition,
+              parentWorkName: eq.parentWorkName || item["Наименование"],
+              parentWorkUnit: eq.parentWorkUnit || item["Единицы измерения"] || item.unit || '',
+              parentWorkSection: eq.parentWorkSection || parentSection
             });
           }
         });
@@ -49,14 +55,18 @@ function getRuleWorks(rule) {
             list.push({ ...item, _tierKey: tierKey });
             const mats = Array.isArray(item["Материалы"]) ? item["Материалы"] : [];
             const equips = Array.isArray(item["Оборудование"]) ? item["Оборудование"] : [];
+            const parentSection = item["Раздел"] || rule["Раздел"] || '';
+            const parentCondition = item["Условие"] !== undefined ? item["Условие"] : item["condition"];
             mats.forEach(mat => {
               if (mat && typeof mat === 'object') {
                 list.push({
                   ...mat,
                   "Тип": mat["Тип"] || mat.type || "материал",
-                  "Раздел": mat["Раздел"] || item["Раздел"] || rule["Раздел"],
-                  parentWorkName: item["Наименование"],
-                  parentWorkUnit: item["Единицы измерения"] || item.unit || '',
+                  "Раздел": mat["Раздел"] || parentSection,
+                  "Условие": mat["Условие"] !== undefined ? mat["Условие"] : parentCondition,
+                  parentWorkName: mat.parentWorkName || item["Наименование"],
+                  parentWorkUnit: mat.parentWorkUnit || item["Единицы измерения"] || item.unit || '',
+                  parentWorkSection: mat.parentWorkSection || parentSection,
                   _tierKey: tierKey
                 });
               }
@@ -66,9 +76,11 @@ function getRuleWorks(rule) {
                 list.push({
                   ...eq,
                   "Тип": eq["Тип"] || eq.type || "оборудование",
-                  "Раздел": eq["Раздел"] || item["Раздел"] || rule["Раздел"],
-                  parentWorkName: item["Наименование"],
-                  parentWorkUnit: item["Единицы измерения"] || item.unit || '',
+                  "Раздел": eq["Раздел"] || parentSection,
+                  "Условие": eq["Условие"] !== undefined ? eq["Условие"] : parentCondition,
+                  parentWorkName: eq.parentWorkName || item["Наименование"],
+                  parentWorkUnit: eq.parentWorkUnit || item["Единицы измерения"] || item.unit || '',
+                  parentWorkSection: eq.parentWorkSection || parentSection,
                   _tierKey: tierKey
                 });
               }
@@ -4015,7 +4027,20 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
       const works = getRuleWorks(rule);
 
       works.forEach((work, workIdx) => {
-        const cond = parseCableCountCondition(work);
+        let cond = parseCableCountCondition(work);
+        if (!cond.hasCondition && work.parentWorkName) {
+          const pWork = works.find(w => {
+            const t = (w["Тип"] || w.type || '').trim().toLowerCase();
+            const wTitle = (w["Наименование"] || w.name || '').trim();
+            return t !== 'материал' && t !== 'оборудование' && wTitle.toLowerCase() === work.parentWorkName.trim().toLowerCase();
+          });
+          if (pWork) {
+            const pCond = parseCableCountCondition(pWork);
+            if (pCond.hasCondition) {
+              cond = pCond;
+            }
+          }
+        }
         let conditionNote = '';
 
         // Filter matching segments by cable count condition if specified
@@ -4152,12 +4177,76 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
 
         const showFormula = shouldShowFormula(work);
         const isSubWork = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
-        const primaryTrenchWork = works.find(w => {
-          const t = (w["Тип"] || w.type || '').trim().toLowerCase();
-          return t !== 'материал' && t !== 'оборудование';
-        }) || works[0];
-        const primaryTrenchWorkTitle = primaryTrenchWork ? (primaryTrenchWork["Наименование"] || primaryTrenchWork.name || ruleName).trim() : ruleName;
-        const primaryTrenchWorkUnit = primaryTrenchWork ? (primaryTrenchWork["Единицы измерения"] || primaryTrenchWork.unit || '').trim() : '';
+
+        let finalParentWorkName = undefined;
+        let finalParentWorkUnit = undefined;
+        let finalParentWorkSection = undefined;
+
+        if (isSubWork) {
+          const mainWorks = works.filter(w => {
+            const t = (w["Тип"] || w.type || '').trim().toLowerCase();
+            return t !== 'материал' && t !== 'оборудование';
+          });
+
+          let parentWorkObj = null;
+          if (work.parentWorkName) {
+            parentWorkObj = works.find(w => {
+              const t = (w["Тип"] || w.type || '').trim().toLowerCase();
+              const wTitle = (w["Наименование"] || w.name || '').trim();
+              return t !== 'материал' && t !== 'оборудование' && wTitle.toLowerCase() === work.parentWorkName.trim().toLowerCase();
+            });
+          }
+
+          if (parentWorkObj) {
+            finalParentWorkName = work.parentWorkName;
+            finalParentWorkUnit = work.parentWorkUnit || parentWorkObj["Единицы измерения"] || parentWorkObj.unit || '';
+            finalParentWorkSection = work.parentWorkSection || parentWorkObj["Раздел"] || parentWorkObj.section || rule["Раздел"] || targetSection;
+          } else if (work.parentWorkName) {
+            finalParentWorkName = work.parentWorkName;
+            finalParentWorkUnit = work.parentWorkUnit || '';
+            finalParentWorkSection = work.parentWorkSection || targetSection;
+          } else if (mainWorks.length === 1) {
+            // Exactly one main work in the rule - unambiguously attach to it
+            const singleMain = mainWorks[0];
+            finalParentWorkName = (singleMain["Наименование"] || singleMain.name || ruleName).trim();
+            finalParentWorkUnit = (singleMain["Единицы измерения"] || singleMain.unit || '').trim();
+            finalParentWorkSection = (singleMain["Раздел"] || singleMain.section || rule["Раздел"] || targetSection).trim();
+          } else if (mainWorks.length > 1) {
+            // Multiple main works: attach to the work sharing the same section, or closest preceding work in the same section
+            const sameSecWorks = mainWorks.filter(w => {
+              const wSec = (w["Раздел"] || w.section || rule["Раздел"] || sectionName).trim().toLowerCase();
+              return wSec === targetSection.toLowerCase();
+            });
+            if (sameSecWorks.length === 1) {
+              parentWorkObj = sameSecWorks[0];
+            } else {
+              const prevMainWorks = works.slice(0, workIdx).filter(w => {
+                const t = (w["Тип"] || w.type || '').trim().toLowerCase();
+                return t !== 'материал' && t !== 'оборудование';
+              });
+              parentWorkObj = prevMainWorks.slice().reverse().find(w => {
+                const wSec = (w["Раздел"] || w.section || rule["Раздел"] || sectionName).trim().toLowerCase();
+                return wSec === targetSection.toLowerCase();
+              }) || null;
+            }
+
+            if (parentWorkObj) {
+              finalParentWorkName = (parentWorkObj["Наименование"] || parentWorkObj.name || ruleName).trim();
+              finalParentWorkUnit = (parentWorkObj["Единицы измерения"] || parentWorkObj.unit || '').trim();
+              finalParentWorkSection = (parentWorkObj["Раздел"] || parentWorkObj.section || rule["Раздел"] || targetSection).trim();
+            } else {
+              // Standalone / unattached material - do not attach to primaryTrenchWork in another section
+              finalParentWorkName = undefined;
+              finalParentWorkUnit = undefined;
+              finalParentWorkSection = targetSection;
+            }
+          } else {
+            // No main works in rule (only sub-items)
+            finalParentWorkName = undefined;
+            finalParentWorkUnit = undefined;
+            finalParentWorkSection = targetSection;
+          }
+        }
 
         calculatedWorks.push({
           name: work["Наименование"] || work.name || '',
@@ -4175,9 +4264,9 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           condition: conditionNote,
           section: targetSection,
           type: determinedWorkType,
-          parentWorkName: work.parentWorkName || ((isSubWork && primaryTrenchWork !== work) ? primaryTrenchWorkTitle : undefined),
-          parentWorkUnit: work.parentWorkUnit || ((isSubWork && primaryTrenchWork !== work) ? primaryTrenchWorkUnit : undefined),
-          parentWorkSection: work.parentWorkSection || ((isSubWork && primaryTrenchWork !== work) ? (primaryTrenchWork["Раздел"] || primaryTrenchWork.section || targetSection) : targetSection),
+          parentWorkName: finalParentWorkName,
+          parentWorkUnit: finalParentWorkUnit,
+          parentWorkSection: finalParentWorkSection,
           comment: work["Комментарий"] || work.comment || ''
         });
       });
