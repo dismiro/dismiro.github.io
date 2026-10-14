@@ -4,8 +4,9 @@ let currentFileName = '';
 let isRawColCollapsed = false;
 
 // Helper to extract works/materials array from a rule object, supporting nested "Материалы" arrays
-function getRuleWorks(rule) {
+function getRuleWorks(rule, defaultSection = '') {
   if (!rule || typeof rule !== 'object') return [];
+  const ruleSec = (rule && rule["Раздел"]) || defaultSection || '';
   const raw = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] : (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
   if (Array.isArray(raw)) {
     const list = [];
@@ -14,7 +15,7 @@ function getRuleWorks(rule) {
         list.push(item);
         const mats = Array.isArray(item["Материалы"]) ? item["Материалы"] : [];
         const equips = Array.isArray(item["Оборудование"]) ? item["Оборудование"] : [];
-        const parentSection = item["Раздел"] || rule["Раздел"] || '';
+        const parentSection = item["Раздел"] || ruleSec;
         const parentCondition = item["Условие"] !== undefined ? item["Условие"] : item["condition"];
         mats.forEach(mat => {
           if (mat && typeof mat === 'object') {
@@ -55,7 +56,7 @@ function getRuleWorks(rule) {
             list.push({ ...item, _tierKey: tierKey });
             const mats = Array.isArray(item["Материалы"]) ? item["Материалы"] : [];
             const equips = Array.isArray(item["Оборудование"]) ? item["Оборудование"] : [];
-            const parentSection = item["Раздел"] || rule["Раздел"] || '';
+            const parentSection = item["Раздел"] || ruleSec;
             const parentCondition = item["Условие"] !== undefined ? item["Условие"] : item["condition"];
             mats.forEach(mat => {
               if (mat && typeof mat === 'object') {
@@ -136,7 +137,7 @@ function normalizeFormulaMathOperators(formulaStr) {
   str = str.replace(/\s*\+\s*/g, ' + ');
   str = str.replace(/\s*=\s*/g, ' = ');
   str = str.replace(/\s*\/\s*/g, ' / ');
-  str = str.replace(/(\w|\)|(?:[.,]\d+))\s*-\s*(\w|\(|\d)/g, '$1 - $2');
+  str = str.replace(/([a-zA-Zа-яА-ЯёЁ0-9_]|\)|(?:[.,]\d+))\s*-\s*([a-zA-Zа-яА-ЯёЁ0-9_]|\(|\d)/g, '$1 - $2');
 
   // 7. Collapse multiple spaces into single space and trim
   str = str.replace(/ {2,}/g, ' ').trim();
@@ -648,6 +649,7 @@ function getTrenchRules(rulesData) {
   if (val && typeof val === 'object' && !Array.isArray(val)) {
     const rulesList = Object.entries(val).map(([ruleName, ruleVal]) => ({
       "Название": ruleName,
+      "Раздел": (ruleVal && ruleVal["Раздел"]) || 'Строительные работы',
       ...(ruleVal && typeof ruleVal === 'object' ? ruleVal : {})
     }));
     return { sectionName: 'Строительные работы', rules: rulesList };
@@ -664,6 +666,7 @@ function getCableRules(rulesData) {
   if (val && typeof val === 'object' && !Array.isArray(val)) {
     const rulesList = Object.entries(val).map(([ruleName, ruleVal]) => ({
       "Название": ruleName,
+      "Раздел": (ruleVal && ruleVal["Раздел"]) || 'Монтажные работы',
       ...(ruleVal && typeof ruleVal === 'object' ? ruleVal : {})
     }));
     return { sectionName: 'Монтажные работы', rules: rulesList };
@@ -1130,8 +1133,8 @@ function getActiveCouplingsSummary(rulesData) {
     if (!c.type || c.length <= 0) return;
     const cMeta = lookupCableInfo(c.type, cableCatalog);
     const buildLen = Number(cMeta.buildingLength) || 0;
-    // Couplings needed: 0 if length <= buildingLength; otherwise div(length - 1, buildingLength)
-    const count = (buildLen > 0 && c.length > buildLen) ? Math.floor((c.length - 1) / buildLen) : 0;
+    // Couplings needed: 0 if length <= buildingLength; otherwise ceil(length / buildingLength) - 1
+    const count = (buildLen > 0 && c.length > buildLen) ? Math.ceil(c.length / buildLen) - 1 : 0;
     if (count > 0) {
       totalCouplingsCount += count;
       const cTypeKey = cMeta.coupling ? cMeta.coupling.trim() : '';
@@ -1949,8 +1952,8 @@ function createCablesAccordion(cables, totalLength) {
     const info = lookupCableInfo(effectiveType, catalog);
     const cableLen = Number(c.length) || 0;
     const buildLen = Number(info.buildingLength) || 0;
-    // Couplings needed: 0 if length <= buildingLength; otherwise div(length - 1, buildingLength)
-    const couplingCount = (buildLen > 0 && cableLen > buildLen) ? Math.floor((cableLen - 1) / buildLen) : 0;
+    // Couplings needed: 0 if length <= buildingLength; otherwise ceil(length / buildingLength) - 1
+    const couplingCount = (buildLen > 0 && cableLen > buildLen) ? Math.ceil(cableLen / buildLen) - 1 : 0;
     totalCouplingsCount += couplingCount;
 
     const couplingName = (info.coupling || '').trim();
@@ -4024,7 +4027,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
     matchingTypes.forEach(tName => {
       matchedTrenchTypes.add(tName);
       const tInfo = trenchSummary[tName];
-      const works = getRuleWorks(rule);
+      const works = getRuleWorks(rule, sectionName);
 
       works.forEach((work, workIdx) => {
         let cond = parseCableCountCondition(work);
@@ -4162,7 +4165,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
               const segCables = Number(seg.cablesCount) || 0;
               return `${segLen} м * ${segCables} каб`;
             });
-            const formulaPrefix = formula.replace(/ДЛИНА.*КОЛИЧЕСТВО.*КАБЕЛЕЙ|ДЛИНА.*КАБЕЛЕЙ|КОЛИЧЕСТВО.*КАБЕЛЕЙ.*ДЛИНА/gi, '').replace(/\*/g, '').trim();
+            const formulaPrefix = formula.replace(/ДЛИНА.*КОЛИЧЕСТВО.*КАБЕЛЕЙ|ДЛИНА.*КАБЕЛЕЙ|КОЛИЧЕСТВО.*КАБЕЛЕЙ.*ДЛИНА/gi, '').replace(/^\s*\*+\s*|\s*\*+\s*$/g, '').trim();
             if (formulaPrefix && formulaPrefix !== '1') {
               displayFormula = `${formulaPrefix} * (${parts.join(' + ')})${condSuffix}`;
             } else {
@@ -4200,17 +4203,17 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           if (parentWorkObj) {
             finalParentWorkName = work.parentWorkName;
             finalParentWorkUnit = work.parentWorkUnit || parentWorkObj["Единицы измерения"] || parentWorkObj.unit || '';
-            finalParentWorkSection = work.parentWorkSection || parentWorkObj["Раздел"] || parentWorkObj.section || rule["Раздел"] || targetSection;
+            finalParentWorkSection = work.parentWorkSection || parentWorkObj["Раздел"] || parentWorkObj.section || rule["Раздел"] || sectionName;
           } else if (work.parentWorkName) {
             finalParentWorkName = work.parentWorkName;
             finalParentWorkUnit = work.parentWorkUnit || '';
-            finalParentWorkSection = work.parentWorkSection || targetSection;
+            finalParentWorkSection = work.parentWorkSection || sectionName;
           } else if (mainWorks.length === 1) {
             // Exactly one main work in the rule - unambiguously attach to it
             const singleMain = mainWorks[0];
             finalParentWorkName = (singleMain["Наименование"] || singleMain.name || ruleName).trim();
             finalParentWorkUnit = (singleMain["Единицы измерения"] || singleMain.unit || '').trim();
-            finalParentWorkSection = (singleMain["Раздел"] || singleMain.section || rule["Раздел"] || targetSection).trim();
+            finalParentWorkSection = (singleMain["Раздел"] || singleMain.section || rule["Раздел"] || sectionName).trim();
           } else if (mainWorks.length > 1) {
             // Multiple main works: attach to the work sharing the same section, or closest preceding work in the same section
             const sameSecWorks = mainWorks.filter(w => {
@@ -4233,7 +4236,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
             if (parentWorkObj) {
               finalParentWorkName = (parentWorkObj["Наименование"] || parentWorkObj.name || ruleName).trim();
               finalParentWorkUnit = (parentWorkObj["Единицы измерения"] || parentWorkObj.unit || '').trim();
-              finalParentWorkSection = (parentWorkObj["Раздел"] || parentWorkObj.section || rule["Раздел"] || targetSection).trim();
+              finalParentWorkSection = (parentWorkObj["Раздел"] || parentWorkObj.section || rule["Раздел"] || sectionName).trim();
             } else {
               // Standalone / unattached material - do not attach to primaryTrenchWork in another section
               finalParentWorkName = undefined;
@@ -4323,6 +4326,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
     const tierData = couplingsSummary.tiers[tier];
     if (tierData && tierData.count > 0) {
       const workItems = getCouplingInstallationWorkItems(tier, rulesData);
+      let tierCouplingsGenerated = false;
       
       workItems.forEach(workItem => {
         const formula = workItem.formula || 'КОЛИЧЕСТВО';
@@ -4373,7 +4377,6 @@ function calculateWorksFromCables(cableSummary, rulesData) {
         }
 
         const isCouplingBrandTemplate = (name) => /\{ *(?:МАРКА[ _-]МУФТЫ|МУФТА|МАРКА) *\}/i.test(name || '');
-        const hasCouplingBrandTemplate = declaredSubItems.some(it => isCouplingBrandTemplate(it["Наименование"] || it.name));
 
         if (declaredSubItems.length > 0) {
           declaredSubItems.forEach(mat => {
@@ -4392,6 +4395,10 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             const matSection = (mat["Раздел"] || mat.section || sectionName).trim();
 
             if (isCouplingBrandTemplate(matNameTpl)) {
+              if (tierCouplingsGenerated) {
+                return; // Couplings for this tier have already been generated
+              }
+              tierCouplingsGenerated = true;
               // Expand coupling brand template for each actual coupling type in this tier
               tierData.couplings.forEach(coupling => {
                 let finalMatName = '';
@@ -4471,58 +4478,36 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               });
             }
           });
-
-          // If the engineer added materials but did not include {МАРКА_МУФТЫ}, ensure couplings are still generated
-          if (!hasCouplingBrandTemplate) {
-            tierData.couplings.forEach(coupling => {
-              const showFormula = (coupling.showFormula !== undefined) ? coupling.showFormula : shouldShowFormula(coupling);
-              calculatedWorks.push({
-                name: coupling.fullName,
-                unit: coupling.unit || 'шт',
-                volume: coupling.count,
-                volumeFormatted: String(coupling.count),
-                decimals: extractItemDecimals(coupling),
-                formula: 'КОЛИЧЕСТВО',
-                formulaDisplay: showFormula ? `${coupling.count} ${coupling.unit || 'шт'}` : '',
-                showFormula: showFormula,
-                tier: tier,
-                maxCores: coupling.maxCores,
-                section: sectionName,
-                type: 'материал',
-                parentWorkName: workItem.name,
-                parentWorkUnit: workItem.unit || 'шт',
-                parentWorkSection: sectionName,
-                comment: `Кабели: ${(coupling.cableTypes || []).join(', ')}`,
-                foundInCatalog: coupling.foundInCatalog !== undefined ? coupling.foundInCatalog : true
-              });
-            });
-          }
-        } else {
-          // Fallback: if rule has no declared materials, generate coupling lines directly
-          tierData.couplings.forEach(coupling => {
-            const showFormula = (coupling.showFormula !== undefined) ? coupling.showFormula : shouldShowFormula(coupling);
-            calculatedWorks.push({
-              name: coupling.fullName,
-              unit: coupling.unit || 'шт',
-              volume: coupling.count,
-              volumeFormatted: String(coupling.count),
-              decimals: extractItemDecimals(coupling),
-              formula: 'КОЛИЧЕСТВО',
-              formulaDisplay: showFormula ? `${coupling.count} ${coupling.unit || 'шт'}` : '',
-              showFormula: showFormula,
-              tier: tier,
-              maxCores: coupling.maxCores,
-              section: sectionName,
-              type: 'материал',
-              parentWorkName: workItem.name,
-              parentWorkUnit: workItem.unit || 'шт',
-              parentWorkSection: sectionName,
-              comment: `Кабели: ${(coupling.cableTypes || []).join(', ')}`,
-              foundInCatalog: coupling.foundInCatalog !== undefined ? coupling.foundInCatalog : true
-            });
-          });
         }
       });
+
+      // Fallback: if no work in this tier declared a {МАРКА_МУФТЫ} template, generate default coupling material lines once
+      if (!tierCouplingsGenerated) {
+        tierCouplingsGenerated = true;
+        const primaryWorkItem = workItems[0] || null;
+        tierData.couplings.forEach(coupling => {
+          const showFormula = (coupling.showFormula !== undefined) ? coupling.showFormula : shouldShowFormula(coupling);
+          calculatedWorks.push({
+            name: coupling.fullName,
+            unit: coupling.unit || 'шт',
+            volume: coupling.count,
+            volumeFormatted: String(coupling.count),
+            decimals: extractItemDecimals(coupling),
+            formula: 'КОЛИЧЕСТВО',
+            formulaDisplay: showFormula ? `${coupling.count} ${coupling.unit || 'шт'}` : '',
+            showFormula: showFormula,
+            tier: tier,
+            maxCores: coupling.maxCores,
+            section: sectionName,
+            type: 'материал',
+            parentWorkName: primaryWorkItem ? primaryWorkItem.name : null,
+            parentWorkUnit: primaryWorkItem ? (primaryWorkItem.unit || 'шт') : 'шт',
+            parentWorkSection: sectionName,
+            comment: `Кабели: ${(coupling.cableTypes || []).join(', ')}`,
+            foundInCatalog: coupling.foundInCatalog !== undefined ? coupling.foundInCatalog : true
+          });
+        });
+      }
     }
   });
 
