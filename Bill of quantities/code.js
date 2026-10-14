@@ -5069,6 +5069,71 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
 // --------------------------------------------------------------------------
 
 /**
+ * Removes unit suffix from an individual summand when aggregating multiple parts.
+ * e.g. "2 шт" -> "2", "2.5 м" -> "2.5", "2 шт (СП-6К)" -> "2 (СП-6К)"
+ */
+function sanitizeFormulaSummand(part, unit) {
+  if (!part || typeof part !== 'string') return '';
+  let str = part.trim();
+  if (!str) return '';
+
+  if (str.includes('=')) {
+    const leftSide = str.split('=').slice(0, -1).join('=').trim();
+    if (leftSide) {
+      str = leftSide;
+    }
+  }
+
+  const unitList = ['шт\\.?', 'пог\\.?\\s*м\\.?', 'м/п', 'компл\\.?', 'м\\.?\\s*кабеля', 'м\\.?', 'км\\.?', 'т\\.?', 'кг\\.?', 'ч\\.?', 'час\\.?', 'маш\\.-ч\\.?'];
+  if (unit && typeof unit === 'string' && unit.trim()) {
+    const cleanUnit = unit.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    unitList.unshift(cleanUnit + '\\.?');
+    unitList.unshift(cleanUnit);
+  }
+  const unitsPattern = unitList.join('|');
+
+  const parenRegex = new RegExp(`^(.+?)\\s*(?:${unitsPattern})\\s*(\\([^()]+\\))$`, 'i');
+  const parenMatch = str.match(parenRegex);
+  if (parenMatch) {
+    return `${parenMatch[1].trim()} ${parenMatch[2].trim()}`.trim();
+  }
+
+  const endUnitRegex = new RegExp(`^(.*?)\\s*(?:${unitsPattern})\\s*$`, 'i');
+  const endMatch = str.match(endUnitRegex);
+  if (endMatch && endMatch[1].trim()) {
+    return endMatch[1].trim();
+  }
+
+  return str;
+}
+
+/**
+ * Formats aggregated formula for merged works or materials:
+ * - Single part: keeps original expression unchanged.
+ * - Multiple parts: sums all summands without Set deduplication, cleaning units from intermediate summands,
+ *   e.g. ["2 шт", "2 шт"] -> "2 + 2 = 4 шт".
+ */
+function formatAggregatedFormula(formulaParts, totalVolume, unit) {
+  if (!Array.isArray(formulaParts) || formulaParts.length === 0) return '';
+  if (formulaParts.length === 1) {
+    return normalizeFormulaMathOperators(formulaParts[0]);
+  }
+
+  const sanitized = formulaParts.map(p => sanitizeFormulaSummand(p, unit)).filter(Boolean);
+  if (sanitized.length === 0) {
+    return normalizeFormulaMathOperators(`${totalVolume} ${unit || ''}`.trim());
+  }
+  if (sanitized.length === 1) {
+    const single = sanitized[0];
+    const full = single.includes('=') ? single : `${single} = ${totalVolume} ${unit || ''}`.trim();
+    return normalizeFormulaMathOperators(full);
+  }
+
+  const formulaStr = `${sanitized.join(' + ')} = ${totalVolume} ${unit || ''}`.trim();
+  return normalizeFormulaMathOperators(formulaStr);
+}
+
+/**
  * Merges identical works by Section, Name, and Unit.
  * Materials linked to works via `parentWorkName` are grouped directly under their parent work.
  * Assigns hierarchical numbering: 1, 1.1, 1.2, 2, 2.1...
@@ -5230,19 +5295,9 @@ function aggregateCalculatedWorks(rawWorksList) {
     let finalWorkFormula = '';
     if (work.showFormula === false || work.formulaParts.length === 0) {
       finalWorkFormula = '';
-    } else if (work.formulaParts.length > 1) {
-      const uniqueParts = Array.from(new Set(work.formulaParts));
-      if (uniqueParts.length === 1 && uniqueParts[0].includes('=')) {
-        finalWorkFormula = uniqueParts[0];
-      } else {
-        finalWorkFormula = uniqueParts.join(' + ') + ` = ${roundedWorkVol} ${work.unit}`;
-      }
-    } else if (work.formulaParts.length === 1) {
-      finalWorkFormula = work.formulaParts[0];
     } else {
-      finalWorkFormula = `${roundedWorkVol} ${work.unit}`;
+      finalWorkFormula = formatAggregatedFormula(work.formulaParts, roundedWorkVol, work.unit);
     }
-    finalWorkFormula = normalizeFormulaMathOperators(finalWorkFormula);
 
     result.push({
       itemNumber: `${workIndex}`,
@@ -5274,15 +5329,9 @@ function aggregateCalculatedWorks(rawWorksList) {
       let finalMatFormula = '';
       if (mat.showFormula === false || mat.formulaParts.length === 0) {
         finalMatFormula = '';
-      } else if (mat.formulaParts.length > 1) {
-        const uniqueParts = Array.from(new Set(mat.formulaParts));
-        finalMatFormula = uniqueParts.join(' + ') + ` = ${roundedMatVol} ${mat.unit}`;
-      } else if (mat.formulaParts.length === 1) {
-        finalMatFormula = mat.formulaParts[0];
       } else {
-        finalMatFormula = `${roundedMatVol} ${mat.unit}`;
+        finalMatFormula = formatAggregatedFormula(mat.formulaParts, roundedMatVol, mat.unit);
       }
-      finalMatFormula = normalizeFormulaMathOperators(finalMatFormula);
 
       result.push({
         itemNumber: `${workIndex}.${matIndex}`,
