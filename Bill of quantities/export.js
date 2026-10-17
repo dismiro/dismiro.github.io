@@ -706,6 +706,7 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
   if (couplingsExceeded.length > 0) {
     let excRows = '';
     couplingsExceeded.forEach((ec, idx) => {
+      const unitLabel = ec.isOptical ? 'волокон' : 'жил';
       excRows += `
         <tr>
           <td class="text-center text-dark small fw-medium">${idx + 1}</td>
@@ -713,9 +714,9 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
             <div>Муфта «${escapeHtml(ec.couplingType)}»</div>
             <div class="text-muted small">${escapeHtml(ec.fullName || '')}</div>
           </td>
-          <td class="text-center font-monospace fw-semibold">${ec.maxCores} жил</td>
+          <td class="text-center font-monospace fw-semibold">${ec.maxCores} ${unitLabel}</td>
           <td class="text-center">
-            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-monospace">до ${ec.assignedTier} жил</span>
+            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-monospace">до ${ec.assignedTier} ${unitLabel}</span>
           </td>
           <td class="text-center font-monospace">${ec.count} шт</td>
           <td class="cell-wrap text-dark small fw-medium">${escapeHtml(ec.reason)}</td>

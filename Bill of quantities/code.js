@@ -948,8 +948,8 @@ function parseMaxCoresFromString(str) {
   return 0;
 }
 
-// Lookup coupling metadata (full name, max cores, unit, foundInCatalog)
-function lookupCouplingInfo(rawType, couplingCatalog) {
+// Lookup coupling metadata (full name, max cores, unit, foundInCatalog, isOptical)
+function lookupCouplingInfo(rawType, couplingCatalog, isCableOptical = false) {
   const cat = couplingCatalog || getCouplingCatalog(currentWorksRules);
   const str = String(rawType || '').trim();
   if (!str) {
@@ -958,19 +958,28 @@ function lookupCouplingInfo(rawType, couplingCatalog) {
       fullName: 'Соединительная муфта',
       maxCores: 0,
       unit: 'шт',
+      isOptical: !!isCableOptical,
       foundInCatalog: false
     };
   }
+
+  const isEntryOptical = (entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    const itemCat = String(entry["Категория"] || '').trim().toLowerCase();
+    return itemCat === 'оптическая муфта';
+  };
 
   // Exact match
   if (cat[str] && typeof cat[str] === 'object') {
     const entry = cat[str];
     const maxCores = Number(entry["МаксЖил"] || entry["Максимальное количество жил"] || entry["Количество жил"] || entry.maxCores) || parseMaxCoresFromString(str);
+    const isOptical = Boolean(isCableOptical || isEntryOptical(entry));
     return {
       type: str,
       fullName: entry["Полное наименование"] || entry["Наименование"] || entry.name || str,
       maxCores: maxCores || 0,
       unit: entry["Единицы измерения"] || entry.unit || 'шт',
+      isOptical: isOptical,
       showFormula: shouldShowFormula(entry),
       foundInCatalog: true
     };
@@ -983,11 +992,13 @@ function lookupCouplingInfo(rawType, couplingCatalog) {
     const normK = k.toLowerCase().replace(/[\s\-_]+/g, '');
     if (normStr === normK) {
       const maxCores = Number(v["МаксЖил"] || v["Максимальное количество жил"] || v["Количество жил"] || v.maxCores) || parseMaxCoresFromString(k);
+      const isOptical = Boolean(isCableOptical || isEntryOptical(v));
       return {
         type: k,
         fullName: v["Полное наименование"] || v["Наименование"] || v.name || k,
         maxCores: maxCores || 0,
         unit: v["Единицы измерения"] || v.unit || 'шт',
+        isOptical: isOptical,
         showFormula: shouldShowFormula(v),
         foundInCatalog: true
       };
@@ -996,18 +1007,20 @@ function lookupCouplingInfo(rawType, couplingCatalog) {
 
   // Fallback if not found in coupling catalog
   const parsedCores = parseMaxCoresFromString(str);
+  const isOptical = Boolean(isCableOptical);
   return {
     type: str,
-    fullName: str.startsWith('Муфта') ? str : `Муфта кабельная соединительная ${str}`,
+    fullName: str.startsWith('Муфта') ? str : (isOptical ? `Муфта оптическая ${str}` : `Муфта кабельная соединительная ${str}`),
     maxCores: parsedCores || 0,
     unit: 'шт',
+    isOptical: isOptical,
     showFormula: true,
     foundInCatalog: false
   };
 }
 
-// Extract all numeric coupling installation tiers dynamically from works_rules.json (e.g. [12, 27, 48, 61, 78...])
-function getCouplingRuleTiers(rulesData) {
+// Extract all numeric coupling installation tiers dynamically from works_rules.json (e.g. [12, 27, 48, 61, 78...] or [8, 16, 32, 48, 96, 144...])
+function getCouplingRuleTiers(rulesData, isOptical = false) {
   const rules = rulesData || currentWorksRules || cachedDefaultRules;
   const cableRules = getCableRules(rules);
   const tiersSet = new Set();
@@ -1015,10 +1028,14 @@ function getCouplingRuleTiers(rulesData) {
   for (const r of (cableRules && cableRules.rules ? cableRules.rules : [])) {
     const rName = (r["Название"] || r.name || '').toLowerCase();
     if (rName.includes('муфт')) {
+      const isRuleOpt = rName.includes('оптич') || rName.includes('волс');
+      if (isOptical && !isRuleOpt) continue;
+      if (!isOptical && isRuleOpt) continue;
+
       const wm = r["Работы"] || r["Работы и материалы"] || {};
       if (wm && typeof wm === 'object' && !Array.isArray(wm)) {
         Object.keys(wm).forEach(k => {
-          const num = parseFloat(k.trim().replace(',', '.'));
+          const num = parseFloat(String(k).trim().replace(',', '.'));
           if (!isNaN(num) && num > 0) {
             tiersSet.add(num);
           }
@@ -1028,13 +1045,14 @@ function getCouplingRuleTiers(rulesData) {
   }
 
   const sortedTiers = Array.from(tiersSet).sort((a, b) => a - b);
-  return sortedTiers.length > 0 ? sortedTiers : [12, 27, 48, 61];
+  if (sortedTiers.length > 0) return sortedTiers;
+  return isOptical ? [8, 16, 32, 48, 96, 144] : [12, 27, 48, 61];
 }
 
-// Determine coupling installation tier dynamically from rules (e.g. 12, 27, 48, 61, 78...)
-function getCouplingInstallationTier(maxCores, rulesData) {
+// Determine coupling installation tier dynamically from rules (e.g. 12, 27, 48, 61, 78... or 8, 16, 32, 48, 96, 144...)
+function getCouplingInstallationTier(maxCores, rulesData, isOptical = false) {
   const cores = Number(maxCores) || 0;
-  const availableTiers = getCouplingRuleTiers(rulesData);
+  const availableTiers = getCouplingRuleTiers(rulesData, isOptical);
   
   for (const t of availableTiers) {
     if (cores <= t) return t;
@@ -1043,12 +1061,16 @@ function getCouplingInstallationTier(maxCores, rulesData) {
 }
 
 // Get coupling installation works array from rules or fallback
-function getCouplingInstallationWorkItems(tier, rulesData) {
+function getCouplingInstallationWorkItems(tier, rulesData, isOptical = false) {
   const cableRules = getCableRules(rulesData || currentWorksRules);
   const foundItems = [];
   for (const r of cableRules.rules) {
     const rName = (r["Название"] || r.name || '').toLowerCase();
     if (rName.includes('муфт')) {
+      const isRuleOpt = rName.includes('оптич') || rName.includes('волс');
+      if (isOptical && !isRuleOpt) continue;
+      if (!isOptical && isRuleOpt) continue;
+
       const wm = r["Работы"] || r["Работы и материалы"] || {};
       const tierKey = String(tier);
       let tierItems = null;
@@ -1078,7 +1100,8 @@ function getCouplingInstallationWorkItems(tier, rulesData) {
             maxCores: it["МаксЖил"] || it["Количество жил"] || it.maxCores || tier,
             showFormula: shouldShowFormula(it),
             rawItem: it,
-            ruleRaw: r
+            ruleRaw: r,
+            isOptical: isOptical
           });
         });
         if (foundItems.length > 0) break;
@@ -1087,16 +1110,31 @@ function getCouplingInstallationWorkItems(tier, rulesData) {
   }
 
   if (foundItems.length === 0) {
-    foundItems.push({
-      name: `Установка муфты кабельной соединительной подземной для кабеля с количеством жил до: ${tier} с гидрофобным заполнением`,
-      unit: 'шт',
-      type: 'работа',
-      formula: 'КОЛИЧЕСТВО',
-      maxCores: tier,
-      showFormula: true,
-      rawItem: null,
-      ruleRaw: null
-    });
+    if (isOptical) {
+      foundItems.push({
+        name: `Установка муфты оптической соединительной тупиковой с количеством свариваемых волокон до: ${tier}`,
+        unit: 'шт',
+        type: 'работа',
+        formula: 'КОЛИЧЕСТВО',
+        maxCores: tier,
+        showFormula: true,
+        rawItem: null,
+        ruleRaw: null,
+        isOptical: true
+      });
+    } else {
+      foundItems.push({
+        name: `Установка муфты кабельной соединительной подземной для кабеля с количеством жил до: ${tier} с гидрофобным заполнением`,
+        unit: 'шт',
+        type: 'работа',
+        formula: 'КОЛИЧЕСТВО',
+        maxCores: tier,
+        showFormula: true,
+        rawItem: null,
+        ruleRaw: null,
+        isOptical: false
+      });
+    }
   }
   return foundItems;
 }
@@ -1138,6 +1176,7 @@ function getActiveCouplingsSummary(rulesData) {
     if (count > 0) {
       totalCouplingsCount += count;
       const cTypeKey = cMeta.coupling ? cMeta.coupling.trim() : '';
+      const isCableOptical = Boolean(cMeta.isOptical);
       if (!cTypeKey) {
         // Missing coupling configuration for cable
         missingCouplings.push({
@@ -1147,6 +1186,7 @@ function getActiveCouplingsSummary(rulesData) {
           length: c.length,
           buildingLength: buildLen,
           couplingsNeeded: count,
+          isOptical: isCableOptical,
           reason: `В справочнике кабелей не указан тип муфты (длина ${Math.round(c.length)} м > стр. длины ${buildLen} м, требуется ${count} шт.)`
         });
       } else {
@@ -1155,31 +1195,48 @@ function getActiveCouplingsSummary(rulesData) {
             couplingType: cTypeKey,
             count: 0,
             cableTypes: new Set(),
-            cables: []
+            cables: [],
+            isOptical: isCableOptical
           });
         }
         const item = couplingsMap.get(cTypeKey);
         item.count += count;
         item.cableTypes.add(c.type);
+        if (isCableOptical) item.isOptical = true;
         item.cables.push({
           cable: c.cable || '',
           type: c.type,
           rawType: c.rawType,
           length: c.length,
-          count: count
+          count: count,
+          isOptical: isCableOptical
         });
       }
     }
   });
 
-  const availableTiers = getCouplingRuleTiers(rules);
-  const maxAvailableTier = availableTiers.length > 0 ? Math.max(...availableTiers) : 61;
-  const tiers = {};
-  availableTiers.forEach(t => {
-    tiers[t] = {
+  const electricalAvailableTiers = getCouplingRuleTiers(rules, false);
+  const maxAvailableElectricalTier = electricalAvailableTiers.length > 0 ? Math.max(...electricalAvailableTiers) : 61;
+  const electricalTiers = {};
+  electricalAvailableTiers.forEach(t => {
+    electricalTiers[t] = {
       tier: t,
       titleTier: `до ${t} жил`,
       count: 0,
+      isOptical: false,
+      couplings: []
+    };
+  });
+
+  const opticalAvailableTiers = getCouplingRuleTiers(rules, true);
+  const maxAvailableOpticalTier = opticalAvailableTiers.length > 0 ? Math.max(...opticalAvailableTiers) : 144;
+  const opticalTiers = {};
+  opticalAvailableTiers.forEach(t => {
+    opticalTiers[t] = {
+      tier: t,
+      titleTier: `до ${t} волокон`,
+      count: 0,
+      isOptical: true,
       couplings: []
     };
   });
@@ -1187,54 +1244,68 @@ function getActiveCouplingsSummary(rulesData) {
   const exceededTierCouplings = [];
 
   couplingsMap.forEach((cData, cTypeKey) => {
-    const cInfo = lookupCouplingInfo(cTypeKey, couplingCatalog);
+    const cInfo = lookupCouplingInfo(cTypeKey, couplingCatalog, cData.isOptical);
+    const isOptical = Boolean(cData.isOptical || cInfo.isOptical);
+
     if (!cInfo.foundInCatalog) {
       missingInCatalog.push({
         couplingType: cTypeKey,
         count: cData.count,
         usedInCables: Array.from(cData.cableTypes),
+        isOptical: isOptical,
         reason: `Муфта «${cTypeKey}» отсутствует в «Справочнике муфт» (используется для кабелей: ${Array.from(cData.cableTypes).join(', ')}, ${cData.count} шт.)`
       });
     }
 
     const coresCount = Number(cInfo.maxCores) || 0;
-    const isTierExceeded = coresCount > maxAvailableTier;
+    const maxTier = isOptical ? maxAvailableOpticalTier : maxAvailableElectricalTier;
+    const isTierExceeded = coresCount > maxTier;
+    const unitLabel = isOptical ? 'волокон' : 'жил';
+
     if (isTierExceeded) {
       exceededTierCouplings.push({
         couplingType: cTypeKey,
         fullName: cInfo.fullName,
         maxCores: coresCount,
-        assignedTier: maxAvailableTier,
+        assignedTier: maxTier,
         count: cData.count,
+        isOptical: isOptical,
         usedInCables: Array.from(cData.cableTypes),
-        reason: `Муфта «${cTypeKey}» (емкость: ${coresCount} жил) превышает максимальную сметную группу норм (до ${maxAvailableTier} жил). Начислена предельная расценка до ${maxAvailableTier} жил (${cData.count} шт.)`
+        reason: `Муфта «${cTypeKey}» (емкость: ${coresCount} ${unitLabel}) превышает максимальную сметную группу норм (до ${maxTier} ${unitLabel}). Начислена предельная расценка до ${maxTier} ${unitLabel} (${cData.count} шт.)`
       });
     }
 
-    const tier = getCouplingInstallationTier(cInfo.maxCores, rules);
-    if (!tiers[tier]) {
-      tiers[tier] = {
+    const tier = getCouplingInstallationTier(cInfo.maxCores, rules, isOptical);
+    const targetTiersMap = isOptical ? opticalTiers : electricalTiers;
+
+    if (!targetTiersMap[tier]) {
+      targetTiersMap[tier] = {
         tier: tier,
-        titleTier: `до ${tier} жил`,
+        titleTier: `до ${tier} ${unitLabel}`,
         count: 0,
+        isOptical: isOptical,
         couplings: []
       };
     }
-    tiers[tier].count += cData.count;
-    tiers[tier].couplings.push({
+    targetTiersMap[tier].count += cData.count;
+
+    const couplingObj = {
       couplingType: cTypeKey,
       fullName: cInfo.fullName,
       maxCores: cInfo.maxCores,
       unit: cInfo.unit || 'шт',
       count: cData.count,
       tier: tier,
+      isOptical: isOptical,
       isTierExceeded,
-      maxAvailableTier,
+      maxAvailableTier: maxTier,
       cableTypes: Array.from(cData.cableTypes),
       cables: cData.cables,
       showFormula: cInfo.showFormula,
       foundInCatalog: cInfo.foundInCatalog
-    });
+    };
+
+    targetTiersMap[tier].couplings.push(couplingObj);
   });
 
   let totalCablesWithCouplings = 0;
@@ -1242,16 +1313,40 @@ function getActiveCouplingsSummary(rulesData) {
     totalCablesWithCouplings += item.cables.length;
   });
 
+  const tierGroups = [
+    ...Object.values(electricalTiers).filter(t => t.count > 0 || true),
+    ...Object.values(opticalTiers).filter(t => t.count > 0 || true)
+  ];
+
+  // For compatibility with legacy code accessing .tiers directly:
+  const tiers = {};
+  Object.values(electricalTiers).forEach(t => {
+    tiers[t.tier] = t;
+  });
+  Object.values(opticalTiers).forEach(t => {
+    if (!tiers[t.tier]) {
+      tiers[t.tier] = t;
+    } else if (t.count > 0 && tiers[t.tier].count === 0) {
+      tiers[t.tier] = t;
+    } else {
+      tiers[`opt_${t.tier}`] = t;
+    }
+  });
+
   return {
     totalCouplingsCount,
     couplingsCount: couplingsMap.size,
     totalCablesWithCouplings,
     tiers,
+    electricalTiers,
+    opticalTiers,
+    tierGroups,
     couplingsList: Array.from(couplingsMap.values()),
     missingCouplings,
     missingInCatalog,
     exceededTierCouplings,
-    maxAvailableTier,
+    maxAvailableTier: maxAvailableElectricalTier,
+    maxAvailableOpticalTier,
     hasMissingInfo: missingCouplings.length > 0 || missingInCatalog.length > 0 || exceededTierCouplings.length > 0
   };
 }
@@ -3668,8 +3763,9 @@ function renderCouplingsResult(couplingsSummary) {
     }
     if (couplingsSummary.exceededTierCouplings && couplingsSummary.exceededTierCouplings.length > 0) {
       couplingsSummary.exceededTierCouplings.forEach(ec => {
+        const unitLabel = ec.isOptical ? 'волокон' : 'жил';
         missingItemsList.push(
-          `<li><strong>Муфта «${escapeHtml(ec.couplingType)}»</strong> (${ec.count} шт, емкость: ${ec.maxCores} жил): превышает максимальную группу сметных норм (до ${ec.assignedTier} жил). Начислена предельная расценка группы до ${ec.assignedTier} жил.</li>`
+          `<li><strong>Муфта «${escapeHtml(ec.couplingType)}»</strong> (${ec.count} шт, емкость: ${ec.maxCores} ${unitLabel}): превышает максимальную группу сметных норм (до ${ec.assignedTier} ${unitLabel}). Начислена предельная расценка группы до ${ec.assignedTier} ${unitLabel}.</li>`
         );
       });
     }
@@ -3730,11 +3826,17 @@ function renderCouplingsResult(couplingsSummary) {
   let rowIdx = 1;
 
   const allCouplings = [];
-  Object.keys(couplingsSummary.tiers || {}).map(Number).sort((a, b) => a - b).forEach(tier => {
-    const tierData = couplingsSummary.tiers[tier];
+  (couplingsSummary.tierGroups || []).forEach(tierData => {
     if (!tierData || tierData.count <= 0) return;
     tierData.couplings.forEach(c => allCouplings.push(c));
   });
+  if (allCouplings.length === 0) {
+    Object.keys(couplingsSummary.tiers || {}).forEach(tierKey => {
+      const tierData = couplingsSummary.tiers[tierKey];
+      if (!tierData || tierData.count <= 0) return;
+      tierData.couplings.forEach(c => allCouplings.push(c));
+    });
+  }
 
   allCouplings.forEach(coupling => {
     const missingWarning = !coupling.foundInCatalog
@@ -3763,6 +3865,11 @@ function renderCouplingsResult(couplingsSummary) {
       `;
     }).join('');
 
+    const unitLabel = coupling.isOptical ? 'волокон' : 'жил';
+    const optBadge = coupling.isOptical
+      ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle me-1" style="font-size: 0.65rem;"><i class="bx bx-broadcast me-0_5"></i>ВОЛС</span>`
+      : '';
+
     rowsHtml += `
       <tr>
         <td class="text-muted small text-center">${rowIdx++}</td>
@@ -3770,8 +3877,8 @@ function renderCouplingsResult(couplingsSummary) {
           <div class="fw-bold text-dark font-monospace" style="font-size: 0.88rem;">${escapeHtml(coupling.couplingType)}${missingWarning}</div>
           <div class="text-muted small mt-0_5" style="font-size: 0.75rem; line-height: 1.35;">${escapeHtml(coupling.fullName)}</div>
           <div class="mt-1 d-flex align-items-center gap-1 flex-wrap">
-            <span class="badge bg-info-subtle text-info-emphasis border" style="font-size: 0.68rem;">группа монтажа до ${coupling.tier || getCouplingInstallationTier(coupling.maxCores)} жил</span>
-            ${coupling.isTierExceeded ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="font-size: 0.66rem;" title="Емкость муфты (${coupling.maxCores} жил) превышает максимальную сметную группу (до ${coupling.maxAvailableTier} жил). Начислена предельная расценка."><i class="bx bx-error-circle me-0_5"></i>превышает макс. группу норм (${coupling.maxCores} > ${coupling.maxAvailableTier} жил)</span>` : ''}
+            <span class="badge bg-info-subtle text-info-emphasis border" style="font-size: 0.68rem;">${optBadge}группа установки до ${coupling.tier || getCouplingInstallationTier(coupling.maxCores, currentWorksRules, coupling.isOptical)} ${unitLabel}</span>
+            ${coupling.isTierExceeded ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="font-size: 0.66rem;" title="Емкость муфты (${coupling.maxCores} ${unitLabel}) превышает максимальную сметную группу (до ${coupling.maxAvailableTier} ${unitLabel}). Начислена предельная расценка."><i class="bx bx-error-circle me-0_5"></i>превышает макс. группу норм (${coupling.maxCores} > ${coupling.maxAvailableTier} ${unitLabel})</span>` : ''}
           </div>
         </td>
         <td class="text-center align-middle">
@@ -4319,101 +4426,145 @@ function calculateWorksFromCables(cableSummary, rulesData) {
     }
   });
 
-  // Calculate and prepend coupling installation works and materials
+  // Calculate and prepend coupling installation works and materials (separate for electrical and optical couplings)
   const couplingsSummary = getActiveCouplingsSummary(rulesData);
-  const activeCouplingTiers = Object.keys(couplingsSummary.tiers).map(Number).sort((a, b) => a - b);
-  activeCouplingTiers.forEach(tier => {
-    const tierData = couplingsSummary.tiers[tier];
-    if (tierData && tierData.count > 0) {
-      const workItems = getCouplingInstallationWorkItems(tier, rulesData);
-      let tierCouplingsGenerated = false;
-      
-      workItems.forEach(workItem => {
-        const formula = workItem.formula || 'КОЛИЧЕСТВО';
-        const evalRes = validateAndEvaluateFormula(formula, tierData.count, 'coupling', {
-          name: workItem.name,
-          type: workItem.type || 'работа',
-          section: sectionName,
-          ruleName: `Установка муфт (до ${tier} жил)`,
-          formula: formula
-        });
-        if (!evalRes.valid) {
-          formulaErrors.push(evalRes.errorInfo);
-          return; // Skip this coupling item!
-        }
-        const rawVol = evalRes.value;
-        const workShowFormula = (workItem.showFormula !== undefined) ? workItem.showFormula : shouldShowFormula(workItem.rawItem || workItem);
-        const formulaDisplay = workShowFormula ? buildCouplingWorkFormulaDisplay(formula, tierData, rawVol, workItem.unit || 'шт') : '';
+  const couplingCategories = [
+    { isOptical: false, tiersMap: couplingsSummary.electricalTiers, unitLabel: 'жил', ruleTitlePrefix: 'Установка муфт', commentPrefix: 'Установка соединительных муфт' },
+    { isOptical: true, tiersMap: couplingsSummary.opticalTiers, unitLabel: 'волокон', ruleTitlePrefix: 'Установка оптических муфт', commentPrefix: 'Установка оптических соединительных муфт' }
+  ];
 
-        calculatedWorks.push({
-          name: workItem.name,
-          unit: workItem.unit || 'шт',
-          volume: rawVol,
-          volumeFormatted: String(rawVol),
-          decimals: extractItemDecimals(workItem.rawItem || workItem),
-          formula: formula,
-          formulaDisplay: formulaDisplay,
-          showFormula: workShowFormula,
-          tier: tier,
-          section: sectionName,
-          type: workItem.type || 'работа',
-          parentWorkName: null,
-          comment: `Установка соединительных муфт (до ${tier} жил)`
-        });
+  couplingCategories.forEach(({ isOptical, tiersMap, unitLabel, ruleTitlePrefix, commentPrefix }) => {
+    const activeTiers = Object.keys(tiersMap || {}).map(Number).sort((a, b) => a - b);
+    activeTiers.forEach(tier => {
+      const tierData = tiersMap[tier];
+      if (tierData && tierData.count > 0) {
+        const workItems = getCouplingInstallationWorkItems(tier, rulesData, isOptical);
+        let tierCouplingsGenerated = false;
 
-        // Process materials and equipment declared under this work
-        const declaredSubItems = [
-          ...(Array.isArray(workItem.rawItem?.["Материалы"]) ? workItem.rawItem["Материалы"] : (workItem.rawItem?.["Материалы"] && typeof workItem.rawItem["Материалы"] === 'object' ? [workItem.rawItem["Материалы"]] : [])),
-          ...(Array.isArray(workItem.rawItem?.["Оборудование"]) ? workItem.rawItem["Оборудование"] : (workItem.rawItem?.["Оборудование"] && typeof workItem.rawItem["Оборудование"] === 'object' ? [workItem.rawItem["Оборудование"]] : []))
-        ];
+        workItems.forEach(workItem => {
+          const formula = workItem.formula || 'КОЛИЧЕСТВО';
+          const evalRes = validateAndEvaluateFormula(formula, tierData.count, 'coupling', {
+            name: workItem.name,
+            type: workItem.type || 'работа',
+            section: sectionName,
+            ruleName: `${ruleTitlePrefix} (до ${tier} ${unitLabel})`,
+            formula: formula
+          });
+          if (!evalRes.valid) {
+            formulaErrors.push(evalRes.errorInfo);
+            return; // Skip this coupling item!
+          }
+          const rawVol = evalRes.value;
+          const workShowFormula = (workItem.showFormula !== undefined) ? workItem.showFormula : shouldShowFormula(workItem.rawItem || workItem);
+          const formulaDisplay = workShowFormula ? buildCouplingWorkFormulaDisplay(formula, tierData, rawVol, workItem.unit || 'шт') : '';
 
-        // Also check rule level if workItem has none
-        if (declaredSubItems.length === 0 && workItem.ruleRaw) {
-          const ruleSub = [
-            ...(Array.isArray(workItem.ruleRaw["Материалы"]) ? workItem.ruleRaw["Материалы"] : []),
-            ...(Array.isArray(workItem.ruleRaw["Оборудование"]) ? workItem.ruleRaw["Оборудование"] : [])
+          calculatedWorks.push({
+            name: workItem.name,
+            unit: workItem.unit || 'шт',
+            volume: rawVol,
+            volumeFormatted: String(rawVol),
+            decimals: extractItemDecimals(workItem.rawItem || workItem),
+            formula: formula,
+            formulaDisplay: formulaDisplay,
+            showFormula: workShowFormula,
+            tier: tier,
+            isOptical: isOptical,
+            section: sectionName,
+            type: workItem.type || 'работа',
+            parentWorkName: null,
+            comment: `${commentPrefix} (до ${tier} ${unitLabel})`
+          });
+
+          // Process materials and equipment declared under this work
+          const declaredSubItems = [
+            ...(Array.isArray(workItem.rawItem?.["Материалы"]) ? workItem.rawItem["Материалы"] : (workItem.rawItem?.["Материалы"] && typeof workItem.rawItem["Материалы"] === 'object' ? [workItem.rawItem["Материалы"]] : [])),
+            ...(Array.isArray(workItem.rawItem?.["Оборудование"]) ? workItem.rawItem["Оборудование"] : (workItem.rawItem?.["Оборудование"] && typeof workItem.rawItem["Оборудование"] === 'object' ? [workItem.rawItem["Оборудование"]] : []))
           ];
-          ruleSub.forEach(s => declaredSubItems.push(s));
-        }
 
-        const isCouplingBrandTemplate = (name) => /\{ *(?:МАРКА[ _-]МУФТЫ|МУФТА|МАРКА) *\}/i.test(name || '');
+          // Also check rule level if workItem has none
+          if (declaredSubItems.length === 0 && workItem.ruleRaw) {
+            const ruleSub = [
+              ...(Array.isArray(workItem.ruleRaw["Материалы"]) ? workItem.ruleRaw["Материалы"] : []),
+              ...(Array.isArray(workItem.ruleRaw["Оборудование"]) ? workItem.ruleRaw["Оборудование"] : [])
+            ];
+            ruleSub.forEach(s => declaredSubItems.push(s));
+          }
 
-        if (declaredSubItems.length > 0) {
-          declaredSubItems.forEach(mat => {
-            const rawMatType = (mat["Тип"] || mat.type || (Array.isArray(workItem.rawItem?.["Оборудование"]) && workItem.rawItem["Оборудование"].includes(mat) ? 'оборудование' : 'материал')).trim().toLowerCase();
-            let determinedMatType = 'материал';
-            if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
-              determinedMatType = 'оборудование';
-            } else if (rawMatType === 'работа' || rawMatType === 'work') {
-              determinedMatType = 'работа';
-            }
+          const isCouplingBrandTemplate = (name) => /\{ *(?:МАРКА[ _-]МУФТЫ|МУФТА|МАРКА) *\}/i.test(name || '');
 
-            const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_МУФТЫ}').trim();
-            const matUnit = mat["Единицы измерения"] || mat.unit || 'шт';
-            const matFormula = mat["Формула"] || mat.formula || 'КОЛИЧЕСТВО';
-            const matShowFormula = shouldShowFormula(mat, workShowFormula);
-            const matSection = (mat["Раздел"] || mat.section || sectionName).trim();
-
-            if (isCouplingBrandTemplate(matNameTpl)) {
-              if (tierCouplingsGenerated) {
-                return; // Couplings for this tier have already been generated
+          if (declaredSubItems.length > 0) {
+            declaredSubItems.forEach(mat => {
+              const rawMatType = (mat["Тип"] || mat.type || (Array.isArray(workItem.rawItem?.["Оборудование"]) && workItem.rawItem["Оборудование"].includes(mat) ? 'оборудование' : 'материал')).trim().toLowerCase();
+              let determinedMatType = 'материал';
+              if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
+                determinedMatType = 'оборудование';
+              } else if (rawMatType === 'работа' || rawMatType === 'work') {
+                determinedMatType = 'работа';
               }
-              tierCouplingsGenerated = true;
-              // Expand coupling brand template for each actual coupling type in this tier
-              tierData.couplings.forEach(coupling => {
-                let finalMatName = '';
-                if (/^\{ *(?:МАРКА[ _-]МУФТЫ|МУФТА|МАРКА) *\}$/i.test(matNameTpl)) {
-                  finalMatName = coupling.fullName || coupling.name || coupling.couplingType || matNameTpl;
-                } else {
-                  finalMatName = matNameTpl.replace(/\{ *(?:МАРКА[ _-]МУФТЫ|МУФТА|МАРКА) *\}/gi, coupling.fullName || coupling.name || coupling.couplingType);
-                }
 
-                const couplingMatUnit = mat["Единицы измерения"] || mat.unit || coupling.unit || 'шт';
-                const matEvalRes = validateAndEvaluateFormula(matFormula, coupling.count, 'coupling', {
-                  name: finalMatName,
+              const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_МУФТЫ}').trim();
+              const matUnit = mat["Единицы измерения"] || mat.unit || 'шт';
+              const matFormula = mat["Формула"] || mat.formula || 'КОЛИЧЕСТВО';
+              const matShowFormula = shouldShowFormula(mat, workShowFormula);
+              const matSection = (mat["Раздел"] || mat.section || sectionName).trim();
+
+              if (isCouplingBrandTemplate(matNameTpl)) {
+                if (tierCouplingsGenerated) {
+                  return; // Couplings for this tier have already been generated
+                }
+                tierCouplingsGenerated = true;
+                // Expand coupling brand template for each actual coupling type in this tier
+                tierData.couplings.forEach(coupling => {
+                  let finalMatName = '';
+                  if (/^\{ *(?:МАРКА[ _-]МУФТЫ|МУФТА|МАРКА) *\}$/i.test(matNameTpl)) {
+                    finalMatName = coupling.fullName || coupling.name || coupling.couplingType || matNameTpl;
+                  } else {
+                    finalMatName = matNameTpl.replace(/\{ *(?:МАРКА[ _-]МУФТЫ|МУФТА|МАРКА) *\}/gi, coupling.fullName || coupling.name || coupling.couplingType);
+                  }
+
+                  const couplingMatUnit = mat["Единицы измерения"] || mat.unit || coupling.unit || 'шт';
+                  const matEvalRes = validateAndEvaluateFormula(matFormula, coupling.count, 'coupling', {
+                    name: finalMatName,
+                    type: determinedMatType,
+                    section: matSection,
+                    ruleName: `${ruleTitlePrefix} (до ${tier} ${unitLabel})`,
+                    formula: matFormula
+                  });
+                  if (!matEvalRes.valid) {
+                    formulaErrors.push(matEvalRes.errorInfo);
+                    return;
+                  }
+                  const matRawVal = matEvalRes.value;
+                  const matFormulaDisp = matShowFormula ? buildCouplingSingleItemFormulaDisplay(matFormula, coupling.count, matRawVal, couplingMatUnit) : '';
+
+                  calculatedWorks.push({
+                    name: finalMatName,
+                    unit: couplingMatUnit,
+                    volume: matRawVal,
+                    volumeFormatted: String(matRawVal),
+                    decimals: extractItemDecimals(mat),
+                    formula: matFormula,
+                    formulaDisplay: matFormulaDisp,
+                    showFormula: matShowFormula,
+                    tier: tier,
+                    isOptical: isOptical,
+                    maxCores: coupling.maxCores,
+                    section: matSection,
+                    type: determinedMatType,
+                    parentWorkName: workItem.name,
+                    parentWorkUnit: workItem.unit || 'шт',
+                    parentWorkSection: sectionName,
+                    comment: `Кабели: ${(coupling.cableTypes || []).join(', ')}`,
+                    foundInCatalog: coupling.foundInCatalog !== undefined ? coupling.foundInCatalog : true
+                  });
+                });
+              } else {
+                // Static accompanying material/equipment declared under coupling work
+                const matEvalRes = validateAndEvaluateFormula(matFormula, tierData.count, 'coupling', {
+                  name: matNameTpl,
                   type: determinedMatType,
                   section: matSection,
-                  ruleName: `Установка муфт (до ${tier} жил)`,
+                  ruleName: `${ruleTitlePrefix} (до ${tier} ${unitLabel})`,
                   formula: matFormula
                 });
                 if (!matEvalRes.valid) {
@@ -4421,11 +4572,11 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                   return;
                 }
                 const matRawVal = matEvalRes.value;
-                const matFormulaDisp = matShowFormula ? buildCouplingSingleItemFormulaDisplay(matFormula, coupling.count, matRawVal, couplingMatUnit) : '';
+                const matFormulaDisp = matShowFormula ? buildCouplingWorkFormulaDisplay(matFormula, tierData, matRawVal, matUnit) : '';
 
                 calculatedWorks.push({
-                  name: finalMatName,
-                  unit: couplingMatUnit,
+                  name: matNameTpl,
+                  unit: matUnit,
                   volume: matRawVal,
                   volumeFormatted: String(matRawVal),
                   decimals: extractItemDecimals(mat),
@@ -4433,88 +4584,56 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                   formulaDisplay: matFormulaDisp,
                   showFormula: matShowFormula,
                   tier: tier,
-                  maxCores: coupling.maxCores,
+                  isOptical: isOptical,
                   section: matSection,
                   type: determinedMatType,
                   parentWorkName: workItem.name,
                   parentWorkUnit: workItem.unit || 'шт',
                   parentWorkSection: sectionName,
-                  comment: `Кабели: ${(coupling.cableTypes || []).join(', ')}`,
-                  foundInCatalog: coupling.foundInCatalog !== undefined ? coupling.foundInCatalog : true
+                  comment: mat["Комментарий"] || `${commentPrefix} (до ${tier} ${unitLabel})`
                 });
-              });
-            } else {
-              // Static accompanying material/equipment declared under coupling work
-              const matEvalRes = validateAndEvaluateFormula(matFormula, tierData.count, 'coupling', {
-                name: matNameTpl,
-                type: determinedMatType,
-                section: matSection,
-                ruleName: `Установка муфт (до ${tier} жил)`,
-                formula: matFormula
-              });
-              if (!matEvalRes.valid) {
-                formulaErrors.push(matEvalRes.errorInfo);
-                return;
               }
-              const matRawVal = matEvalRes.value;
-              const matFormulaDisp = matShowFormula ? buildCouplingWorkFormulaDisplay(matFormula, tierData, matRawVal, matUnit) : '';
+            });
+          }
+        });
 
-              calculatedWorks.push({
-                name: matNameTpl,
-                unit: matUnit,
-                volume: matRawVal,
-                volumeFormatted: String(matRawVal),
-                decimals: extractItemDecimals(mat),
-                formula: matFormula,
-                formulaDisplay: matFormulaDisp,
-                showFormula: matShowFormula,
-                tier: tier,
-                section: matSection,
-                type: determinedMatType,
-                parentWorkName: workItem.name,
-                parentWorkUnit: workItem.unit || 'шт',
-                parentWorkSection: sectionName,
-                comment: mat["Комментарий"] || `Установка соединительных муфт (до ${tier} жил)`
-              });
-            }
+        // Fallback: if no work in this tier declared a {МАРКА_МУФТЫ} template, generate default coupling material lines once
+        if (!tierCouplingsGenerated) {
+          tierCouplingsGenerated = true;
+          const primaryWorkItem = workItems[0] || null;
+          tierData.couplings.forEach(coupling => {
+            const showFormula = (coupling.showFormula !== undefined) ? coupling.showFormula : shouldShowFormula(coupling);
+            calculatedWorks.push({
+              name: coupling.fullName,
+              unit: coupling.unit || 'шт',
+              volume: coupling.count,
+              volumeFormatted: String(coupling.count),
+              decimals: extractItemDecimals(coupling),
+              formula: 'КОЛИЧЕСТВО',
+              formulaDisplay: showFormula ? `${coupling.count} ${coupling.unit || 'шт'}` : '',
+              showFormula: showFormula,
+              tier: tier,
+              isOptical: isOptical,
+              maxCores: coupling.maxCores,
+              section: sectionName,
+              type: 'материал',
+              parentWorkName: primaryWorkItem ? primaryWorkItem.name : null,
+              parentWorkUnit: primaryWorkItem ? (primaryWorkItem.unit || 'шт') : 'шт',
+              parentWorkSection: sectionName,
+              comment: `Кабели: ${(coupling.cableTypes || []).join(', ')}`,
+              foundInCatalog: coupling.foundInCatalog !== undefined ? coupling.foundInCatalog : true
+            });
           });
         }
-      });
-
-      // Fallback: if no work in this tier declared a {МАРКА_МУФТЫ} template, generate default coupling material lines once
-      if (!tierCouplingsGenerated) {
-        tierCouplingsGenerated = true;
-        const primaryWorkItem = workItems[0] || null;
-        tierData.couplings.forEach(coupling => {
-          const showFormula = (coupling.showFormula !== undefined) ? coupling.showFormula : shouldShowFormula(coupling);
-          calculatedWorks.push({
-            name: coupling.fullName,
-            unit: coupling.unit || 'шт',
-            volume: coupling.count,
-            volumeFormatted: String(coupling.count),
-            decimals: extractItemDecimals(coupling),
-            formula: 'КОЛИЧЕСТВО',
-            formulaDisplay: showFormula ? `${coupling.count} ${coupling.unit || 'шт'}` : '',
-            showFormula: showFormula,
-            tier: tier,
-            maxCores: coupling.maxCores,
-            section: sectionName,
-            type: 'материал',
-            parentWorkName: primaryWorkItem ? primaryWorkItem.name : null,
-            parentWorkUnit: primaryWorkItem ? (primaryWorkItem.unit || 'шт') : 'шт',
-            parentWorkSection: sectionName,
-            comment: `Кабели: ${(coupling.cableTypes || []).join(', ')}`,
-            foundInCatalog: coupling.foundInCatalog !== undefined ? coupling.foundInCatalog : true
-          });
-        });
       }
-    }
+    });
   });
 
   // Iterate rules in the JSON file order
   rules.forEach(rule => {
     const ruleName = (rule["Название"] || rule.name || '').trim();
     if (!ruleName) return;
+    if (ruleName.toLowerCase().includes('муфт')) return; // Skip coupling rules in cable routing loop
 
     const parsedWM = parseRuleWorksAndMaterials(rule);
     const template = (rule["Шаблон"] || rule.template || '').trim();
@@ -5129,7 +5248,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
         const t = (w["Тип"] || w.type || '').trim().toLowerCase();
         return t !== 'материал' && t !== 'оборудование';
       }) || ruleWorks[0];
-      const primaryWorkTitle = (typeof primaryWork === 'string' ? primaryWork : (primaryWork["Наименование"] || primaryWork.name || `Монтаж оборудования ${itemMark}`)).trim();
+      const primaryWorkTitle = (typeof primaryWork === 'string' ? primaryWork : (primaryWork["Наименование"] || primaryWork.name || `Установка оборудования ${itemMark}`)).trim();
       const primaryWorkUnit = (typeof primaryWork === 'string' ? 'шт' : (primaryWork["Единицы измерения"] || primaryWork.unit || 'шт')).trim();
 
       ruleWorks.forEach(work => {

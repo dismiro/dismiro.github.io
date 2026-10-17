@@ -464,6 +464,17 @@ function renderRulesModalContent(rulesObj = null) {
 
           if (isEquipSec) {
             groupTitle = `Способ установки: «${escapeHtml(key)}»`;
+          } else if (rName.toLowerCase().includes('муфт')) {
+            const isRuleOpt = rName.toLowerCase().includes('оптич') || rName.toLowerCase().includes('волс');
+            const unitLabel = isRuleOpt ? 'волокон' : 'жил';
+            const cleanKey = String(key).trim().replace(',', '.');
+            const numK = parseFloat(cleanKey);
+            if (!isNaN(numK)) {
+              tierThreshold = numK;
+              groupTitle = `Емкость до ${tierThreshold} ${unitLabel} (ключ "${escapeHtml(key)}")`;
+            } else {
+              groupTitle = `Емкость "${escapeHtml(key)}"`;
+            }
           } else if (isOptKey) {
             groupTitle = `Оптический кабель (ключ "${escapeHtml(key)}")`;
           } else {
@@ -1108,22 +1119,27 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
     const fullName = (data && data["Полное наименование"]) || mark;
     const maxCores = (data && data["МаксЖил"]) !== undefined ? data["МаксЖил"] : parseMaxCoresFromString(mark);
     const unit = (data && data["Единицы измерения"]) || 'шт';
-    const tier = getCouplingInstallationTier(maxCores);
+    const isOpt = !!(data && String(data["Категория"] || '').trim().toLowerCase() === 'оптическая муфта');
+    const tier = getCouplingInstallationTier(maxCores, rules, isOpt);
+    const unitLabel = isOpt ? 'волокон' : 'жил';
+    const optBadge = isOpt
+      ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" style="font-size: 0.65rem;">ВОЛС</span>`
+      : '';
 
     return `
       <tr>
         <td class="text-center text-muted small ps-3">${idx + 1}</td>
         <td>
-          <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace py-1 px-2" style="font-size: 0.82rem;">${escapeHtml(mark)}</span>
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace py-1 px-2" style="font-size: 0.82rem;">${escapeHtml(mark)}</span>${optBadge}
         </td>
         <td>
           <div class="text-body fw-medium" style="line-height: 1.35;">${escapeHtml(fullName)}</div>
         </td>
         <td class="text-center">
-          <span class="badge bg-body-secondary text-body border" style="font-size: 0.78rem;">до ${maxCores} жил</span>
+          <span class="badge bg-body-secondary text-body border" style="font-size: 0.78rem;">до ${maxCores} ${unitLabel}</span>
         </td>
         <td class="text-center">
-          <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle font-monospace" style="font-size: 0.75rem;">до ${tier} жил</span>
+          <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle font-monospace" style="font-size: 0.75rem;">до ${tier} ${unitLabel}</span>
         </td>
         <td class="text-center font-monospace text-muted small pe-3">${escapeHtml(unit)}</td>
       </tr>
@@ -1141,7 +1157,7 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
               <th style="width: 240px;">Обозначение / Марка</th>
               <th>Полное наименование</th>
               <th style="width: 120px;" class="text-center">Макс. жил</th>
-              <th style="width: 140px;" class="text-center">Группа монтажа</th>
+              <th style="width: 140px;" class="text-center">Группа установки</th>
               <th style="width: 70px;" class="text-center pe-3">Ед. изм.</th>
             </tr>
           </thead>
