@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="ru" data-bs-theme="auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Справка и руководство пользователя по модулю автоматизированного расчета ведомостей объемов работ (ВОР)">
+  <title>Справка — Модуль заполнения ведомостей объемов работ (ВОР)</title>
+
+  <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+  <link href="../assets/theme.min.css" rel="stylesheet">
+  <link href="../assets/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+  /* -------------------------------------------------------------
+     THEME INTEGRATION & COMPONENT STYLES (Matches index.html)
+     ------------------------------------------------------------- */
+  .main-container {
+    max-width: 1440px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-top: 4.5rem;
+    padding-bottom: 3rem;
+  }
+
+  .module-card {
+    border: 1px solid var(--si-border-color);
+    border-radius: var(--si-border-radius-lg, 0.85rem);
+    background-color: var(--si-card-bg);
+    box-shadow: var(--si-box-shadow-sm, 0 4px 20px rgba(0, 0, 0, 0.04));
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    overflow: hidden;
+  }
+
+  .card-header {
+    border-bottom: 1px solid var(--si-border-color);
+    background: transparent;
+  }
+
+  .table-sticky-header th {
+    background-color: var(--si-tertiary-bg) !important;
+    box-shadow: inset 0 -1px 0 var(--si-border-color);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--si-body-color);
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+    vertical-align: middle !important;
+  }
+
+  .cable-pill {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    border-radius: var(--si-border-radius-sm, 0.35rem);
+    background-color: var(--si-tertiary-bg);
+    color: var(--si-body-color);
+    border: 1px solid var(--si-border-color);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  .routing-tag {
+    display: inline-block;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.76rem;
+    border-radius: var(--si-border-radius-sm, 0.25rem);
+    background-color: rgba(var(--si-primary-rgb, 99, 102, 241), 0.08);
+    color: var(--si-primary);
+    border: 1px solid rgba(var(--si-primary-rgb, 99, 102, 241), 0.22);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  [data-bs-theme="dark"] .routing-tag {
+    background-color: rgba(99, 102, 241, 0.18);
+    color: #a5b4fc;
+    border-color: rgba(99, 102, 241, 0.3);
+  }
+
+  .stat-summary-card {
+    border: 1px solid var(--si-border-color, #e2e8f0);
+    border-radius: 0.55rem;
+    padding: 0.75rem 1rem;
+    background: var(--si-gray-50, #f8fafc);
+    height: 100%;
+  }
+
+  [data-bs-theme="dark"] .stat-summary-card {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: #0f172a;
+  }
+
+  .step-number {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+  }
+
+  .help-nav-sticky {
+    position: sticky;
+    top: 5.5rem;
+  }
+
+  .help-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.48rem 0.75rem;
+    border-radius: 0.45rem;
+    color: var(--si-body-color);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 500;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .help-nav-link:hover {
+    background-color: var(--si-tertiary-bg);
+    color: var(--si-primary);
+  }
+
+  .code-block-sample {
+    background-color: #f6f8fa;
+    border: 1px solid var(--si-border-color);
+    border-radius: 0.5rem;
+    padding: 0.85rem 1rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    overflow-x: auto;
+    color: #24292f;
+  }
+
+  [data-bs-theme="dark"] .code-block-sample {
+    background-color: #0d1117;
+    border-color: #30363d;
+    color: #e6edf3;
+  }
+
+  section[id] {
+    scroll-margin-top: 5.5rem;
+  }
+
+  /* Badge contrast fixes */
+  .badge.bg-secondary-subtle,
+  .badge.bg-light,
+  .badge.bg-body,
+  .badge.bg-body-secondary,
+  .badge.bg-body-tertiary {
+    color: var(--si-secondary-text-emphasis, #333d48) !important;
+  }
+  [data-bs-theme="dark"] .badge.bg-secondary-subtle,
+  [data-bs-theme="dark"] .badge.bg-light,
+  [data-bs-theme="dark"] .badge.bg-body-tertiary {
+    color: #e2e8f0 !important;
+  }
+  </style>
+</head>
+<body>
+
+  <!-- Header Navbar (Identical to index.html) -->
+  <header class="header navbar navbar-expand-lg bg-light shadow-sm fixed-top">
+    <div class="container px-3">
+      <a href="https://dismiro.github.io" class="navbar-brand pe-3">
+        <img src="../assets/logo.svg" width="47" alt="S & I">
+        Signaling & Interlocking
+      </a>
+      <div id="navbarNav" class="offcanvas offcanvas-end">
+        <div class="offcanvas-header border-bottom">
+          <h5 class="offcanvas-title">Меню</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-current="page">Сервисы</a>
+              <div class="dropdown-menu p-0">
+                <div class="d-lg-flex">
+                  <div class="mega-dropdown-column d-flex justify-content-center align-items-center rounded-3 rounded-end-0 px-0" style="margin: -1px; background-color: #f3f6ff;">
+                    <img src="../assets/images/landings.jpg" alt="Landings">
+                  </div>
+                  <div class="mega-dropdown-column pt-lg-3 pb-lg-4" style="--si-mega-dropdown-column-width: 25rem;">
+                    <ul class="list-unstyled mb-0">
+                      <li><a href="../index.html" class="dropdown-item">Главная страница</a></li>
+                      <li><a href="./index.html" class="dropdown-item fw-semibold text-primary">Ведомости объемов работ (ВОР) <span class="badge bg-success ms-2">Активный</span></a></li>
+                      <li><a href="../indicator/index.html" class="dropdown-item">Жильность кабеля к МУ <span class="badge bg-success ms-2">Готово</span></a></li>
+                      <li><a href="../crossroad/index.html" class="dropdown-item">Параметры извещения переезд <span class="badge bg-warning ms-2">В разработке</span></a></li>
+                      <li><a href="../battery_parameters/index.html" class="dropdown-item">Расчет емкости аккумуляторов<span class="badge bg-warning ms-2">В разработке</span></a></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle active" data-bs-toggle="dropdown">Справка</a>
+              <ul class="dropdown-menu">
+                <li><a href="../help.html" class="dropdown-item">Вся платформа</a></li>
+                <li><a href="./help.html" class="dropdown-item active">Этот модуль</a></li>
+              </ul>
+            </li>
+            <li class="nav-item">
+              <a href="../about.html" class="nav-link">О нас</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div class="form-check form-switch mode-switch pe-lg-1 ms-auto me-4" data-bs-toggle="mode">
+        <input type="checkbox" class="form-check-input" id="theme-mode">
+        <label class="form-check-label d-none d-sm-block" for="theme-mode">Светлая</label>
+        <label class="form-check-label d-none d-sm-block" for="theme-mode">Темная</label>
+      </div>
+      <button type="button" class="navbar-toggler" data-bs-toggle="offcanvas" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="container main-container px-3 px-xl-4">
+    <main>
+      <!-- Top Hero Banner -->
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 pt-3 pt-md-4 mb-4 pb-2 border-bottom">
+        <div>
+          <div class="d-inline-flex align-items-center gap-2 badge bg-primary-subtle text-primary border mb-2 px-2 py-1">
+            <i class='bx bx-book-open fs-6'></i> Документация модуля
+          </div>
+          <h1 class="h2 mb-1 fw-bold">Руководство пользователя: Модуль ВОР</h1>
+          <p class="text-muted mb-0" style="max-width: 780px; font-size: 0.95rem;">
+            Автоматизированный расчет ведомостей объемов строительных и монтажных работ по кабельным трассам, траншеям, соединительным муфтам и напольному оборудованию СЦБ.
+          </p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <a href="./index.html" class="btn btn-primary d-inline-flex align-items-center gap-2 shadow-sm">
+            <i class='bx bx-arrow-back fs-5'></i> Перейти к расчету ВОР
+          </a>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <!-- Left Sidebar: Sticky Table of Contents -->
+        <div class="col-12 col-lg-3">
+          <div class="card module-card help-nav-sticky">
+            <div class="card-header py-2_5 px-3 d-flex align-items-center gap-2">
+              <i class='bx bx-list-ul text-primary fs-5'></i>
+              <span class="fw-bold small text-uppercase">Содержание</span>
+            </div>
+            <div class="card-body p-2">
+              <nav class="d-flex flex-column gap-1">
+                <a href="#section-overview" class="help-nav-link">
+                  <i class='bx bx-layout text-primary'></i> 1. Обзор интерфейса
+                </a>
+                <a href="#section-quickstart" class="help-nav-link">
+                  <i class='bx bx-play-circle text-success'></i> 2. Порядок работы
+                </a>
+                <a href="#section-calc-logic" class="help-nav-link">
+                  <i class='bx bx-calculator text-info'></i> 3. Логика расчетов
+                </a>
+                <a href="#section-rules-modal" class="help-nav-link">
+                  <i class='bx bx-slider-alt text-warning'></i> 4. Сметные нормы и JSON
+                </a>
+                <a href="#section-formulas" class="help-nav-link">
+                  <i class='bx bx-code-curly text-danger'></i> 5. Формулы и переменные
+                </a>
+                <a href="#section-export" class="help-nav-link">
+                  <i class='bx bx-download text-success'></i> 6. Экспорт в GGE и Excel
+                </a>
+              </nav>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Content Column -->
+        <div class="col-12 col-lg-9 d-flex flex-column gap-4">
+
+          <!-- SECTION 1: ОБЗОР ИНТЕРФЕЙСА -->
+          <section id="section-overview" class="card module-card">
+            <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
+              <i class='bx bx-layout text-primary fs-3'></i>
+              <h2 class="h5 my-0 fw-bold">1. Обзор рабочей области</h2>
+            </div>
+            <div class="card-body p-4">
+              <p class="text-muted mb-3">
+                Интерфейс модуля спроектирован по принципу трехколоночного конвейера: слева находятся исходные данные из САПР, по центру — сгруппированные инженерные ведомости, справа — готовая сметная ведомость объемов работ (ВОР).
+              </p>
+
+              <div class="row g-3">
+                <div class="col-12 col-md-4">
+                  <div class="stat-summary-card">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      <span class="badge bg-primary-subtle text-primary border p-1_5"><i class='bx bx-data fs-5'></i></span>
+                      <h3 class="h6 mb-0 fw-bold">Столбец 1: Исходные данные</h3>
+                    </div>
+                    <ul class="small text-muted ps-3 mb-0">
+                      <li class="mb-1">Таблицы <strong>Кабели</strong>, <strong>Участки трассы / траншеи</strong> и <strong>Напольное оборудование</strong>.</li>
+                      <li class="mb-1">Контроль соответствия длин и наличия муфт по каждому кабелю.</li>
+                      <li class="mb-1">Глобальный поиск по строкам и сворачивание панели кнопкой <kbd>«</kbd>.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-4">
+                  <div class="stat-summary-card">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      <span class="badge bg-info-subtle text-info-emphasis border p-1_5"><i class='bx bx-layer fs-5'></i></span>
+                      <h3 class="h6 mb-0 fw-bold">Столбец 2: Сводные ведомости</h3>
+                    </div>
+                    <ul class="small text-muted ps-3 mb-0">
+                      <li class="mb-1"><strong>Ведомость траншей</strong> — сумма длин и долей по типам прокладки.</li>
+                      <li class="mb-1"><strong>Ведомость кабелей</strong> — сумма длин и ниток по маркам кабелей.</li>
+                      <li class="mb-1"><strong>Ведомость муфт</strong> и <strong>Ведомость оборудования</strong>.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-4">
+                  <div class="stat-summary-card">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      <span class="badge bg-success-subtle text-success border p-1_5"><i class='bx bx-spreadsheet fs-5'></i></span>
+                      <h3 class="h6 mb-0 fw-bold">Столбец 3: Итоговая ВОР</h3>
+                    </div>
+                    <ul class="small text-muted ps-3 mb-0">
+                      <li class="mb-1"><strong>Строительные работы</strong> (разработка и засыпка грунта).</li>
+                      <li class="mb-1"><strong>Монтажные работы</strong> (прокладка кабелей, труб, муфт, оборудования).</li>
+                      <li class="mb-1">Иерархическая привязка материалов <span class="font-monospace fw-bold">↳</span> и экспорт в <code>.gge</code> / <code>.xlsx</code>.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- SECTION 2: БЫСТРЫЙ СТАРТ -->
+          <section id="section-quickstart" class="card module-card">
+            <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
+              <i class='bx bx-play-circle text-success fs-3'></i>
+              <h2 class="h5 my-0 fw-bold">2. Порядок работы (Быстрый старт)</h2>
+            </div>
+            <div class="card-body p-4">
+              <div class="d-flex flex-column gap-3">
+                <div class="d-flex align-items-start gap-3">
+                  <span class="step-number bg-primary text-white">1</span>
+                  <div>
+                    <h3 class="h6 fw-bold mb-1">Загрузите JSON-файл проекта</h3>
+                    <p class="small text-muted mb-0">
+                      Перетащите файл выгрузки из AutoCAD (например, <code>data_export.json</code>) в пунктирную область первого столбца или нажмите <strong>«Загрузить свой файл (.json)»</strong>. Для демонстрации работы нажмите кнопку <strong>«Загрузить пример»</strong>. Программа автоматически определяет кодировку файла (<code>UTF-8</code>, <code>Windows-1251</code>, <code>UTF-16</code>) и сразу запускает расчет.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="d-flex align-items-start gap-3">
+                  <span class="step-number bg-primary text-white">2</span>
+                  <div>
+                    <h3 class="h6 fw-bold mb-1">Проверьте уведомления и полноту правил</h3>
+                    <p class="small text-muted mb-0">
+                      Если в проекте встретились способы прокладки, марки кабелей или оборудование, для которых в базе нет сметных норм, на карточках появятся желтые бейджи <span class="badge bg-warning text-dark">Неполные правила</span> и кнопки <strong>«Добавить в правила JSON»</strong>, которые автоматически создадут шаблоны недостающих позиций в редакторе норм.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="d-flex align-items-start gap-3">
+                  <span class="step-number bg-primary text-white">3</span>
+                  <div>
+                    <h3 class="h6 fw-bold mb-1">При необходимости скорректируйте сметные нормы</h3>
+                    <p class="small text-muted mb-0">
+                      Нажмите кнопку <span class="badge bg-light text-dark border"><i class='bx bx-slider-alt'></i></span> в шапке первого столбца, чтобы открыть окно сметных норм и справочников. После внесения правок нажмите зеленую кнопку <strong>«Применить и пересчитать работы»</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="d-flex align-items-start gap-3">
+                  <span class="step-number bg-success text-white">4</span>
+                  <div>
+                    <h3 class="h6 fw-bold mb-1">Экспортируйте готовую ведомость</h3>
+                    <p class="small text-muted mb-0">
+                      В нижней карточке третьего столбца нажмите <strong>«GGE (.gge)»</strong> для выгрузки в формате Главгосэкспертизы 3.01 или <strong>«Excel (.xlsx)»</strong> для получения таблицы Excel со всеми расчетными листами.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- SECTION 3: ЛОГИКА РАСЧЕТОВ -->
+          <section id="section-calc-logic" class="card module-card">
+            <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
+              <i class='bx bx-calculator text-info fs-3'></i>
+              <h2 class="h5 my-0 fw-bold">3. Логика и правила выполнения расчетов</h2>
+            </div>
+            <div class="card-body p-4">
+              <h3 class="h6 fw-bold mb-2"><i class='bx bx-git-branch text-primary me-1'></i>3.1. Нормализация и распознавание марок кабелей</h3>
+              <p class="small text-muted mb-3">
+                Программа автоматически приводит проектные обозначения кабелей к номенклатурным маркам из <strong>«Справочника кабелей»</strong>:
+              </p>
+
+              <div class="table-responsive rounded-2 border mb-4">
+                <table class="table table-sm table-hover align-middle mb-0 small">
+                  <thead class="table-sticky-header">
+                    <tr>
+                      <th class="ps-3">Обозначение в проекте</th>
+                      <th>Символ сноски</th>
+                      <th>Распознанная группа / марка</th>
+                      <th class="pe-3">Правило обработки скобок</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="ps-3 font-monospace fw-semibold">3х2(2), 7х2(4)</td>
+                      <td><span class="text-muted">без символа</span></td>
+                      <td><code>СБВБПу</code> (3х2х0,9, 7х2х0,9)</td>
+                      <td class="pe-3">Число запасных жил <code>(2)</code>, <code>(4)</code> отбрасывается</td>
+                    </tr>
+                    <tr>
+                      <td class="ps-3 font-monospace fw-semibold">10х2(8)*</td>
+                      <td><span class="cable-pill">*</span></td>
+                      <td><code>СБВБэпПуц</code> (10х2х0,9)</td>
+                      <td class="pe-3">Запас жил <code>(8)</code> отбрасывается → <code>10х2*</code></td>
+                    </tr>
+                    <tr>
+                      <td class="ps-3 font-monospace fw-semibold">14х2(8)**, 30х2(8)**</td>
+                      <td><span class="cable-pill">**</span></td>
+                      <td><code>СБВБПсЭауПсБбШпц</code></td>
+                      <td class="pe-3">Запас жил <code>(8)</code> отбрасывается → <code>14х2**</code>, <code>30х2**</code></td>
+                    </tr>
+                    <tr>
+                      <td class="ps-3 font-monospace fw-semibold">7х2(4) &amp;</td>
+                      <td><span class="cable-pill">&amp;</span></td>
+                      <td><code>СБВБПнг(А)-HF</code></td>
+                      <td class="pe-3">Запас жил <code>(4)</code> отбрасывается → <code>7х2 &amp;</code></td>
+                    </tr>
+                    <tr>
+                      <td class="ps-3 font-monospace fw-semibold">10х2(9) #, 14х2(8) \U+0394</td>
+                      <td><span class="cable-pill">#</span> или <span class="cable-pill">\U+0394</span></td>
+                      <td><code>СБМВБэпПу</code> (с жилами 1,0 мм)</td>
+                      <td class="pe-3">Запас жил отбрасывается, поддерживается код дельты AutoCAD</td>
+                    </tr>
+                    <tr>
+                      <td class="ps-3 font-monospace fw-semibold">ВБШвнг(А)-LS 2х2,5-0,66</td>
+                      <td><span class="badge bg-secondary-subtle border">Особый кабель</span></td>
+                      <td>Силовой / Специальный кабель</td>
+                      <td class="pe-3">Буквенный индекс горючести <code>(А)</code> сохраняется</td>
+                    </tr>
+                    <tr>
+                      <td class="ps-3 font-monospace fw-semibold">ОКБ-Н-Сп-4/2(2,0)Сп-16(2) "8кН"</td>
+                      <td><span class="badge bg-info-subtle text-info-emphasis border">Оптический кабель</span></td>
+                      <td>Оптический кабель связи (ВОЛС)</td>
+                      <td class="pe-3">Все конструктивные скобки <code>(2,0)</code>, <code>(2)</code> сохраняются полностью</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h3 class="h6 fw-bold mb-2"><i class='bx bx-git-merge text-warning me-1'></i>3.2. Расчет количества соединительных муфт</h3>
+              <p class="small text-muted mb-3">
+                Для каждого отдельного кабеля в проекте его длина <code>L</code> сравнивается со <strong>строительной длиной</strong> <code>L_стр</code> из справочника кабелей (например, <code>300 м</code>, <code>600 м</code>, <code>1000 м</code> или <code>2000 м</code>):
+              </p>
+              <div class="p-3 rounded bg-body-tertiary border mb-4 small">
+                <div class="fw-semibold mb-1">Формула расчета на один кабель:</div>
+                <code class="fs-6 text-primary">Количество муфт = (L &lt;= L_стр) ? 0 : Math.ceil(L / L_стр) - 1</code>
+                <div class="text-muted mt-1">
+                  Например, при строительной длине <strong>600 м</strong>: для кабеля длиной <strong>590 м</strong> требуется <strong>0 муфт</strong>; для кабеля <strong>680 м</strong> — <strong>1 муфта</strong>; для кабеля <strong>1250 м</strong> — <strong>2 муфты</strong>.
+                </div>
+              </div>
+
+              <h3 class="h6 fw-bold mb-2"><i class='bx bx-sitemap text-success me-1'></i>3.3. Иерархическая группировка работ и материалов</h3>
+              <p class="small text-muted mb-0">
+                В ведомостях ВОР (столбец 3) одноименные работы из разных правил в пределах одного раздела автоматически складываются в одну строку с формированием подробной суммы в графе <strong>«Формула»</strong>. Все вложенные материалы и оборудование группируются строго под своей родительской работой и получают подчиненные номера (например, <code>1.1</code>, <code>1.2</code> под работой <code>1</code>).
+              </p>
+            </div>
+          </section>
+
+          <!-- SECTION 4: МОДАЛЬНОЕ ОКНО ПРАВИЛ -->
+          <section id="section-rules-modal" class="card module-card">
+            <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
+              <i class='bx bx-slider-alt text-warning fs-3'></i>
+              <h2 class="h5 my-0 fw-bold">4. Управление сметными нормами и справочниками</h2>
+            </div>
+            <div class="card-body p-4">
+              <p class="small text-muted mb-3">
+                Окно <strong>«Сметные нормы и работы (JSON)»</strong> включает 6 специализированных вкладок. Все изменения внутри окна сначала сохраняются в черновик редактора и вступают в силу только после нажатия кнопки <strong>«Применить и пересчитать работы»</strong>.
+              </p>
+
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <div class="p-3 rounded border h-100">
+                    <div class="fw-bold mb-1 d-flex align-items-center gap-2">
+                      <i class='bx bx-code-curly text-warning fs-5'></i> 1. Редактор JSON
+                    </div>
+                    <p class="small text-muted mb-0">
+                      Редактор CodeMirror с подсветкой синтаксиса, проверкой валидности JSON на лету, сворачиванием блоков (<kbd>Ctrl+Q</kbd>) и поиском по тексту (<kbd>Ctrl+F</kbd>). Позволяет загрузить внешний файл норм или скачать текущие правила.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <div class="p-3 rounded border h-100">
+                    <div class="fw-bold mb-1 d-flex align-items-center gap-2">
+                      <i class='bx bx-list-check text-primary fs-5'></i> 2. Сметные нормы
+                    </div>
+                    <p class="small text-muted mb-0">
+                      Наглядное отображение всех правил по разделам в виде карточек с формулами, единицами измерения и условиями. Кнопка <strong>«JSON»</strong> на любой карточке мгновенно прокручивает редактор к нужному узлу и подсвечивает его.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <div class="p-3 rounded border h-100">
+                    <div class="fw-bold mb-1 d-flex align-items-center gap-2">
+                      <i class='bx bx-cable text-success fs-5'></i> 3. Справочник кабелей
+                    </div>
+                    <p class="small text-muted mb-0">
+                      Каталог кабелей с фильтрацией по категориям (ВОЛС, Особый кабель, кабели СЦБ). Содержит строительную длину, массу 1 м (для выбора весовой ступени прокладки), марку муфты и полное наименование по ГОСТ/ТУ.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <div class="p-3 rounded border h-100">
+                    <div class="fw-bold mb-1 d-flex align-items-center gap-2">
+                      <i class='bx bx-git-merge text-warning fs-5'></i> 4. Справочник муфт
+                    </div>
+                    <p class="small text-muted mb-0">
+                      Перечень кабельных и оптических муфт с указанием полного наименования, максимального числа жил/волокон (<code>МаксЖил</code>) и автоматически определяемой группы сметных расценок на установку.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <div class="p-3 rounded border h-100">
+                    <div class="fw-bold mb-1 d-flex align-items-center gap-2">
+                      <i class='bx bx-cube text-warning fs-5'></i> 5. Оборудование
+                    </div>
+                    <p class="small text-muted mb-0">
+                      Сметные нормы для напольных устройств (стрелочные электроприводы, светофоры, путевые коробки, разветвительные муфты) с разделением по способам установки (например, <code>«Не указано»</code>, <code>«Боковые пути»</code>).
+                    </p>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <div class="p-3 rounded border h-100">
+                    <div class="fw-bold mb-1 d-flex align-items-center gap-2">
+                      <i class='bx bx-cog text-secondary fs-5'></i> 6. Настройки
+                    </div>
+                    <p class="small text-muted mb-0">
+                      Выбор режима нумерации позиций (иерархическая <code>1, 1.1, 1.2</code> или сквозная <code>1, 2, 3</code>), точности округления работ и материалов, а также метаданных для заголовка XML-файла Главгосэкспертизы.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- SECTION 5: СПРАВОЧНИК ФОРМУЛ И ПЕРЕМЕННЫХ -->
+          <section id="section-formulas" class="card module-card">
+            <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
+              <i class='bx bx-code-curly text-danger fs-3'></i>
+              <h2 class="h5 my-0 fw-bold">5. Справочник переменных, шаблонов и условий в JSON</h2>
+            </div>
+            <div class="card-body p-4">
+              <p class="small text-muted mb-3">
+                При создании или редактировании правил в поле <code>"Формула"</code> допускаются арифметические операторы (<code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, скобки <code>()</code>), дробные числа (через запятую или точку) и следующие встроенные переменные:
+              </p>
+
+              <div class="table-responsive rounded-2 border mb-4">
+                <table class="table table-sm table-hover align-middle mb-0 small">
+                  <thead class="table-sticky-header">
+                    <tr>
+                      <th class="ps-3" style="width: 24%;">Раздел / Контекст</th>
+                      <th style="width: 34%;">Доступные переменные</th>
+                      <th style="width: 42%;" class="pe-3">Описание и примеры формул</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="ps-3 fw-semibold">Строительные работы<br><span class="text-muted fw-normal">(по участкам траншей)</span></td>
+                      <td>
+                        <span class="routing-tag mb-1">ДЛИНА</span><br>
+                        <span class="routing-tag mb-1">КАБЕЛЕЙ</span> / <span class="routing-tag mb-1">КОЛИЧЕСТВО_КАБЕЛЕЙ</span><br>
+                        <span class="routing-tag mb-1">КОЛИЧЕСТВО_ПЕРЕСЕЧЕНИЙ</span><br>
+                        <span class="routing-tag mb-1">КОЛИЧЕСТВО_ТРУБ</span><br>
+                        <span class="routing-tag">ДЛИНА_ТРУБ</span>
+                      </td>
+                      <td class="pe-3">
+                        <div class="mb-1"><code>"0,36*ДЛИНА"</code> — объем грунта по длине траншеи.</div>
+                        <div class="mb-1"><code>"0,05*0,8*ДЛИНА"</code> — объем уширения траншеи.</div>
+                        <div><code>"КОЛИЧЕСТВО_ПЕРЕСЕЧЕНИЙ*КОЛИЧЕСТВО_ТРУБ*ДЛИНА_ТРУБ"</code> — метраж защитных ПНД труб под путями.</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="ps-3 fw-semibold">Монтажные работы<br><span class="text-muted fw-normal">(прокладка кабелей)</span></td>
+                      <td>
+                        <span class="routing-tag">ДЛИНА</span>
+                      </td>
+                      <td class="pe-3">
+                        <div class="mb-1">Для работ: <code>"ДЛИНА"</code> (суммарная длина кабелей данной весовой категории в метрах).</div>
+                        <div>Для кабеля (в материалах): <code>"ДЛИНА/1000"</code> (перевод длины конкретного кабеля в километры).</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="ps-3 fw-semibold">Установка муфт и Оборудование</td>
+                      <td>
+                        <span class="routing-tag mb-1">КОЛИЧЕСТВО</span><br>
+                        <span class="routing-tag">КОЛИЧЕСТВО_МУФТ</span>
+                      </td>
+                      <td class="pe-3">
+                        <div><code>"КОЛИЧЕСТВО"</code> — количество устанавливаемых муфт или единиц напольного оборудования в штуках.</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h3 class="h6 fw-bold mb-2">Дополнительные поля и макроподстановки в JSON</h3>
+              <ul class="small text-muted mb-3">
+                <li class="mb-1"><code>"{МАРКА_КАБЕЛЯ}"</code> — указывается в поле <code>"Наименование"</code> материала внутри правил прокладки кабелей. Автоматически разворачивается в отдельные строки материалов для каждой марки кабеля с подстановкой её полного описания из справочника.</li>
+                <li class="mb-1"><code>"{МАРКА_МУФТЫ}"</code> — указывается в поле <code>"Наименование"</code> материала внутри правил установки муфт. Автоматически подставляет полное наименование каждой рассчитанной муфты.</li>
+                <li class="mb-1"><code>"Условие": "кабелей &gt; 4"</code> — фильтр участков траншеи по числу проложенных в ней кабелей (поддерживаются форматы: <code>"кабелей &gt; 4"</code>, <code>"&gt;= 5"</code>, <code>"до 4 кабелей"</code>, <code>"от 2 до 4 кабелей"</code>).</li>
+                <li class="mb-1"><code>"ОтображатьФормулу": true / false</code> — управляет выводом текстовой формулы расчета в графу «Формула» таблицы ВОР, а также в выгрузки <code>.gge</code> и <code>.xlsx</code>.</li>
+                <li class="mb-1"><code>"Раздел": "Монтажные работы"</code> — позволяет перенести работу или материал из раздела «Строительные работы» в раздел «Монтажные работы» (например, для укладки ПНД-труб в поперечных траншеях).</li>
+                <li class="mb-0"><code>"Округление": 3</code> — задает индивидуальное число знаков после запятой для конкретной позиции, переопределяя общие настройки округления.</li>
+              </ul>
+
+              <div class="code-block-sample">
+<pre class="mb-0">{
+  "Наименование": "Разработка грунта для уширения траншеи при укладке более 4 кабелей",
+  "Единицы измерения": "м3 грунта",
+  "Формула": "0,05*0,8*ДЛИНА",
+  "Тип": "работа",
+  "ОтображатьФормулу": true,
+  "Условие": "кабелей > 4",
+  "Материалы": []
+}</pre>
+              </div>
+            </div>
+          </section>
+
+          <!-- SECTION 6: ЭКСПОРТ -->
+          <section id="section-export" class="card module-card">
+            <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
+              <i class='bx bx-download text-success fs-3'></i>
+              <h2 class="h5 my-0 fw-bold">6. Экспорт ВОР и предэкспортный контроль</h2>
+            </div>
+            <div class="card-body p-4">
+              <p class="small text-muted mb-3">
+                Перед формированием выходного файла программа автоматически запускает проверку полноты данных. Если в расчете есть несопоставленные типы прокладки, кабели без указанной муфты или ошибки в формулах, открывается окно <strong>«Замечания перед экспортом ВОР»</strong>, из которого можно в один клик добавить недостающие шаблоны в правила JSON.
+              </p>
+
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <div class="stat-summary-card">
+                    <div class="fw-bold text-success mb-1 d-flex align-items-center gap-1">
+                      <i class='bx bx-file fs-5'></i> Формат Главгосэкспертизы (.gge)
+                    </div>
+                    <p class="small text-muted mb-0">
+                      Генерирует XML-документ по актуальной схеме <code>QuantityTakeoff-3_01.xsd</code> с разбивкой по разделам (<code>Section</code>), типам позиций (<code>работа</code>, <code>материал</code>, <code>оборудование</code>), объемами (<code>Quantity</code>) и формулами расчета (<code>QuantityFormula</code>).
+                    </p>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <div class="stat-summary-card">
+                    <div class="fw-bold text-primary mb-1 d-flex align-items-center gap-1">
+                      <i class='bx bx-spreadsheet fs-5'></i> Формат Microsoft Excel (.xlsx)
+                    </div>
+                    <p class="small text-muted mb-0">
+                      Формирует готовую рабочую книгу Excel, содержащую оформленный лист <strong>«ВОР»</strong> со стандартной шапкой (графы 1–7) и числовым форматированием объемов, а также сводные листы: <strong>«Ведомость кабелей»</strong>, <strong>«Ведомость траншей»</strong> и <strong>«Ведомость муфт»</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../assets/theme.min.js"></script>
+  <script src="../assets/theme-switcher.js"></script>
+</body>
+</html>

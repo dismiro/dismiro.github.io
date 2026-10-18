@@ -3,6 +3,25 @@ let currentData = null;
 let currentFileName = '';
 let isRawColCollapsed = false;
 
+// Universal debounce helper with cancel method
+function debounce(fn, delay = 180) {
+  let timer = null;
+  const debounced = function(...args) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      fn.apply(this, args);
+    }, delay);
+  };
+  debounced.cancel = function() {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+  return debounced;
+}
+
 // Helper to extract works/materials array from a rule object, supporting nested "Материалы" arrays
 function getRuleWorks(rule, defaultSection = '') {
   if (!rule || typeof rule !== 'object') return [];
@@ -1543,23 +1562,28 @@ function setupEventListeners() {
   const searchInput = document.getElementById('tableFilterInput');
   const clearFilterBtn = document.getElementById('clearFilterBtn');
   if (searchInput) {
+    const debouncedFilterTableRows = debounce((q) => {
+      filterTableRows(q);
+    }, 180);
+
     searchInput.addEventListener('input', (e) => {
       const q = e.target.value;
       if (clearFilterBtn) {
         if (q) clearFilterBtn.classList.remove('d-none');
         else clearFilterBtn.classList.add('d-none');
       }
-      filterTableRows(q);
+      debouncedFilterTableRows(q);
     });
-  }
 
-  if (clearFilterBtn && searchInput) {
-    clearFilterBtn.addEventListener('click', () => {
-      searchInput.value = '';
-      clearFilterBtn.classList.add('d-none');
-      filterTableRows('');
-      searchInput.focus();
-    });
+    if (clearFilterBtn) {
+      clearFilterBtn.addEventListener('click', () => {
+        debouncedFilterTableRows.cancel();
+        searchInput.value = '';
+        clearFilterBtn.classList.add('d-none');
+        filterTableRows('');
+        searchInput.focus();
+      });
+    }
   }
 
   const expandAllBtn = document.getElementById('expandAllBtn');

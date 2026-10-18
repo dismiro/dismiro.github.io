@@ -6,6 +6,25 @@
 
 let worksJsonCodeMirror = null;
 
+// Universal debounce helper with cancel method
+function debounce(fn, delay = 180) {
+  let timer = null;
+  const debounced = function(...args) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      fn.apply(this, args);
+    }, delay);
+  };
+  debounced.cancel = function() {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+  return debounced;
+}
+
 // Get current JSON string from CodeMirror or fallback textarea
 function getWorksJsonEditorValue() {
   if (worksJsonCodeMirror) {
@@ -53,6 +72,14 @@ function getDraftRulesFromEditor() {
 
 // Backward compatible helper: updates internal modal draft cache only, NEVER overwrites global currentWorksRules
 function syncCurrentRulesFromEditorIfValid() {
+  return getDraftRulesFromEditor();
+}
+
+// Safely resolve rules object, rejecting DOM Event objects or invalid inputs
+function resolveValidRules(rulesObj) {
+  if (rulesObj && typeof rulesObj === 'object' && !(rulesObj instanceof Event) && !('target' in rulesObj) && !Array.isArray(rulesObj)) {
+    return rulesObj;
+  }
   return getDraftRulesFromEditor();
 }
 
@@ -270,16 +297,18 @@ function renderModalWorkItemHtml(w, wIdx, options = {}) {
 }
 
 // Render rules modal cards, cable catalog, couplings, equipment and settings tabs
-function renderRulesModalContent(rulesObj = null) {
+function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
   const container = document.getElementById('rulesListContainer');
   const countBadge = document.getElementById('worksRulesCountBadge');
-  const rules = rulesObj || getDraftRulesFromEditor();
+  const rules = resolveValidRules(rulesObj);
   
-  // Render cables, couplings, equipment and settings tabs content
-  renderCableCatalogModalContent(rules);
-  renderCouplingCatalogModalContent(rules);
-  renderEquipmentCatalogModalContent(rules);
-  renderSettingsModalContent(rules);
+  // Render cables, couplings, equipment and settings tabs content only when full refresh requested
+  if (updateAllTabs) {
+    renderCableCatalogModalContent(rules);
+    renderCouplingCatalogModalContent(rules);
+    renderEquipmentCatalogModalContent(rules);
+    renderSettingsModalContent(rules);
+  }
 
   if (!container) return;
 
@@ -364,8 +393,14 @@ function renderRulesModalContent(rulesObj = null) {
       if (!query) return true;
       const rName = rule["Марка"] || rule["Название"] || rule.mark || rule.name || '';
       const works = getRuleWorks(rule);
-      const worksNames = works.map(w => w["Наименование"] || '').join(' ');
-      const haystack = `${sec.name} ${rName} ${worksNames}`.toLowerCase();
+      const worksNames = works.map(w => {
+        if (!w) return '';
+        if (typeof w === 'string') return w;
+        return `${w["Наименование"] || w.name || ''} ${w["Единицы измерения"] || w.unit || ''} ${w["Тип"] || w.type || ''}`;
+      }).join(' ');
+      const rawWm = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] : (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
+      const tierKeys = (rawWm && typeof rawWm === 'object' && !Array.isArray(rawWm)) ? Object.keys(rawWm).join(' ') : '';
+      const haystack = `${sec.name} ${rName} ${worksNames} ${tierKeys}`.toLowerCase();
       return haystack.includes(query);
     });
 
@@ -608,7 +643,7 @@ function renderCableCatalogModalContent(rulesObj = null) {
   const tabBadge = document.getElementById('tabWorksCablesCountBadge');
   if (!container) return;
 
-  const rules = rulesObj || getDraftRulesFromEditor();
+  const rules = resolveValidRules(rulesObj);
   // Extract catalog from draft rules or default
   const catalog = getCableCatalog(rules) || {};
   const groups = Object.keys(catalog);
@@ -802,7 +837,7 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
   const tabBadge = document.getElementById('tabWorksEquipmentCountBadge');
   if (!container) return;
 
-  const rules = rulesObj || getDraftRulesFromEditor();
+  const rules = resolveValidRules(rulesObj);
   const equipmentList = getEquipmentRulesList(rules);
   const totalEquipmentCount = equipmentList.length;
 
@@ -982,7 +1017,7 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
 
 // Render the Settings tab content in Works Rules Modal
 function renderSettingsModalContent(rulesObj = null) {
-  const rules = rulesObj || getDraftRulesFromEditor();
+  const rules = resolveValidRules(rulesObj);
   const settings = getRulesSettings(rules);
 
   const numSelect = document.getElementById('settingNumberingMode');
@@ -1087,7 +1122,7 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
   const tabBadge = document.getElementById('tabWorksCouplingsCountBadge');
   if (!container) return;
 
-  const rules = rulesObj || getDraftRulesFromEditor();
+  const rules = resolveValidRules(rulesObj);
   const catalog = getCouplingCatalog(rules) || {};
   const entries = Object.entries(catalog);
   const totalCouplingsCount = entries.length;
@@ -1228,9 +1263,11 @@ function initWorksJsonCodeMirror() {
       }
     });
 
+    const debouncedValidateCodeMirror = debounce(validateWorksJsonInput, 200);
+
     worksJsonCodeMirror.on('change', () => {
       textarea.value = worksJsonCodeMirror.getValue();
-      validateWorksJsonInput();
+      debouncedValidateCodeMirror();
     });
 
     // Refresh layout when modal or tab is shown
@@ -1506,7 +1543,8 @@ function setupWorksRulesListeners() {
 
   const textarea = document.getElementById('worksJsonEditorTextarea');
   if (textarea) {
-    textarea.addEventListener('input', validateWorksJsonInput);
+    const debouncedValidateTextarea = debounce(validateWorksJsonInput, 200);
+    textarea.addEventListener('input', debouncedValidateTextarea);
 
     // Support Tab key indentation inside fallback textarea
     textarea.addEventListener('keydown', function(e) {
@@ -1516,7 +1554,7 @@ function setupWorksRulesListeners() {
         const end = this.selectionEnd;
         this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
         this.selectionStart = this.selectionEnd = start + 2;
-        validateWorksJsonInput();
+        debouncedValidateTextarea();
       }
     });
   }
@@ -1667,17 +1705,19 @@ function setupWorksRulesListeners() {
 
   // Rules cards search listeners
   const rulesCardsSearchInput = document.getElementById('rulesCardsSearchInput');
-  if (rulesCardsSearchInput) {
-    rulesCardsSearchInput.addEventListener('input', renderRulesModalContent);
-  }
-
   const rulesCardsClearSearchBtn = document.getElementById('rulesCardsClearSearchBtn');
-  if (rulesCardsClearSearchBtn && rulesCardsSearchInput) {
-    rulesCardsClearSearchBtn.addEventListener('click', () => {
-      rulesCardsSearchInput.value = '';
-      renderRulesModalContent();
-      rulesCardsSearchInput.focus();
-    });
+  if (rulesCardsSearchInput) {
+    const debouncedRenderRules = debounce(renderRulesModalContent, 180);
+    rulesCardsSearchInput.addEventListener('input', debouncedRenderRules);
+
+    if (rulesCardsClearSearchBtn) {
+      rulesCardsClearSearchBtn.addEventListener('click', () => {
+        debouncedRenderRules.cancel();
+        rulesCardsSearchInput.value = '';
+        renderRulesModalContent();
+        rulesCardsSearchInput.focus();
+      });
+    }
   }
 
   // Add cable template button (+ Кабель) in toolbar and in cables tab
@@ -1771,17 +1811,19 @@ function setupWorksRulesListeners() {
 
   // Cable catalog tab search and filter listeners
   const cableSearchInput = document.getElementById('cableCatalogSearchInput');
-  if (cableSearchInput) {
-    cableSearchInput.addEventListener('input', renderCableCatalogModalContent);
-  }
-
   const cableClearSearchBtn = document.getElementById('cableCatalogClearSearchBtn');
-  if (cableClearSearchBtn && cableSearchInput) {
-    cableClearSearchBtn.addEventListener('click', () => {
-      cableSearchInput.value = '';
-      renderCableCatalogModalContent();
-      cableSearchInput.focus();
-    });
+  if (cableSearchInput) {
+    const debouncedRenderCableCatalog = debounce(renderCableCatalogModalContent, 180);
+    cableSearchInput.addEventListener('input', debouncedRenderCableCatalog);
+
+    if (cableClearSearchBtn) {
+      cableClearSearchBtn.addEventListener('click', () => {
+        debouncedRenderCableCatalog.cancel();
+        cableSearchInput.value = '';
+        renderCableCatalogModalContent();
+        cableSearchInput.focus();
+      });
+    }
   }
 
   const cableCatFilter = document.getElementById('cableCatalogCategoryFilter');
@@ -1956,17 +1998,19 @@ function setupWorksRulesListeners() {
 
   // Equipment tab search listeners
   const equipmentSearchInput = document.getElementById('equipmentCatalogSearchInput');
-  if (equipmentSearchInput) {
-    equipmentSearchInput.addEventListener('input', renderEquipmentCatalogModalContent);
-  }
-
   const equipmentClearSearchBtn = document.getElementById('equipmentCatalogClearSearchBtn');
-  if (equipmentClearSearchBtn && equipmentSearchInput) {
-    equipmentClearSearchBtn.addEventListener('click', () => {
-      equipmentSearchInput.value = '';
-      renderEquipmentCatalogModalContent();
-      equipmentSearchInput.focus();
-    });
+  if (equipmentSearchInput) {
+    const debouncedRenderEquipment = debounce(renderEquipmentCatalogModalContent, 180);
+    equipmentSearchInput.addEventListener('input', debouncedRenderEquipment);
+
+    if (equipmentClearSearchBtn) {
+      equipmentClearSearchBtn.addEventListener('click', () => {
+        debouncedRenderEquipment.cancel();
+        equipmentSearchInput.value = '';
+        renderEquipmentCatalogModalContent();
+        equipmentSearchInput.focus();
+      });
+    }
   }
 
   const quickAddCouplingInTabBtn = document.getElementById('quickAddCouplingInTabBtn');
@@ -1976,17 +2020,19 @@ function setupWorksRulesListeners() {
 
   // Coupling catalog tab search and filter listeners
   const couplingSearchInput = document.getElementById('couplingCatalogSearchInput');
-  if (couplingSearchInput) {
-    couplingSearchInput.addEventListener('input', renderCouplingCatalogModalContent);
-  }
-
   const couplingClearSearchBtn = document.getElementById('couplingCatalogClearSearchBtn');
-  if (couplingClearSearchBtn && couplingSearchInput) {
-    couplingClearSearchBtn.addEventListener('click', () => {
-      couplingSearchInput.value = '';
-      renderCouplingCatalogModalContent();
-      couplingSearchInput.focus();
-    });
+  if (couplingSearchInput) {
+    const debouncedRenderCouplings = debounce(renderCouplingCatalogModalContent, 180);
+    couplingSearchInput.addEventListener('input', debouncedRenderCouplings);
+
+    if (couplingClearSearchBtn) {
+      couplingClearSearchBtn.addEventListener('click', () => {
+        debouncedRenderCouplings.cancel();
+        couplingSearchInput.value = '';
+        renderCouplingCatalogModalContent();
+        couplingSearchInput.focus();
+      });
+    }
   }
 
   // Reset rules button
