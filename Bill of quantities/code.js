@@ -8,96 +8,77 @@ function getRuleWorks(rule, defaultSection = '') {
   if (!rule || typeof rule !== 'object') return [];
   const ruleSec = (rule && rule["Раздел"]) || defaultSection || '';
   const raw = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] : (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
-  if (Array.isArray(raw)) {
-    const list = [];
-    raw.forEach(item => {
-      if (item && typeof item === 'object') {
-        list.push(item);
-        const mats = Array.isArray(item["Материалы"]) ? item["Материалы"] : [];
-        const equips = Array.isArray(item["Оборудование"]) ? item["Оборудование"] : [];
-        const parentSection = item["Раздел"] || ruleSec;
-        const parentCondition = item["Условие"] !== undefined ? item["Условие"] : item["condition"];
-        mats.forEach(mat => {
-          if (mat && typeof mat === 'object') {
-            list.push({
-              ...mat,
-              "Тип": mat["Тип"] || mat.type || "материал",
-              "Раздел": mat["Раздел"] || parentSection,
-              "Условие": mat["Условие"] !== undefined ? mat["Условие"] : parentCondition,
-              parentWorkName: mat.parentWorkName || item["Наименование"],
-              parentWorkUnit: mat.parentWorkUnit || item["Единицы измерения"] || item.unit || '',
-              parentWorkSection: mat.parentWorkSection || parentSection
-            });
-          }
-        });
-        equips.forEach(eq => {
-          if (eq && typeof eq === 'object') {
-            list.push({
-              ...eq,
-              "Тип": eq["Тип"] || eq.type || "оборудование",
-              "Раздел": eq["Раздел"] || parentSection,
-              "Условие": eq["Условие"] !== undefined ? eq["Условие"] : parentCondition,
-              parentWorkName: eq.parentWorkName || item["Наименование"],
-              parentWorkUnit: eq.parentWorkUnit || item["Единицы измерения"] || item.unit || '',
-              parentWorkSection: eq.parentWorkSection || parentSection
-            });
-          }
-        });
+  const list = [];
+
+  function appendItemWithResources(item, tierKey = null) {
+    if (!item || typeof item !== 'object') return;
+    const workEntry = tierKey !== null ? { ...item, _tierKey: tierKey } : item;
+    list.push(workEntry);
+
+    const mats = Array.isArray(item["Материалы"]) ? item["Материалы"] : [];
+    const equips = Array.isArray(item["Оборудование"]) ? item["Оборудование"] : [];
+    const parentSection = item["Раздел"] || ruleSec;
+    const parentCondition = item["Условие"] !== undefined ? item["Условие"] : item["condition"];
+    const parentWorkName = item["Наименование"] || item.name || '';
+    const parentWorkUnit = item["Единицы измерения"] || item.unit || '';
+
+    mats.forEach(mat => {
+      if (mat && typeof mat === 'object') {
+        const matEntry = {
+          ...mat,
+          "Тип": mat["Тип"] || mat.type || "материал",
+          "Раздел": mat["Раздел"] || parentSection,
+          "Условие": mat["Условие"] !== undefined ? mat["Условие"] : parentCondition,
+          parentWorkName: mat.parentWorkName || parentWorkName,
+          parentWorkUnit: mat.parentWorkUnit || parentWorkUnit,
+          parentWorkSection: mat.parentWorkSection || parentSection
+        };
+        if (tierKey !== null) matEntry._tierKey = tierKey;
+        list.push(matEntry);
       }
     });
-    return list;
+
+    equips.forEach(eq => {
+      if (eq && typeof eq === 'object') {
+        const eqEntry = {
+          ...eq,
+          "Тип": eq["Тип"] || eq.type || "оборудование",
+          "Раздел": eq["Раздел"] || parentSection,
+          "Условие": eq["Условие"] !== undefined ? eq["Условие"] : parentCondition,
+          parentWorkName: eq.parentWorkName || parentWorkName,
+          parentWorkUnit: eq.parentWorkUnit || parentWorkUnit,
+          parentWorkSection: eq.parentWorkSection || parentSection
+        };
+        if (tierKey !== null) eqEntry._tierKey = tierKey;
+        list.push(eqEntry);
+      }
+    });
   }
-  if (raw && typeof raw === 'object') {
-    const list = [];
+
+  if (Array.isArray(raw)) {
+    raw.forEach(item => appendItemWithResources(item));
+  } else if (raw && typeof raw === 'object') {
     Object.entries(raw).forEach(([tierKey, arr]) => {
       if (Array.isArray(arr)) {
-        arr.forEach(item => {
-          if (item && typeof item === 'object') {
-            list.push({ ...item, _tierKey: tierKey });
-            const mats = Array.isArray(item["Материалы"]) ? item["Материалы"] : [];
-            const equips = Array.isArray(item["Оборудование"]) ? item["Оборудование"] : [];
-            const parentSection = item["Раздел"] || ruleSec;
-            const parentCondition = item["Условие"] !== undefined ? item["Условие"] : item["condition"];
-            mats.forEach(mat => {
-              if (mat && typeof mat === 'object') {
-                list.push({
-                  ...mat,
-                  "Тип": mat["Тип"] || mat.type || "материал",
-                  "Раздел": mat["Раздел"] || parentSection,
-                  "Условие": mat["Условие"] !== undefined ? mat["Условие"] : parentCondition,
-                  parentWorkName: mat.parentWorkName || item["Наименование"],
-                  parentWorkUnit: mat.parentWorkUnit || item["Единицы измерения"] || item.unit || '',
-                  parentWorkSection: mat.parentWorkSection || parentSection,
-                  _tierKey: tierKey
-                });
-              }
-            });
-            equips.forEach(eq => {
-              if (eq && typeof eq === 'object') {
-                list.push({
-                  ...eq,
-                  "Тип": eq["Тип"] || eq.type || "оборудование",
-                  "Раздел": eq["Раздел"] || parentSection,
-                  "Условие": eq["Условие"] !== undefined ? eq["Условие"] : parentCondition,
-                  parentWorkName: eq.parentWorkName || item["Наименование"],
-                  parentWorkUnit: eq.parentWorkUnit || item["Единицы измерения"] || item.unit || '',
-                  parentWorkSection: eq.parentWorkSection || parentSection,
-                  _tierKey: tierKey
-                });
-              }
-            });
-          }
-        });
+        arr.forEach(item => appendItemWithResources(item, tierKey));
       }
     });
-    return list;
   }
-  return [];
+  return list;
 }
 
 // --------------------------------------------------------------------------
 // FORMULA MATH OPERATOR NORMALIZATION
-// --------------------------------------------------------------------------
+// Universal helper to replace identifier tokens (Cyrillic + Latin) without relying on JS \b limitation
+function replaceFormulaToken(str, tokenRegex, valStr, addSpaces = false) {
+  if (!str) return '';
+  const pattern = new RegExp('(^|[^a-zA-Z0-9а-яА-ЯёЁ_])(?:' + tokenRegex + ')([^a-zA-Z0-9а-яА-ЯёЁ_]|$)', 'gi');
+  return str.replace(pattern, (match, p1, p2) => {
+    const pre = p1 || '';
+    const post = p2 !== undefined ? p2 : '';
+    return addSpaces ? `${pre} ${valStr} ${post}` : `${pre}${valStr}${post}`;
+  });
+}
 
 // Normalize all mathematical operator symbols in formula strings to standard characters
 // - Multiplication: convert '×', '✕', '✖', '·', '∗', '•', and letter 'х'/'x' in multiplication context to standard '*'
@@ -121,7 +102,7 @@ function normalizeFormulaMathOperators(formulaStr) {
   // Letter 'х'/'Х' (Cyrillic) or 'x'/'X' (Latin) when used as multiplication between numbers or after units
   // e.g. "5 х 10", "5x10", "3 шт. х 2 м", "3 шт х 2 м"
   str = str.replace(/(\d+(?:[.,]\d+)?)\s*[xхXХ]\s*(\d+(?:[.,]\d+)?)/g, '$1 * $2');
-  str = str.replace(/(\b(?:шт|м|каб|перес|км)\.?)\s*[xхXХ]\s*/gi, '$1 * ');
+  str = str.replace(/(^|[^a-zA-Zа-яА-ЯёЁ_])((?:шт|м|каб|перес|км)\.?)\s*[xхXХ]\s*/gi, '$1$2 * ');
 
   // 3. Replace non-standard division symbol ÷
   str = str.replace(/÷/g, '/');
@@ -489,35 +470,35 @@ function parseCableCountCondition(work) {
   let maxCables = null;
 
   // Range: "от 2 до 4 кабелей"
-  const mRange = condText.match(/от\s*(\d+)\s*до\s*(\d+)\s*(?:кабел|каб|\b)/i);
+  const mRange = condText.match(/от\s*(\d+)\s*до\s*(\d+)(?:\s*(?:кабелей|кабеля|кабел|каб))?/i);
   if (mRange) {
     minCables = parseInt(mRange[1], 10);
     maxCables = parseInt(mRange[2], 10);
   } else {
     // Greater than: "> 4", "кабелей > 4", "более 4 кабелей", "свыше 4"
-    const mGt = condText.match(/(?:кабелей|кабеля|каб\.?|\b)\s*(?:более|свыше|>)\s*(\d+)/i) ||
-                condText.match(/(?:более|свыше|>)\s*(\d+)\s*(?:кабелей|кабеля|каб\.?|\b)/i);
+    const mGt = condText.match(/(?:кабелей|кабеля|каб\.?)?\s*(?<!не\s*)(?:более|свыше|>)\s*(\d+)/i) ||
+                condText.match(/(?<!не\s*)(?:более|свыше|>)\s*(\d+)(?:\s*(?:кабелей|кабеля|каб\.?))?/i);
     if (mGt) {
       minCables = parseInt(mGt[1], 10) + 1;
     }
 
     // Greater or equal: ">= 5", "кабелей >= 5", "от 5 кабелей"
-    const mGte = condText.match(/(?:кабелей|кабеля|каб\.?|\b)\s*(?:>=|от)\s*(\d+)/i) ||
-                 condText.match(/(?:>=|от)\s*(\d+)\s*(?:кабелей|кабеля|каб\.?|\b)/i);
+    const mGte = condText.match(/(?:кабелей|кабеля|каб\.?)?\s*(?:>=|от)\s*(\d+)/i) ||
+                 condText.match(/(?:>=|от)\s*(\d+)(?:\s*(?:кабелей|кабеля|каб\.?))?/i);
     if (mGte && !mGt) {
       minCables = parseInt(mGte[1], 10);
     }
 
     // Less or equal / up to: "<= 4", "до 4 кабелей", "не более 4"
-    const mLte = condText.match(/(?:кабелей|кабеля|каб\.?|\b)\s*(?:до|не более|<=)\s*(\d+)/i) ||
-                 condText.match(/(?:до|не более|<=)\s*(\d+)\s*(?:кабелей|кабеля|каб\.?|\b)/i);
+    const mLte = condText.match(/(?:кабелей|кабеля|каб\.?)?\s*(?:до|не более|<=)\s*(\d+)/i) ||
+                 condText.match(/(?:до|не более|<=)\s*(\d+)(?:\s*(?:кабелей|кабеля|каб\.?))?/i);
     if (mLte) {
       maxCables = parseInt(mLte[1], 10);
     }
 
     // Less than: "< 5", "менее 5 кабелей"
-    const mLt = condText.match(/(?:кабелей|кабеля|каб\.?|\b)\s*(?:менее|<)\s*(\d+)/i) ||
-                condText.match(/(?:менее|<)\s*(\d+)\s*(?:кабелей|кабеля|каб\.?|\b)/i);
+    const mLt = condText.match(/(?:кабелей|кабеля|каб\.?)?\s*(?:менее|<)\s*(\d+)/i) ||
+                condText.match(/(?:менее|<)\s*(\d+)(?:\s*(?:кабелей|кабеля|каб\.?))?/i);
     if (mLt && !mLte) {
       maxCables = parseInt(mLt[1], 10) - 1;
     }
@@ -2983,6 +2964,39 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
   return cableWorksCalc;
 }
 
+// Universal alert renderer for formula evaluation errors across VOR sections
+function renderFormulaErrorsAlertHtml(formulaErrors, sectionTitle = 'работах/материалах') {
+  if (!Array.isArray(formulaErrors) || formulaErrors.length === 0) return '';
+  const errorItems = formulaErrors.map(e => `
+    <li class="mb-1">
+      <strong class="text-danger">«${escapeHtml(e.name)}»</strong>: формула <code>${escapeHtml(e.formula)}</code> — <span class="text-danger-emphasis">${escapeHtml(e.reason)}</span>
+    </li>
+  `).join('');
+  return `
+    <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
+      <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+        <div class="d-flex align-items-start gap-2">
+          <i class="bx bx-error-circle fs-5 text-danger flex-shrink-0 mt-0_5"></i>
+          <div>
+            <div class="fw-bold text-danger mb-1">
+              Внимание: некорректная формула в ${escapeHtml(sectionTitle)} (${formulaErrors.length} поз. пропущено)
+            </div>
+            <ul class="mb-1 ps-3 text-body-secondary" style="font-size: 0.8rem; line-height: 1.35;">
+              ${errorItems}
+            </ul>
+            <div class="text-danger small" style="font-size: 0.75rem;">
+              Данные позиции пропущены и не вошли в итоговую ведомость (ВОР). Исправьте формулу или переменные в правилах сметных норм.
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('editor')">
+          <i class="bx bx-edit"></i> Исправить в JSON
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function renderEquipmentStatement(equipmentData, equipmentWorksCalc) {
   const container = document.getElementById('resultEquipmentStatement');
   const card = document.getElementById('equipmentCard');
@@ -3026,37 +3040,7 @@ function renderEquipmentStatement(equipmentData, equipmentWorksCalc) {
     }
   }
 
-  let formulaErrorAlertHtml = '';
-  if (hasFormulaErrors) {
-    const errorItems = equipmentWorksCalc.formulaErrors.map(e => `
-      <li class="mb-1">
-        <strong class="text-danger">«${escapeHtml(e.name)}»</strong>: формула <code>${escapeHtml(e.formula)}</code> — <span class="text-danger-emphasis">${escapeHtml(e.reason)}</span>
-      </li>
-    `).join('');
-    formulaErrorAlertHtml = `
-      <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
-        <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-          <div class="d-flex align-items-start gap-2">
-            <i class="bx bx-error-circle fs-5 text-danger flex-shrink-0 mt-0_5"></i>
-            <div>
-              <div class="fw-bold text-danger mb-1">
-                Внимание: некорректная формула в разделе «Оборудование» (${equipmentWorksCalc.formulaErrors.length} поз. пропущено)
-              </div>
-              <ul class="mb-1 ps-3 text-body-secondary" style="font-size: 0.8rem; line-height: 1.35;">
-                ${errorItems}
-              </ul>
-              <div class="text-danger small" style="font-size: 0.75rem;">
-                Данные позиции пропущены и не вошли в итоговую ведомость (ВОР). Исправьте формулу или переменные в правилах сметных норм.
-              </div>
-            </div>
-          </div>
-          <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('editor')">
-            <i class="bx bx-edit"></i> Исправить в JSON
-          </button>
-        </div>
-      </div>
-    `;
-  }
+  const formulaErrorAlertHtml = hasFormulaErrors ? renderFormulaErrorsAlertHtml(equipmentWorksCalc.formulaErrors, 'разделе «Оборудование»') : '';
 
   let missingAlertHtml = '';
   if (hasMissing) {
@@ -3172,6 +3156,66 @@ function renderEquipmentStatement(equipmentData, equipmentWorksCalc) {
   }
 }
 
+// Universal table row generator for VOR tables (Строительные работы and Монтажные работы)
+function renderVorTableRowsHtml(worksList) {
+  if (!Array.isArray(worksList) || worksList.length === 0) return '';
+  let rowsHtml = '';
+  worksList.forEach((w, idx) => {
+    const isSub = Boolean(w.isSubItem);
+    const rawType = (w.type || '').trim().toLowerCase();
+    const isEquip = rawType === 'оборудование';
+    const isMat = rawType === 'материал' || (isSub && !isEquip);
+    const rowClass = isSub ? 'table-row-material' : 'table-row-work';
+
+    let tagBadge = '';
+    if (isEquip) {
+      tagBadge = `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;"><i class='bx bx-cube me-0_5'></i>оборудование</span>`;
+    } else if (isMat) {
+      tagBadge = `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal; color: #495057 !important;">материал</span>`;
+    } else {
+      tagBadge = `<span class="badge bg-primary-subtle text-primary border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">работа</span>`;
+    }
+
+    const opticalBadge = w.isOptical
+      ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">ВОЛС</span>`
+      : '';
+    const catalogBadge = (w.foundInCatalog === false)
+      ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;" title="Марка не найдена в справочнике кабелей"><i class="bx bx-error me-0_5"></i>нет в справочнике</span>`
+      : '';
+    const trenchBadge = w.trenchType
+      ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.7rem; font-weight: normal; color: #495057 !important;" title="Рассчитано по ведомости траншей (${escapeHtml(w.trenchType)})"><i class='bx bx-git-commit me-0_5'></i>${escapeHtml(w.trenchType)}</span>`
+      : '';
+    const equipmentBadge = (w.equipmentType || w.mark) && !isEquip
+      ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1 font-monospace" style="font-size: 0.7rem;" title="Оборудование: ${escapeHtml(w.equipmentType || w.mark)}${w.method ? ` (${escapeHtml(w.method)})` : ''}"><i class='bx bx-cube me-0_5'></i>${escapeHtml(w.equipmentType || w.mark)}</span>`
+      : '';
+
+    const volumeStr = formatVolumeDisplay(w.volume, w, currentWorksRules);
+
+    const commentHtml = w.comment
+      ? `<div class="text-muted small mt-0_5" style="font-size: 0.74rem; font-weight: normal;"><i class='bx bx-detail me-1 opacity-75'></i>${escapeHtml(w.comment)}</div>`
+      : '';
+
+    const numDisplay = w.itemNumber || `${idx + 1}`;
+    const nameDisplay = isSub 
+      ? `<span class="text-muted me-1 fw-bold">↳</span>${escapeHtml(w.name)}`
+      : escapeHtml(w.name);
+
+    rowsHtml += `
+      <tr class="${rowClass}">
+        <td class="text-muted small text-center ${isSub ? 'ps-3 text-secondary' : 'fw-semibold'}">${numDisplay}</td>
+        <td class="cell-wrap ${!isSub ? 'fw-semibold' : 'fw-medium ps-4 text-body-secondary'}">
+          ${nameDisplay}${tagBadge}${opticalBadge}${catalogBadge}${trenchBadge}${equipmentBadge}
+          ${commentHtml}
+        </td>
+        <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
+        <td class="text-end font-monospace fw-bold text-success">${volumeStr}</td>
+        <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${(w.showFormula !== false && w.formulaDisplay) ? escapeHtml(w.formulaDisplay) : '<span class="text-muted opacity-50">-</span>'}</td>
+      </tr>
+    `;
+  });
+  return rowsHtml;
+}
+
 function renderInstallationWorks(cableWorksCalc) {
   const container = document.getElementById('resultInstallationWorks');
   if (!container) return;
@@ -3219,37 +3263,7 @@ function renderInstallationWorks(cableWorksCalc) {
     }
   });
 
-  let formulaErrorAlertHtml = '';
-  if (hasFormulaErrors) {
-    const errorItems = cableWorksCalc.formulaErrors.map(e => `
-      <li class="mb-1">
-        <strong class="text-danger">«${escapeHtml(e.name)}»</strong>: формула <code>${escapeHtml(e.formula)}</code> — <span class="text-danger-emphasis">${escapeHtml(e.reason)}</span>
-      </li>
-    `).join('');
-    formulaErrorAlertHtml = `
-      <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
-        <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-          <div class="d-flex align-items-start gap-2">
-            <i class="bx bx-error-circle fs-5 text-danger flex-shrink-0 mt-0_5"></i>
-            <div>
-              <div class="fw-bold text-danger mb-1">
-                Внимание: некорректная формула в монтажных работах/материалах (${cableWorksCalc.formulaErrors.length} поз. пропущено)
-              </div>
-              <ul class="mb-1 ps-3 text-body-secondary" style="font-size: 0.8rem; line-height: 1.35;">
-                ${errorItems}
-              </ul>
-              <div class="text-danger small" style="font-size: 0.75rem;">
-                Данные работы и материалы пропущены и не вошли в итоговую ведомость (ВОР). Исправьте формулу или переменные в правилах сметных норм.
-              </div>
-            </div>
-          </div>
-          <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('editor')">
-            <i class="bx bx-edit"></i> Исправить в JSON
-          </button>
-        </div>
-      </div>
-    `;
-  }
+  const formulaErrorAlertHtml = hasFormulaErrors ? renderFormulaErrorsAlertHtml(cableWorksCalc.formulaErrors, 'монтажных работах/материалах') : '';
 
   let missingCableAlertHtml = '';
   if (hasMissingCable) {
@@ -3335,60 +3349,7 @@ function renderInstallationWorks(cableWorksCalc) {
     `;
   }
 
-  let cableWorksRowsHtml = '';
-  worksList.forEach((w, idx) => {
-    const isSub = Boolean(w.isSubItem);
-    const rawType = (w.type || '').trim().toLowerCase();
-    const isEquip = rawType === 'оборудование';
-    const isMat = rawType === 'материал' || (isSub && !isEquip);
-    const rowClass = isSub ? 'table-row-material' : 'table-row-work';
-
-    let tagBadge = '';
-    if (isEquip) {
-      tagBadge = `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;"><i class='bx bx-cube me-0_5'></i>оборудование</span>`;
-    } else if (isMat) {
-      tagBadge = `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal; color: #495057 !important;">материал</span>`;
-    } else {
-      tagBadge = `<span class="badge bg-primary-subtle text-primary border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">работа</span>`;
-    }
-
-    const opticalBadge = w.isOptical
-      ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">ВОЛС</span>`
-      : '';
-    const catalogBadge = (w.foundInCatalog === false)
-      ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;" title="Марка не найдена в справочнике кабелей"><i class="bx bx-error me-0_5"></i>нет в справочнике</span>`
-      : '';
-    const trenchBadge = w.trenchType
-      ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.7rem; font-weight: normal; color: #495057 !important;" title="Рассчитано по ведомости траншей (${escapeHtml(w.trenchType)})"><i class='bx bx-git-commit me-0_5'></i>${escapeHtml(w.trenchType)}</span>`
-      : '';
-    const equipmentBadge = (w.equipmentType || w.mark) && !isEquip
-      ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1 font-monospace" style="font-size: 0.7rem;" title="Оборудование: ${escapeHtml(w.equipmentType || w.mark)}${w.method ? ` (${escapeHtml(w.method)})` : ''}"><i class='bx bx-cube me-0_5'></i>${escapeHtml(w.equipmentType || w.mark)}</span>`
-      : '';
-
-    const volumeStr = formatVolumeDisplay(w.volume, w, currentWorksRules);
-
-    const commentHtml = w.comment
-      ? `<div class="text-muted small mt-0_5" style="font-size: 0.74rem; font-weight: normal;"><i class='bx bx-detail me-1 opacity-75'></i>${escapeHtml(w.comment)}</div>`
-      : '';
-
-    const numDisplay = w.itemNumber || `${idx + 1}`;
-    const nameDisplay = isSub 
-      ? `<span class="text-muted me-1 fw-bold">↳</span>${escapeHtml(w.name)}`
-      : escapeHtml(w.name);
-
-    cableWorksRowsHtml += `
-      <tr class="${rowClass}">
-        <td class="text-muted small text-center ${isSub ? 'ps-3 text-secondary' : 'fw-semibold'}">${numDisplay}</td>
-        <td class="cell-wrap ${!isSub ? 'fw-semibold' : 'fw-medium ps-4 text-body-secondary'}">
-          ${nameDisplay}${tagBadge}${opticalBadge}${catalogBadge}${trenchBadge}${equipmentBadge}
-          ${commentHtml}
-        </td>
-        <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
-        <td class="text-end font-monospace fw-bold text-success">${volumeStr}</td>
-        <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${(w.showFormula !== false && w.formulaDisplay) ? escapeHtml(w.formulaDisplay) : '<span class="text-muted opacity-50">-</span>'}</td>
-      </tr>
-    `;
-  });
+  const cableWorksRowsHtml = renderVorTableRowsHtml(worksList);
 
   if (cableWorksCalc.works.length > 0) {
     container.innerHTML = `
@@ -3573,37 +3534,7 @@ function renderConstructionWorks(worksCalc) {
     }
   });
 
-  let formulaErrorAlertHtml = '';
-  if (hasFormulaErrors) {
-    const errorItems = worksCalc.formulaErrors.map(e => `
-      <li class="mb-1">
-        <strong class="text-danger">«${escapeHtml(e.name)}»</strong>: формула <code>${escapeHtml(e.formula)}</code> — <span class="text-danger-emphasis">${escapeHtml(e.reason)}</span>
-      </li>
-    `).join('');
-    formulaErrorAlertHtml = `
-      <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
-        <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-          <div class="d-flex align-items-start gap-2">
-            <i class="bx bx-error-circle fs-5 text-danger flex-shrink-0 mt-0_5"></i>
-            <div>
-              <div class="fw-bold text-danger mb-1">
-                Внимание: некорректная формула в строительных работах/материалах (${worksCalc.formulaErrors.length} поз. пропущено)
-              </div>
-              <ul class="mb-1 ps-3 text-body-secondary" style="font-size: 0.8rem; line-height: 1.35;">
-                ${errorItems}
-              </ul>
-              <div class="text-danger small" style="font-size: 0.75rem;">
-                Данные работы и материалы пропущены и не вошли в итоговую ведомость (ВОР). Исправьте формулу или переменные в правилах сметных норм.
-              </div>
-            </div>
-          </div>
-          <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('editor')">
-            <i class="bx bx-edit"></i> Исправить в JSON
-          </button>
-        </div>
-      </div>
-    `;
-  }
+  const formulaErrorAlertHtml = hasFormulaErrors ? renderFormulaErrorsAlertHtml(worksCalc.formulaErrors, 'строительных работах/материалах') : '';
 
   let missingAlertHtml = '';
   if (hasMissing) {
@@ -3633,40 +3564,7 @@ function renderConstructionWorks(worksCalc) {
     `;
   }
 
-  let worksRowsHtml = '';
-  worksList.forEach((w, idx) => {
-    const isSub = Boolean(w.isSubItem);
-    const rawType = (w.type || '').trim().toLowerCase();
-    const isEquip = rawType === 'оборудование';
-    const isMat = rawType === 'материал' || (isSub && !isEquip);
-    const rowClass = isSub ? 'table-row-material' : 'table-row-work';
-
-    let tagBadge = '';
-    if (isEquip) {
-      tagBadge = `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;"><i class='bx bx-cube me-0_5'></i>оборудование</span>`;
-    } else if (isMat) {
-      tagBadge = `<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal; color: #495057 !important;">материал</span>`;
-    } else {
-      tagBadge = `<span class="badge bg-primary-subtle text-primary border ms-1 py-0 px-1" style="font-size: 0.72rem; font-weight: normal;">работа</span>`;
-    }
-
-    const numDisplay = w.itemNumber || `${idx + 1}`;
-    const nameDisplay = isSub 
-      ? `<span class="text-muted me-1 fw-bold">↳</span>${escapeHtml(w.name)}`
-      : escapeHtml(w.name);
-
-    worksRowsHtml += `
-      <tr class="${rowClass}">
-        <td class="text-muted small text-center ${isSub ? 'ps-3 text-secondary' : 'fw-semibold'}">${numDisplay}</td>
-        <td class="cell-wrap ${!isSub ? 'fw-semibold' : 'fw-medium ps-4 text-body-secondary'}">
-          ${nameDisplay}${tagBadge}
-        </td>
-        <td class="text-center small text-nowrap">${escapeHtml(w.unit)}</td>
-        <td class="text-end font-monospace fw-bold text-success">${formatVolumeDisplay(w.volume, w, currentWorksRules)}</td>
-        <td class="small text-muted cell-wrap" style="max-width: 140px; font-size: 0.78rem;">${(w.showFormula !== false && w.formulaDisplay) ? escapeHtml(w.formulaDisplay) : '<span class="text-muted opacity-50">-</span>'}</td>
-      </tr>
-    `;
-  });
+  const worksRowsHtml = renderVorTableRowsHtml(worksList);
 
   if (worksCalc.works.length > 0) {
     container.innerHTML = `
@@ -4215,7 +4113,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           return; // Skip this work/material!
         }
 
-        const hasCableVar = /(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|\bКОЛИЧЕСТВО\b)/i.test(formula);
+        const hasCableVar = /(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|(?:^|[^a-zA-Z0-9а-яА-ЯёЁ_])(?:КОЛИЧЕСТВО|COUNT|QTY)(?:[^a-zA-Z0-9а-яА-ЯёЁ_]|$))/i.test(formula);
         const hasPipeVar = /(?:ТРУБ|PIPES)/i.test(formula);
 
         const trenchWorkUnit = work["Единицы измерения"] || work.unit || '';
@@ -4254,16 +4152,16 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
         } else if (!hasCableVar) {
           // Standard formula without cable count variable (e.g. "0.36 * ДЛИНА")
           displayFormula = formula.replace(/\*/g, ' * ');
-          displayFormula = displayFormula.replace(/ДЛИНА/gi, `${effectiveLength} ${unitSuffix}${condSuffix}`);
+          displayFormula = replaceFormulaToken(displayFormula, 'ДЛИНА|LENGTH', `${effectiveLength} ${unitSuffix}${condSuffix}`);
         } else {
           // Formula uses cable count variable (e.g. "ДЛИНА * КОЛИЧЕСТВО_КАБЕЛЕЙ" or "0.1 * ДЛИНА * КАБЕЛЕЙ")
           if (matchingSegments.length === 1) {
             const seg = matchingSegments[0];
             const segLen = Number(seg.length) || 0;
             const segCables = Number(seg.cablesCount) || 0;
-            displayFormula = formula.replace(/\*/g, ' * ')
-              .replace(/ДЛИНА/gi, `${segLen} ${unitSuffix}`)
-              .replace(/(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|\bКОЛИЧЕСТВО\b)/gi, `${segCables} каб.`);
+            displayFormula = formula.replace(/\*/g, ' * ');
+            displayFormula = replaceFormulaToken(displayFormula, 'ДЛИНА|LENGTH', `${segLen} ${unitSuffix}`);
+            displayFormula = replaceFormulaToken(displayFormula, 'КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|КОЛИЧЕСТВО|COUNT|QTY', `${segCables} каб.`);
             if (condSuffix) displayFormula += condSuffix;
           } else if (matchingSegments.length <= 3) {
             // Detailed segment breakdown: "(100 м * 5 каб + 250 м * 6 каб)"
@@ -4399,6 +4297,186 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
     missingInRules,
     formulaErrors
   };
+}
+
+// Universal helper to process a group of cables (optical cables or electrical weight tier)
+// Evaluates works, expands cable brand templates ({МАРКА_КАБЕЛЯ}), and processes static materials/equipment
+function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
+  if (!Array.isArray(workItems) || workItems.length === 0 || !Array.isArray(cablesList) || cablesList.length === 0) return;
+  const { calculatedWorks, formulaErrors } = context;
+  const { ruleName, sectionName, tierThreshold, tierKey, isOptical, category, fallbackTitle } = groupMeta;
+
+  // Sort cables in this group by length descending
+  cablesList.sort((a, b) => (b.length || 0) - (a.length || 0));
+  const totalGroupLength = cablesList.reduce((sum, c) => sum + (Number(c.length) || 0), 0);
+
+  const primaryWork = workItems.find(w => (w["Тип"] || w.type) !== 'материал') || workItems[0];
+  let primaryWorkTitle = (primaryWork ? (primaryWork["Наименование"] || primaryWork.name || '') : '').trim();
+  if (!primaryWorkTitle && fallbackTitle) {
+    primaryWorkTitle = fallbackTitle;
+  }
+  const primaryWorkUnit = (primaryWork ? (primaryWork["Единицы измерения"] || primaryWork.unit || 'м') : 'м').trim();
+
+  workItems.forEach(work => {
+    const rawWorkType = (work["Тип"] || work.type || '').trim().toLowerCase();
+    let determinedWorkType = 'работа';
+    if (rawWorkType === 'оборудование' || rawWorkType === 'equipment') {
+      determinedWorkType = 'оборудование';
+    } else if (rawWorkType === 'материал' || rawWorkType === 'material') {
+      determinedWorkType = 'материал';
+    }
+    const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
+    const formula = work["Формула"] || work.formula || "ДЛИНА";
+    const workTitle = (work["Наименование"] || work.name || primaryWorkTitle).trim();
+    const targetSection = (work["Раздел"] || work.section || sectionName).trim();
+    const workShowFormula = shouldShowFormula(work);
+
+    const evalRes = validateAndEvaluateFormula(formula, totalGroupLength, 'cable', {
+      name: workTitle,
+      type: determinedWorkType,
+      section: targetSection,
+      ruleName: ruleName,
+      formula: formula
+    });
+
+    if (!evalRes.valid) {
+      formulaErrors.push(evalRes.errorInfo);
+      return; // Skip this work item
+    }
+
+    const rawVal = evalRes.value;
+    const unit = work["Единицы измерения"] || work.unit || 'м';
+    const formulaDisplay = workShowFormula ? buildWorkFormulaDisplay(formula, totalGroupLength, cablesList.length, unit) : '';
+
+    calculatedWorks.push({
+      name: workTitle,
+      unit: unit,
+      volume: rawVal,
+      decimals: extractItemDecimals(work),
+      formulaDisplay: formulaDisplay,
+      showFormula: workShowFormula,
+      ruleName: ruleName,
+      routingType: ruleName,
+      tierMax: tierThreshold !== undefined ? tierThreshold : undefined,
+      tierKey: tierKey,
+      isOptical: !!isOptical,
+      category: category || (isOptical ? 'Оптический кабель' : 'Электрический кабель'),
+      section: targetSection,
+      type: determinedWorkType,
+      parentWorkName: (isWorkSub && primaryWork !== work) ? primaryWorkTitle : undefined,
+      parentWorkUnit: (isWorkSub && primaryWork !== work) ? primaryWorkUnit : undefined,
+      parentWorkSection: (isWorkSub && primaryWork !== work) ? targetSection : undefined,
+      cablesCount: cablesList.length,
+      comment: work["Комментарий"] || work.comment || ''
+    });
+
+    // Process materials and equipment declared under this work
+    const declaredSubItems = [
+      ...(Array.isArray(work["Материалы"]) ? work["Материалы"] : []),
+      ...(Array.isArray(work["Оборудование"]) ? work["Оборудование"] : [])
+    ];
+
+    declaredSubItems.forEach(mat => {
+      const rawMatType = (mat["Тип"] || mat.type || (Array.isArray(work["Оборудование"]) && work["Оборудование"].includes(mat) ? 'оборудование' : 'материал')).trim().toLowerCase();
+      let determinedMatType = 'материал';
+      if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
+        determinedMatType = 'оборудование';
+      } else if (rawMatType === 'работа' || rawMatType === 'work') {
+        determinedMatType = 'работа';
+      }
+      const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_КАБЕЛЯ}').trim();
+      const matUnit = mat["Единицы измерения"] || mat.unit || 'км';
+      const matFormula = mat["Формула"] || mat.formula || "ДЛИНА";
+      const matShowFormula = shouldShowFormula(mat, workShowFormula);
+      const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
+
+      if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
+        // Expand material for each cable in this group
+        const matCheck = validateAndEvaluateFormula(matFormula, 100, 'cable', {
+          name: matNameTpl,
+          type: determinedMatType,
+          section: matSection,
+          ruleName: ruleName,
+          formula: matFormula
+        });
+        if (!matCheck.valid) {
+          formulaErrors.push(matCheck.errorInfo);
+          return; // Skip this material
+        }
+
+        cablesList.forEach(c => {
+          const cVol = evaluateWorkFormula(matFormula, c.length);
+          let formulaSuffix = '';
+          if (isOptical) {
+            formulaSuffix = ' (ВОЛС)';
+          } else if (c.weight) {
+            formulaSuffix = ` (масса 1 м: ${c.weight} кг)`;
+          }
+          const cFormulaDisp = matShowFormula
+            ? (buildWorkFormulaDisplay(matFormula, c.length, 1, matUnit) + formulaSuffix)
+            : '';
+
+          calculatedWorks.push({
+            name: c.fullDescription || `Кабель ${c.type}`,
+            unit: matUnit,
+            volume: cVol,
+            decimals: extractItemDecimals(mat),
+            formulaDisplay: cFormulaDisp,
+            showFormula: matShowFormula,
+            ruleName: ruleName,
+            routingType: c.routingName,
+            cableType: c.type,
+            cableLength: c.length,
+            weight: c.weight,
+            isOptical: !!isOptical,
+            category: category || (isOptical ? 'Оптический кабель' : 'Электрический кабель'),
+            foundInCatalog: !!c.foundInCatalog,
+            section: matSection,
+            type: determinedMatType,
+            parentWorkName: workTitle,
+            parentWorkUnit: (work["Единицы измерения"] || work.unit || 'м'),
+            parentWorkSection: targetSection,
+            comment: mat["Комментарий"] || ''
+          });
+        });
+      } else {
+        // Static item declared in work
+        const matEvalRes = validateAndEvaluateFormula(matFormula, totalGroupLength, 'cable', {
+          name: matNameTpl,
+          type: determinedMatType,
+          section: matSection,
+          ruleName: ruleName,
+          formula: matFormula
+        });
+        if (!matEvalRes.valid) {
+          formulaErrors.push(matEvalRes.errorInfo);
+          return; // Skip this material
+        }
+        const matRawVal = matEvalRes.value;
+        const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalGroupLength, cablesList.length, matUnit) : '';
+        calculatedWorks.push({
+          name: matNameTpl,
+          unit: matUnit,
+          volume: matRawVal,
+          decimals: extractItemDecimals(mat),
+          formulaDisplay: matFormulaDisp,
+          showFormula: matShowFormula,
+          ruleName: ruleName,
+          routingType: ruleName,
+          tierMax: tierThreshold !== undefined ? tierThreshold : undefined,
+          tierKey: tierKey,
+          isOptical: !!isOptical,
+          category: category || (isOptical ? 'Оптический кабель' : 'Электрический кабель'),
+          section: matSection,
+          type: determinedMatType,
+          parentWorkName: workTitle,
+          parentWorkUnit: (work["Единицы измерения"] || work.unit || 'м'),
+          parentWorkSection: targetSection,
+          comment: mat["Комментарий"] || ''
+        });
+      }
+    });
+  });
 }
 
 // Calculate works based on cable summary and rules JSON
@@ -4709,164 +4787,18 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 
     // 1. Process OPTICAL cables separately
     if (opticalCables.length > 0) {
-      opticalCables.sort((a, b) => (b.length || 0) - (a.length || 0));
       const totalOpticalLength = opticalCables.reduce((sum, c) => sum + (Number(c.length) || 0), 0);
 
       if (parsedWM.optical && Array.isArray(parsedWM.optical.items) && parsedWM.optical.items.length > 0) {
-        const optItems = parsedWM.optical.items;
-        const primaryWork = optItems.find(w => (w["Тип"] || w.type) !== 'материал') || optItems[0];
-        const opticalPrimaryTitle = (primaryWork["Наименование"] || primaryWork.name || `Прокладка оптического кабеля (${ruleName})`).trim();
-        const opticalPrimaryUnit = (primaryWork["Единицы измерения"] || primaryWork.unit || 'м').trim();
-
-        // Apply all works and their declared materials/equipment from the optical rules list
-        optItems.forEach(work => {
-          const rawWorkType = (work["Тип"] || work.type || '').trim().toLowerCase();
-          let determinedWorkType = 'работа';
-          if (rawWorkType === 'оборудование' || rawWorkType === 'equipment') {
-            determinedWorkType = 'оборудование';
-          } else if (rawWorkType === 'материал' || rawWorkType === 'material') {
-            determinedWorkType = 'материал';
-          }
-          const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
-          const formula = work["Формула"] || work.formula || "ДЛИНА";
-          const workTitle = (work["Наименование"] || work.name || opticalPrimaryTitle).trim();
-          const targetSection = (work["Раздел"] || work.section || sectionName).trim();
-          const workShowFormula = shouldShowFormula(work);
-
-          const evalRes = validateAndEvaluateFormula(formula, totalOpticalLength, 'cable', {
-            name: workTitle,
-            type: determinedWorkType,
-            section: targetSection,
-            ruleName: ruleName,
-            formula: formula
-          });
-
-          if (!evalRes.valid) {
-            formulaErrors.push(evalRes.errorInfo);
-            // Skip this work item!
-          } else {
-            const rawVal = evalRes.value;
-            const unit = work["Единицы измерения"] || work.unit || 'м';
-            const formulaDisplay = workShowFormula ? buildWorkFormulaDisplay(formula, totalOpticalLength, opticalCables.length, unit) : '';
-
-            calculatedWorks.push({
-              name: workTitle,
-              unit: unit,
-              volume: rawVal,
-              decimals: extractItemDecimals(work),
-              formulaDisplay: formulaDisplay,
-              showFormula: workShowFormula,
-              ruleName: ruleName,
-              routingType: ruleName,
-              tierKey: parsedWM.optical.key,
-              isOptical: true,
-              category: 'Оптический кабель',
-              section: targetSection,
-              type: determinedWorkType,
-              parentWorkName: (isWorkSub && primaryWork !== work) ? opticalPrimaryTitle : undefined,
-              parentWorkUnit: (isWorkSub && primaryWork !== work) ? opticalPrimaryUnit : undefined,
-              parentWorkSection: (isWorkSub && primaryWork !== work) ? targetSection : undefined,
-              cablesCount: opticalCables.length,
-              comment: work["Комментарий"] || work.comment || ''
-            });
-          }
-
-          // Process materials and equipment declared under this work
-          const declaredSubItems = [
-            ...(Array.isArray(work["Материалы"]) ? work["Материалы"] : []),
-            ...(Array.isArray(work["Оборудование"]) ? work["Оборудование"] : [])
-          ];
-          declaredSubItems.forEach(mat => {
-            const rawMatType = (mat["Тип"] || mat.type || (Array.isArray(work["Оборудование"]) && work["Оборудование"].includes(mat) ? 'оборудование' : 'материал')).trim().toLowerCase();
-            let determinedMatType = 'материал';
-            if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
-              determinedMatType = 'оборудование';
-            } else if (rawMatType === 'работа' || rawMatType === 'work') {
-              determinedMatType = 'работа';
-            }
-            const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_КАБЕЛЯ}').trim();
-            const matUnit = mat["Единицы измерения"] || mat.unit || 'км';
-            const matFormula = mat["Формула"] || mat.formula || "ДЛИНА";
-            const matShowFormula = shouldShowFormula(mat, workShowFormula);
-            const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
-
-            if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
-              // Expand material for each optical cable
-              const matCheck = validateAndEvaluateFormula(matFormula, 100, 'cable', {
-                name: matNameTpl,
-                type: determinedMatType,
-                section: matSection,
-                ruleName: ruleName,
-                formula: matFormula
-              });
-              if (!matCheck.valid) {
-                formulaErrors.push(matCheck.errorInfo);
-                return; // Skip this material!
-              }
-
-              opticalCables.forEach(c => {
-                const cVol = evaluateWorkFormula(matFormula, c.length);
-                const cFormulaDisp = matShowFormula
-                  ? (buildWorkFormulaDisplay(matFormula, c.length, 1, matUnit) + ' (ВОЛС)')
-                  : '';
-                calculatedWorks.push({
-                  name: c.fullDescription || `Кабель ${c.type}`,
-                  unit: matUnit,
-                  volume: cVol,
-                  decimals: extractItemDecimals(mat),
-                  formulaDisplay: cFormulaDisp,
-                  showFormula: matShowFormula,
-                  ruleName: ruleName,
-                  routingType: c.routingName,
-                  cableType: c.type,
-                  cableLength: c.length,
-                  weight: c.weight,
-                  isOptical: true,
-                  category: 'Оптический кабель',
-                  foundInCatalog: !!c.foundInCatalog,
-                  section: matSection,
-                  type: determinedMatType,
-                  parentWorkName: workTitle,
-                  parentWorkUnit: (work["Единицы измерения"] || work.unit || 'м'),
-                  parentWorkSection: targetSection,
-                  comment: mat["Комментарий"] || ''
-                });
-              });
-            } else {
-              // Static item declared in work
-              const matEvalRes = validateAndEvaluateFormula(matFormula, totalOpticalLength, 'cable', {
-                name: matNameTpl,
-                type: determinedMatType,
-                section: matSection,
-                ruleName: ruleName,
-                formula: matFormula
-              });
-              if (!matEvalRes.valid) {
-                formulaErrors.push(matEvalRes.errorInfo);
-                return; // Skip this material!
-              }
-              const matRawVal = matEvalRes.value;
-              const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalOpticalLength, opticalCables.length, matUnit) : '';
-              calculatedWorks.push({
-                name: matNameTpl,
-                unit: matUnit,
-                volume: matRawVal,
-                decimals: extractItemDecimals(mat),
-                formulaDisplay: matFormulaDisp,
-                showFormula: matShowFormula,
-                ruleName: ruleName,
-                routingType: ruleName,
-                isOptical: true,
-                section: matSection,
-                type: determinedMatType,
-                parentWorkName: workTitle,
-                parentWorkUnit: (work["Единицы измерения"] || work.unit || 'м'),
-                parentWorkSection: targetSection,
-                comment: mat["Комментарий"] || ''
-              });
-            }
-          });
-        });
+        processCableGroupWorks(parsedWM.optical.items, opticalCables, {
+          ruleName: ruleName,
+          sectionName: sectionName,
+          tierThreshold: undefined,
+          tierKey: parsedWM.optical.key,
+          isOptical: true,
+          category: 'Оптический кабель',
+          fallbackTitle: `Прокладка оптического кабеля (${ruleName})`
+        }, { calculatedWorks, formulaErrors });
       } else {
         missingInRules.push({
           type: `${ruleName} (оптический кабель)`,
@@ -4936,11 +4868,6 @@ function calculateWorksFromCables(cableSummary, rulesData) {
         parsedWM.tiers.forEach(tier => {
           if (tier.cables.length === 0) return;
 
-          // Sort cables in this tier by length descending
-          tier.cables.sort((a, b) => (b.length || 0) - (a.length || 0));
-
-          const totalTierLength = tier.cables.reduce((sum, c) => sum + (Number(c.length) || 0), 0);
-
           const tierItems = (Array.isArray(tier.items) && tier.items.length > 0)
             ? tier.items
             : [{
@@ -4952,165 +4879,25 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                 "Тип": "работа"
               }];
 
-          const primaryWork = tierItems.find(w => (w["Тип"] || w.type) !== 'материал') || tierItems[0];
-          let primaryWorkTitle = (primaryWork["Наименование"] || primaryWork.name || '').trim();
-          const primaryWorkUnit = (primaryWork["Единицы измерения"] || primaryWork.unit || 'м').trim();
-          if (!primaryWorkTitle && template && (template.includes('{масса}') || template.includes('{вес}'))) {
-            primaryWorkTitle = template.replace(/\{масса\}|\{вес\}/gi, String(tier.threshold || '')).trim();
+          let fallbackTitle = '';
+          if (template && (template.includes('{масса}') || template.includes('{вес}'))) {
+            fallbackTitle = template.replace(/\{масса\}|\{вес\}/gi, String(tier.threshold || '')).trim();
           }
-          if (!primaryWorkTitle) {
-            primaryWorkTitle = tier.threshold !== null
+          if (!fallbackTitle) {
+            fallbackTitle = tier.threshold !== null
               ? `Прокладка кабеля массой 1 м, кг, до: ${tier.threshold} (${ruleName})`
               : `Прокладка кабеля (${ruleName})`;
           }
 
-          // APPLY ALL WORKS AND THEIR DECLARED MATERIALS/EQUIPMENT FROM THIS TIER LIST
-          tierItems.forEach(work => {
-            const rawWorkType = (work["Тип"] || work.type || '').trim().toLowerCase();
-            let determinedWorkType = 'работа';
-            if (rawWorkType === 'оборудование' || rawWorkType === 'equipment') {
-              determinedWorkType = 'оборудование';
-            } else if (rawWorkType === 'материал' || rawWorkType === 'material') {
-              determinedWorkType = 'материал';
-            }
-            const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
-            const formula = work["Формула"] || work.formula || "ДЛИНА";
-            const workTitle = (work["Наименование"] || work.name || primaryWorkTitle).trim();
-            const targetSection = (work["Раздел"] || work.section || sectionName).trim();
-            const workShowFormula = shouldShowFormula(work);
-
-            const evalRes = validateAndEvaluateFormula(formula, totalTierLength, 'cable', {
-              name: workTitle,
-              type: determinedWorkType,
-              section: targetSection,
-              ruleName: ruleName,
-              formula: formula
-            });
-
-            if (!evalRes.valid) {
-              formulaErrors.push(evalRes.errorInfo);
-              // Skip this work item!
-            } else {
-              const rawVal = evalRes.value;
-              const unit = work["Единицы измерения"] || work.unit || 'м';
-              const formulaDisplay = workShowFormula ? buildWorkFormulaDisplay(formula, totalTierLength, tier.cables.length, unit) : '';
-
-              calculatedWorks.push({
-                name: workTitle,
-                unit: unit,
-                volume: rawVal,
-                decimals: extractItemDecimals(work),
-                formulaDisplay: formulaDisplay,
-                showFormula: workShowFormula,
-                ruleName: ruleName,
-                routingType: ruleName,
-                tierMax: tier.threshold,
-                tierKey: tier.key,
-                section: targetSection,
-                type: determinedWorkType,
-                parentWorkName: (isWorkSub && primaryWork !== work) ? primaryWorkTitle : undefined,
-                parentWorkUnit: (isWorkSub && primaryWork !== work) ? primaryWorkUnit : undefined,
-                parentWorkSection: (isWorkSub && primaryWork !== work) ? targetSection : undefined,
-                cablesCount: tier.cables.length,
-                comment: work["Комментарий"] || work.comment || ''
-              });
-            }
-
-            // Process materials and equipment declared under this work
-            const declaredSubItems = [
-              ...(Array.isArray(work["Материалы"]) ? work["Материалы"] : []),
-              ...(Array.isArray(work["Оборудование"]) ? work["Оборудование"] : [])
-            ];
-            declaredSubItems.forEach(mat => {
-              const rawMatType = (mat["Тип"] || mat.type || (Array.isArray(work["Оборудование"]) && work["Оборудование"].includes(mat) ? 'оборудование' : 'материал')).trim().toLowerCase();
-              let determinedMatType = 'материал';
-              if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
-                determinedMatType = 'оборудование';
-              } else if (rawMatType === 'работа' || rawMatType === 'work') {
-                determinedMatType = 'работа';
-              }
-              const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_КАБЕЛЯ}').trim();
-              const matUnit = mat["Единицы измерения"] || mat.unit || 'км';
-              const matFormula = mat["Формула"] || mat.formula || "ДЛИНА";
-              const matShowFormula = shouldShowFormula(mat, workShowFormula);
-              const matSection = (mat["Раздел"] || mat.section || targetSection).trim();
-
-              if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
-                // Expand material for each electrical cable in this tier
-                const matCheck = validateAndEvaluateFormula(matFormula, 100, 'cable', {
-                  name: matNameTpl,
-                  type: determinedMatType,
-                  section: matSection,
-                  ruleName: ruleName,
-                  formula: matFormula
-                });
-                if (!matCheck.valid) {
-                  formulaErrors.push(matCheck.errorInfo);
-                  return; // Skip this material!
-                }
-
-                tier.cables.forEach(c => {
-                  const cVol = evaluateWorkFormula(matFormula, c.length);
-                  const cFormulaDisp = matShowFormula
-                    ? (buildWorkFormulaDisplay(matFormula, c.length, 1, matUnit) + (c.weight ? ` (масса 1 м: ${c.weight} кг)` : ''))
-                    : '';
-                  calculatedWorks.push({
-                    name: c.fullDescription || `Кабель ${c.type}`,
-                    unit: matUnit,
-                    volume: cVol,
-                    decimals: extractItemDecimals(mat),
-                    formulaDisplay: cFormulaDisp,
-                    showFormula: matShowFormula,
-                    ruleName: ruleName,
-                    routingType: c.routingName,
-                    cableType: c.type,
-                    cableLength: c.length,
-                    weight: c.weight,
-                    foundInCatalog: !!c.foundInCatalog,
-                    section: matSection,
-                    type: determinedMatType,
-                    parentWorkName: workTitle,
-                    parentWorkUnit: (work["Единицы измерения"] || work.unit || 'м'),
-                    parentWorkSection: targetSection,
-                    comment: mat["Комментарий"] || ''
-                  });
-                });
-              } else {
-                // Static item declared under this work
-                const matEvalRes = validateAndEvaluateFormula(matFormula, totalTierLength, 'cable', {
-                  name: matNameTpl,
-                  type: determinedMatType,
-                  section: matSection,
-                  ruleName: ruleName,
-                  formula: matFormula
-                });
-                if (!matEvalRes.valid) {
-                  formulaErrors.push(matEvalRes.errorInfo);
-                  return; // Skip this material!
-                }
-                const matRawVal = matEvalRes.value;
-                const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalTierLength, tier.cables.length, matUnit) : '';
-                calculatedWorks.push({
-                  name: matNameTpl,
-                  unit: matUnit,
-                  volume: matRawVal,
-                  decimals: extractItemDecimals(mat),
-                  formulaDisplay: matFormulaDisp,
-                  showFormula: matShowFormula,
-                  ruleName: ruleName,
-                  routingType: ruleName,
-                  tierMax: tier.threshold,
-                  tierKey: tier.key,
-                  section: matSection,
-                  type: determinedMatType,
-                  parentWorkName: workTitle,
-                  parentWorkUnit: (work["Единицы измерения"] || work.unit || 'м'),
-                  parentWorkSection: targetSection,
-                  comment: mat["Комментарий"] || ''
-                });
-              }
-            });
-          });
+          processCableGroupWorks(tierItems, tier.cables, {
+            ruleName: ruleName,
+            sectionName: sectionName,
+            tierThreshold: tier.threshold,
+            tierKey: tier.key,
+            isOptical: false,
+            category: 'Электрический кабель',
+            fallbackTitle: fallbackTitle
+          }, { calculatedWorks, formulaErrors });
         });
       }
     }
@@ -5185,13 +4972,14 @@ function evaluateEquipmentFormula(formula, count) {
 }
 
 function buildEquipmentFormulaDisplay(formula, count, unit) {
-  if (!formula || formula.trim() === 'КОЛИЧЕСТВО' || formula.trim() === '1') {
-    return `${count} ${unit || 'шт'}`;
+  const u = (unit || 'шт').trim();
+  const clean = (formula || 'КОЛИЧЕСТВО').trim();
+  const upper = clean.toUpperCase();
+  if (!clean || upper === 'КОЛИЧЕСТВО' || upper === 'COUNT' || upper === 'QTY' || clean === '1') {
+    return `${count} ${u}`;
   }
-  const disp = formula
-    .replace(/\bКОЛИЧЕСТВО\b/gi, `${count} шт`)
-    .replace(/\bCOUNT\b/gi, `${count} шт`)
-    .replace(/\bQTY\b/gi, `${count} шт`);
+  let disp = clean.replace(/,/g, '.');
+  disp = replaceFormulaToken(disp, 'КОЛИЧЕСТВО|COUNT|QTY|ДЛИНА|LENGTH', `${count} ${u}`);
   return normalizeFormulaMathOperators(disp);
 }
 
