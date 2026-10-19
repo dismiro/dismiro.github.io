@@ -226,56 +226,35 @@ function validateAndEvaluateFormula(formula, dataCtx, domain = 'cable', context 
 
     // Intersections
     expr = replaceToken(expr, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]', countIntersections);
-    expr = replaceToken(expr, 'INTERSECTIONS[_\\s]?COUNT', countIntersections);
-    expr = replaceToken(expr, 'COUNT[_\\s]?INTERSECTIONS', countIntersections);
     expr = replaceToken(expr, 'ПЕРЕСЕЧЕНИ[ЙЯЕ]', countIntersections);
     // Pipe count
     expr = replaceToken(expr, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ТРУБ[АЫ]?', countPipes);
-    expr = replaceToken(expr, 'PIPES[_\\s]?COUNT', countPipes);
-    expr = replaceToken(expr, 'COUNT[_\\s]?PIPES', countPipes);
-    expr = replaceToken(expr, 'ТРУБ[АЫ]?', countPipes);
     // Pipe length
     expr = replaceToken(expr, 'ДЛИН[АЫ][_\\s]?ТРУБ[АЫ]?', lengthPipes);
-    expr = replaceToken(expr, 'PIPES[_\\s]?LENGTH', lengthPipes);
-    expr = replaceToken(expr, 'LENGTH[_\\s]?PIPES', lengthPipes);
     // Cable count
     expr = replaceToken(expr, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ', cab);
-    expr = replaceToken(expr, 'CABLES_COUNT', cab);
-    expr = replaceToken(expr, 'CABLES', cab);
     expr = replaceToken(expr, 'КАБЕЛЕ[ЙЯИ]', cab);
     // Generic
     expr = replaceToken(expr, 'КОЛИЧЕСТВО', cab);
-    expr = replaceToken(expr, 'COUNT', cab);
-    expr = replaceToken(expr, 'QTY', cab);
     expr = replaceToken(expr, 'ДЛИНА', len);
-    expr = replaceToken(expr, 'LENGTH', len);
   } else if (domain === 'equipment') {
     const count = Number(baseValue) || 0;
     expr = replaceToken(expr, 'КОЛИЧЕСТВО', count);
-    expr = replaceToken(expr, 'COUNT', count);
-    expr = replaceToken(expr, 'QTY', count);
     expr = replaceToken(expr, 'ШТ', count);
     expr = replaceToken(expr, 'ДЛИНА', count);
-    expr = replaceToken(expr, 'LENGTH', count);
   } else if (domain === 'coupling') {
     const count = Number(baseValue) || 0;
     expr = replaceToken(expr, 'КОЛИЧЕСТВО_МУФТ', count);
     expr = replaceToken(expr, 'КОЛИЧЕСТВО', count);
-    expr = replaceToken(expr, 'COUNT', count);
-    expr = replaceToken(expr, 'QTY', count);
     expr = replaceToken(expr, 'ШТ', count);
     expr = replaceToken(expr, 'ДЛИНА', count);
-    expr = replaceToken(expr, 'LENGTH', count);
   } else {
     // domain === 'cable' (default)
     const num = Number(baseValue) || 0;
     expr = replaceToken(expr, 'КОЛИЧЕСТВО_МУФТ', num);
     expr = replaceToken(expr, 'КОЛИЧЕСТВО', num);
-    expr = replaceToken(expr, 'COUNT', num);
-    expr = replaceToken(expr, 'QTY', num);
     expr = replaceToken(expr, 'ШТ', num);
     expr = replaceToken(expr, 'ДЛИНА', num);
-    expr = replaceToken(expr, 'LENGTH', num);
   }
 
   // Check for remaining unknown identifiers (variables)
@@ -4006,15 +3985,15 @@ function formatSegmentFormulaWithTokens(formulaStr, seg, unitSuffix = 'м') {
   const cab = Number(seg.cablesCount !== undefined ? seg.cablesCount : (seg.count !== undefined ? seg.count : 0)) || 0;
 
   // Intersections
-  disp = replaceTokenInDisp(disp, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]|INTERSECTIONS[_\\s]?COUNT|COUNT[_\\s]?INTERSECTIONS|ПЕРЕСЕЧЕНИ[ЙЯЕ]', `${countIntersections} перес.`);
+  disp = replaceTokenInDisp(disp, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]|ПЕРЕСЕЧЕНИ[ЙЯЕ]', `${countIntersections} перес.`);
   // Pipe length
-  disp = replaceTokenInDisp(disp, 'ДЛИН[АЫ][_\\s]?ТРУБ[АЫ]?|PIPES[_\\s]?LENGTH|LENGTH[_\\s]?PIPES', `${lengthPipes} м`);
+  disp = replaceTokenInDisp(disp, 'ДЛИН[АЫ][_\\s]?ТРУБ[АЫ]?', `${lengthPipes} м`);
   // Pipe count
-  disp = replaceTokenInDisp(disp, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ТРУБ[АЫ]?|PIPES[_\\s]?COUNT|COUNT[_\\s]?PIPES|ТРУБ[АЫ]?', `${countPipes} шт.`);
+  disp = replaceTokenInDisp(disp, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ТРУБ[АЫ]?', `${countPipes} шт.`);
   // Cable count
-  disp = replaceTokenInDisp(disp, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ|CABLES_COUNT|CABLES|КАБЕЛЕ[ЙЯИ]', `${cab} каб.`);
+  disp = replaceTokenInDisp(disp, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ|КАБЕЛЕ[ЙЯИ]|КОЛИЧЕСТВО', `${cab} каб.`);
   // Generic length
-  disp = replaceTokenInDisp(disp, 'ДЛИНА|LENGTH', `${segLen} ${unitSuffix}`);
+  disp = replaceTokenInDisp(disp, 'ДЛИНА', `${segLen} ${unitSuffix}`);
 
   return disp.replace(/\s+/g, ' ').trim();
 }
@@ -4137,8 +4116,8 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           return; // Skip this work/material!
         }
 
-        const hasCableVar = /(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|(?:^|[^a-zA-Z0-9а-яА-ЯёЁ_])(?:КОЛИЧЕСТВО|COUNT|QTY)(?:[^a-zA-Z0-9а-яА-ЯёЁ_]|$))/i.test(formula);
-        const hasPipeVar = /(?:ТРУБ|PIPES)/i.test(formula);
+        const hasCableVar = /(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|КАБЕЛЕ[ЙЯИ]|(?:^|[^a-zA-Z0-9а-яА-ЯёЁ_])КОЛИЧЕСТВО(?:[^a-zA-Z0-9а-яА-ЯёЁ_]|$))/i.test(formula);
+        const hasPipeVar = /(?:(?:КОЛИЧЕСТВО|ЧИСЛО)[_\s]?ТРУБ[АЫ]?|ДЛИН[АЫ][_\s]?ТРУБ[АЫ]?)/i.test(formula);
 
         const trenchWorkUnit = work["Единицы измерения"] || work.unit || '';
 
@@ -4154,19 +4133,14 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
           } else if (matchingSegments.length <= 5) {
             displayFormula = matchingSegments.map(s => formatSegmentFormulaWithTokens(formula, s, unitSuffix)).join(' + ');
           } else {
-            const hasInterVar = /(?:ПЕРЕСЕЧЕНИ|INTERSECTIONS)/i.test(formula);
             const totalIntersections = matchingSegments.reduce((sum, s) => sum + (s.countIntersections > 0 ? s.countIntersections : 1), 0);
-            const totalPipes = matchingSegments.reduce((sum, s) => sum + (s.countPipes || 1), 0);
             const allSameLen = matchingSegments.every(s => (Number(s.lengthPipes) || 0) === (Number(matchingSegments[0].lengthPipes) || 0));
-            const allOneInter = matchingSegments.every(s => (s.countIntersections || 1) === 1);
+            const allSamePipesCount = matchingSegments.every(s => (Number(s.countPipes) || 1) === (Number(matchingSegments[0].countPipes) || 1));
             const isStandardFormula = /^КОЛИЧЕСТВО_ПЕРЕСЕЧЕНИЙ\*КОЛИЧЕСТВО_ТРУБ\*ДЛИНА_ТРУБ$/i.test(formula.replace(/\s+/g, ''));
 
-            if (isStandardFormula && allSameLen && allOneInter && !hasInterVar) {
+            if (isStandardFormula && allSameLen && allSamePipesCount) {
               const pLen = Number(matchingSegments[0].lengthPipes) || 0;
-              displayFormula = `${totalPipes} шт. * ${pLen} м`;
-            } else if (isStandardFormula && allSameLen && hasInterVar) {
-              const pLen = Number(matchingSegments[0].lengthPipes) || 0;
-              const pCount = matchingSegments[0].countPipes || 1;
+              const pCount = Number(matchingSegments[0].countPipes) || 1;
               displayFormula = `${totalIntersections} перес. * ${pCount} шт. * ${pLen} м`;
             } else {
               displayFormula = `${formula.replace(/\*/g, ' * ')} по ${matchingSegments.length} блокам (всего ${formatVolumeDisplay(totalVolume, trenchWorkUnit, rulesData)} м)`;
@@ -4176,7 +4150,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
         } else if (!hasCableVar) {
           // Standard formula without cable count variable (e.g. "0.36 * ДЛИНА")
           displayFormula = formula.replace(/\*/g, ' * ');
-          displayFormula = replaceFormulaToken(displayFormula, 'ДЛИНА|LENGTH', `${effectiveLength} ${unitSuffix}${condSuffix}`);
+          displayFormula = replaceFormulaToken(displayFormula, 'ДЛИНА', `${effectiveLength} ${unitSuffix}${condSuffix}`);
         } else {
           // Formula uses cable count variable (e.g. "ДЛИНА * КОЛИЧЕСТВО_КАБЕЛЕЙ" or "0.1 * ДЛИНА * КАБЕЛЕЙ")
           if (matchingSegments.length === 1) {
@@ -4184,8 +4158,8 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
             const segLen = Number(seg.length) || 0;
             const segCables = Number(seg.cablesCount) || 0;
             displayFormula = formula.replace(/\*/g, ' * ');
-            displayFormula = replaceFormulaToken(displayFormula, 'ДЛИНА|LENGTH', `${segLen} ${unitSuffix}`);
-            displayFormula = replaceFormulaToken(displayFormula, 'КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|CABLES(?:_COUNT)?|КАБЕЛЕ[ЙЯИ]|КОЛИЧЕСТВО|COUNT|QTY', `${segCables} каб.`);
+            displayFormula = replaceFormulaToken(displayFormula, 'ДЛИНА', `${segLen} ${unitSuffix}`);
+            displayFormula = replaceFormulaToken(displayFormula, 'КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|КАБЕЛЕ[ЙЯИ]|КОЛИЧЕСТВО', `${segCables} каб.`);
             if (condSuffix) displayFormula += condSuffix;
           } else if (matchingSegments.length <= 3) {
             // Detailed segment breakdown: "(100 м * 5 каб + 250 м * 6 каб)"
@@ -4370,7 +4344,8 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
 
     const rawVal = evalRes.value;
     const unit = work["Единицы измерения"] || work.unit || 'м';
-    const formulaDisplay = workShowFormula ? buildWorkFormulaDisplay(formula, totalGroupLength, cablesList.length, unit) : '';
+    const rawFormulaDisp = buildWorkFormulaDisplay(formula, totalGroupLength, cablesList.length, unit);
+    const formulaDisplay = workShowFormula ? rawFormulaDisp : '';
 
     calculatedWorks.push({
       name: workTitle,
@@ -4378,6 +4353,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
       volume: rawVal,
       decimals: extractItemDecimals(work),
       formulaDisplay: formulaDisplay,
+      rawFormulaDisplay: rawFormulaDisp,
       showFormula: workShowFormula,
       ruleName: ruleName,
       routingType: ruleName,
@@ -4436,9 +4412,8 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
           } else if (c.weight) {
             formulaSuffix = ` (масса 1 м: ${c.weight} кг)`;
           }
-          const cFormulaDisp = matShowFormula
-            ? (buildWorkFormulaDisplay(matFormula, c.length, 1, matUnit) + formulaSuffix)
-            : '';
+          const rawCFormulaDisp = buildWorkFormulaDisplay(matFormula, c.length, 1, matUnit) + formulaSuffix;
+          const cFormulaDisp = matShowFormula ? rawCFormulaDisp : '';
 
           calculatedWorks.push({
             name: c.fullDescription || `Кабель ${c.type}`,
@@ -4446,6 +4421,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
             volume: cVol,
             decimals: extractItemDecimals(mat),
             formulaDisplay: cFormulaDisp,
+            rawFormulaDisplay: rawCFormulaDisp,
             showFormula: matShowFormula,
             ruleName: ruleName,
             routingType: c.routingName,
@@ -4477,13 +4453,15 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
           return; // Skip this material
         }
         const matRawVal = matEvalRes.value;
-        const matFormulaDisp = matShowFormula ? buildWorkFormulaDisplay(matFormula, totalGroupLength, cablesList.length, matUnit) : '';
+        const rawMatFormulaDisp = buildWorkFormulaDisplay(matFormula, totalGroupLength, cablesList.length, matUnit);
+        const matFormulaDisp = matShowFormula ? rawMatFormulaDisp : '';
         calculatedWorks.push({
           name: matNameTpl,
           unit: matUnit,
           volume: matRawVal,
           decimals: extractItemDecimals(mat),
           formulaDisplay: matFormulaDisp,
+          rawFormulaDisplay: rawMatFormulaDisp,
           showFormula: matShowFormula,
           ruleName: ruleName,
           routingType: ruleName,
@@ -4558,7 +4536,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
           }
           const rawVol = evalRes.value;
           const workShowFormula = (workItem.showFormula !== undefined) ? workItem.showFormula : shouldShowFormula(workItem.rawItem || workItem);
-          const formulaDisplay = workShowFormula ? buildCouplingWorkFormulaDisplay(formula, tierData, rawVol, workItem.unit || 'шт') : '';
+          const rawFormulaDisp = buildCouplingWorkFormulaDisplay(formula, tierData, rawVol, workItem.unit || 'шт');
+          const formulaDisplay = workShowFormula ? rawFormulaDisp : '';
 
           calculatedWorks.push({
             name: workItem.name,
@@ -4568,6 +4547,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             decimals: extractItemDecimals(workItem.rawItem || workItem),
             formula: formula,
             formulaDisplay: formulaDisplay,
+            rawFormulaDisplay: rawFormulaDisp,
             showFormula: workShowFormula,
             tier: tier,
             isOptical: isOptical,
@@ -4637,7 +4617,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                     return;
                   }
                   const matRawVal = matEvalRes.value;
-                  const matFormulaDisp = matShowFormula ? buildCouplingSingleItemFormulaDisplay(matFormula, coupling.count, matRawVal, couplingMatUnit) : '';
+                  const rawMatFormulaDisp = buildCouplingSingleItemFormulaDisplay(matFormula, coupling.count, matRawVal, couplingMatUnit);
+                  const matFormulaDisp = matShowFormula ? rawMatFormulaDisp : '';
 
                   calculatedWorks.push({
                     name: finalMatName,
@@ -4647,6 +4628,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                     decimals: extractItemDecimals(mat),
                     formula: matFormula,
                     formulaDisplay: matFormulaDisp,
+                    rawFormulaDisplay: rawMatFormulaDisp,
                     showFormula: matShowFormula,
                     tier: tier,
                     isOptical: isOptical,
@@ -4674,7 +4656,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                   return;
                 }
                 const matRawVal = matEvalRes.value;
-                const matFormulaDisp = matShowFormula ? buildCouplingWorkFormulaDisplay(matFormula, tierData, matRawVal, matUnit) : '';
+                const rawMatFormulaDisp = buildCouplingWorkFormulaDisplay(matFormula, tierData, matRawVal, matUnit);
+                const matFormulaDisp = matShowFormula ? rawMatFormulaDisp : '';
 
                 calculatedWorks.push({
                   name: matNameTpl,
@@ -4684,6 +4667,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                   decimals: extractItemDecimals(mat),
                   formula: matFormula,
                   formulaDisplay: matFormulaDisp,
+                  rawFormulaDisplay: rawMatFormulaDisp,
                   showFormula: matShowFormula,
                   tier: tier,
                   isOptical: isOptical,
@@ -4999,11 +4983,11 @@ function buildEquipmentFormulaDisplay(formula, count, unit) {
   const u = (unit || 'шт').trim();
   const clean = (formula || 'КОЛИЧЕСТВО').trim();
   const upper = clean.toUpperCase();
-  if (!clean || upper === 'КОЛИЧЕСТВО' || upper === 'COUNT' || upper === 'QTY' || clean === '1') {
+  if (!clean || upper === 'КОЛИЧЕСТВО' || upper === 'ШТ' || clean === '1') {
     return `${count} ${u}`;
   }
   let disp = clean.replace(/,/g, '.');
-  disp = replaceFormulaToken(disp, 'КОЛИЧЕСТВО|COUNT|QTY|ДЛИНА|LENGTH', `${count} ${u}`);
+  disp = replaceFormulaToken(disp, 'КОЛИЧЕСТВО|ШТ|ДЛИНА', `${count} ${u}`);
   return normalizeFormulaMathOperators(disp);
 }
 
@@ -5114,7 +5098,8 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           // Skip this work item!
         } else {
           const rawVol = evalRes.value;
-          const formulaDisplay = workShowFormula ? buildEquipmentFormulaDisplay(formula, count, unit) : '';
+          const rawFormulaDisp = buildEquipmentFormulaDisplay(formula, count, unit);
+          const formulaDisplay = workShowFormula ? rawFormulaDisp : '';
 
           calculatedWorks.push({
             name: workTitle,
@@ -5124,6 +5109,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
             decimals: extractItemDecimals(work),
             formula: formula,
             formulaDisplay: formulaDisplay,
+            rawFormulaDisplay: rawFormulaDisp,
             showFormula: workShowFormula,
             mark: itemMark,
             method: itemMethod,
@@ -5200,7 +5186,8 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
 
           const matRawVol = matEvalRes.value;
           const matShowFormula = shouldShowFormula(mat, workShowFormula);
-          const matFormulaDisp = matShowFormula ? buildEquipmentFormulaDisplay(matFormula, count, matUnit) : '';
+          const rawMatFormulaDisp = buildEquipmentFormulaDisplay(matFormula, count, matUnit);
+          const matFormulaDisp = matShowFormula ? rawMatFormulaDisp : '';
 
           calculatedWorks.push({
             name: matName,
@@ -5210,6 +5197,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
             decimals: extractItemDecimals(mat),
             formula: matFormula,
             formulaDisplay: matFormulaDisp,
+            rawFormulaDisplay: rawMatFormulaDisp,
             showFormula: matShowFormula,
             mark: itemMark,
             method: itemMethod,
@@ -5370,12 +5358,16 @@ function aggregateCalculatedWorks(rawWorksList) {
 
     if (itemShowFormula !== false) {
       group.showFormula = true;
-      if (item.formulaDisplay && item.formulaDisplay.trim()) {
-        group.formulaParts.push(item.formulaDisplay.trim());
-      } else if (item.volume) {
-        const srcLabel = item.trenchType || item.routingType || item.mark || item.ruleName || '';
-        group.formulaParts.push(srcLabel ? `${item.volume} (${srcLabel})` : `${item.volume}`);
-      }
+    }
+    const workFormulaPart = (item.formulaDisplay && item.formulaDisplay.trim())
+      ? item.formulaDisplay.trim()
+      : ((item.rawFormulaDisplay && item.rawFormulaDisplay.trim()) ? item.rawFormulaDisplay.trim() : '');
+
+    if (workFormulaPart) {
+      group.formulaParts.push(workFormulaPart);
+    } else if (item.volume) {
+      const srcLabel = item.trenchType || item.routingType || item.mark || item.ruleName || '';
+      group.formulaParts.push(srcLabel ? `${item.volume} (${srcLabel})` : `${item.volume}`);
     }
 
     if (Array.isArray(item.handles)) {
@@ -5447,12 +5439,16 @@ function aggregateCalculatedWorks(rawWorksList) {
 
       if (itemShowFormula !== false) {
         matEntry.showFormula = true;
-        if (item.formulaDisplay && item.formulaDisplay.trim()) {
-          matEntry.formulaParts.push(item.formulaDisplay.trim());
-        } else if (item.volume) {
-          const srcLabel = item.trenchType || item.routingType || item.mark || '';
-          matEntry.formulaParts.push(srcLabel ? `${item.volume} (${srcLabel})` : `${item.volume}`);
-        }
+      }
+      const matFormulaPart = (item.formulaDisplay && item.formulaDisplay.trim())
+        ? item.formulaDisplay.trim()
+        : ((item.rawFormulaDisplay && item.rawFormulaDisplay.trim()) ? item.rawFormulaDisplay.trim() : '');
+
+      if (matFormulaPart) {
+        matEntry.formulaParts.push(matFormulaPart);
+      } else if (item.volume) {
+        const srcLabel = item.trenchType || item.routingType || item.mark || '';
+        matEntry.formulaParts.push(srcLabel ? `${item.volume} (${srcLabel})` : `${item.volume}`);
       }
 
       if (Array.isArray(item.handles)) {

@@ -1707,7 +1707,7 @@ function setupWorksRulesListeners() {
   const rulesCardsSearchInput = document.getElementById('rulesCardsSearchInput');
   const rulesCardsClearSearchBtn = document.getElementById('rulesCardsClearSearchBtn');
   if (rulesCardsSearchInput) {
-    const debouncedRenderRules = debounce(renderRulesModalContent, 180);
+    const debouncedRenderRules = debounce(() => renderRulesModalContent(null, false), 180);
     rulesCardsSearchInput.addEventListener('input', debouncedRenderRules);
 
     if (rulesCardsClearSearchBtn) {
