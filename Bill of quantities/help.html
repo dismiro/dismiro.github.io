@@ -252,23 +252,26 @@
             </div>
             <div class="card-body p-2">
               <nav class="d-flex flex-column gap-1">
+                <a href="#section-cad-export" class="help-nav-link">
+                  <i class="bx bx-cube-alt text-primary"></i> 1. Подготовка в САПР (AutoLISP)
+                </a>
                 <a href="#section-overview" class="help-nav-link">
-                  <i class='bx bx-layout text-primary'></i> 1. Обзор интерфейса
+                  <i class="bx bx-layout text-primary"></i> 2. Обзор веб-интерфейса
                 </a>
                 <a href="#section-quickstart" class="help-nav-link">
-                  <i class='bx bx-play-circle text-success'></i> 2. Порядок работы
+                  <i class="bx bx-play-circle text-success"></i> 3. Порядок работы
                 </a>
                 <a href="#section-calc-logic" class="help-nav-link">
-                  <i class='bx bx-calculator text-info'></i> 3. Логика расчетов
+                  <i class="bx bx-calculator text-info"></i> 4. Логика расчетов
                 </a>
                 <a href="#section-rules-modal" class="help-nav-link">
-                  <i class='bx bx-slider-alt text-warning'></i> 4. Сметные нормы и JSON
+                  <i class="bx bx-slider-alt text-warning"></i> 5. Сметные нормы и JSON
                 </a>
                 <a href="#section-formulas" class="help-nav-link">
-                  <i class='bx bx-code-curly text-danger'></i> 5. Формулы и переменные
+                  <i class="bx bx-code-curly text-danger"></i> 6. Формулы и переменные
                 </a>
                 <a href="#section-export" class="help-nav-link">
-                  <i class='bx bx-download text-success'></i> 6. Экспорт в GGE и Excel
+                  <i class="bx bx-download text-success"></i> 7. Экспорт в GGE и Excel
                 </a>
               </nav>
             </div>
@@ -278,11 +281,361 @@
         <!-- Right Content Column -->
         <div class="col-12 col-lg-9 d-flex flex-column gap-4">
 
-          <!-- SECTION 1: ОБЗОР ИНТЕРФЕЙСА -->
+                    <!-- SECTION 1: ПОДГОТОВКА В САПР (AUTOLISP) И ЭКСПОРТ JSON -->
+          <section id="section-cad-export" class="card module-card">
+            <div class="card-header py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bx bx-cube-alt text-primary fs-3"></i>
+                <h2 class="h5 my-0 fw-bold">1. Подготовка двухниточного плана в САПР (AutoLISP) и экспорт проекта JSON</h2>
+              </div>
+              <span class="badge bg-primary-subtle text-primary border">AutoCAD</span>
+            </div>
+            <div class="card-body p-4">
+              <p class="text-muted mb-4">
+                Исходным источником данных для автоматизированного расчета ведомостей объемов работ (ВОР) является двухниточный план станции, подготовленный в среде САПР с помощью прилагаемого комплекса программ на <strong>AutoLISP</strong>. Программа считывает пространственную трассировку кабелей, характеристики участков прокладки и напольного оборудования СЦБ, контролирует баланс длин и экспортирует структурированный файл <code>data_export.json</code>.
+              </p>
+
+              <!-- Инфо-панель инициализации -->
+              <div class="alert alert-primary bg-primary-subtle border-primary-subtle d-flex align-items-start gap-3 p-3 mb-4 rounded-3">
+                <i class="bx bx-info-circle text-primary fs-4 mt-1"></i>
+                <div class="small">
+                  <div class="fw-bold text-primary mb-1">Загрузка программы и регистрация сред расширенных данных (XData)</div>
+                  Загрузите файл LISP-программы в рабочий чертеж командой <kbd>APPLOAD</kbd> (или добавьте в <em>Startup Suite</em> / автозагрузку). При загрузке автоматически регистрируются словари расширенных данных: <code>MY_APP</code> (паспортные данные кабелей) и <code>MY_ATTR_LINK</code> (двусторонние динамические ссылки между блоками и кабелями по их <code>Handle</code>). Все рабочие кабели и блоки способов прокладки должны размещаться на слое <strong>«Слой для ВОРов»</strong>.
+                </div>
+              </div>
+
+              <!-- 1.1 Трассировка линий кабелей -->
+              <div class="mb-4 pb-3 border-bottom">
+                <h3 class="h6 fw-bold mb-2 d-flex align-items-center gap-2">
+                  <span class="step-number bg-primary text-white" style="width: 26px; height: 26px; font-size: 0.8rem;">1</span>
+                  1.1. Подгрузка и трассировка линий кабелей на двухниточном плане
+                </h3>
+                <p class="small text-muted mb-2">
+                  Трассы кабелей на двухниточном плане станции вычерчиваются примитивами <span class="badge bg-secondary-subtle border">LINE</span>, <span class="badge bg-secondary-subtle border">LWPOLYLINE</span> или <span class="badge bg-secondary-subtle border">POLYLINE</span> на слое <strong>«Слой для ВОРов»</strong>. В расширенные данные (XData) каждой линии кабеля под приложением <code>MY_APP</code> вносится строка с паспортными характеристиками:
+                </p>
+
+                <div class="p-3 rounded bg-body-tertiary border mb-3 small">
+                  <div class="fw-semibold mb-1 text-primary">Формат строки XData в словаре <code>MY_APP</code>:</div>
+                  <code class="fs-6">[1000] "Длина-Марка_кабеля"</code> или <code class="fs-6">[1000] "Длина-Марка_кабеля | Дополнительно"</code>
+                  <div class="text-muted mt-2">
+                    <strong>Примеры проектных записей:</strong>
+                    <ul class="mb-0 ps-3 mt-1">
+                      <li><code>"450-СБВБПу 7х2(4)"</code> — паспортная длина <strong>450 м</strong>, сигнально-блокировочный кабель <strong>7х2(4)</strong> с 4 запасными жилами.</li>
+                      <li><code>"680-СБВБэпПуц 10х2(8)*"</code> — длина <strong>680 м</strong>, экранированный кабель <strong>10х2*</strong> со сноской.</li>
+                      <li><code>"1250-ВБШвнг(А)-LS 2х2,5-0,66"</code> — силовой бронированный кабель <strong>1250 м</strong> не распространяющий горение.</li>
+                      <li><code>"2100-ОКБ-Н-Сп-4/2(2,0)Сп-16(2) "8кН""</code> — магистральный волоконно-оптический кабель (ВОЛС) <strong>2100 м</strong>.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div class="small text-muted">
+                  <i class="bx bx-check-double text-success me-1"></i><strong>Правило распознавания:</strong> Числовое значение до первого дефиса <code>-</code> парсится как паспортная длина кабеля в метрах, оставшаяся часть — как марка кабеля. Если присутствует вертикальная черта <code>|</code>, отсекается правая дополнительная часть. Трасса должна быть непрерывной от поста ЭЦ до напольных устройств или кабельных муфт.
+                </div>
+              </div>
+
+              <!-- 1.2 Блоки способов прокладки кабеля -->
+              <div class="mb-4 pb-3 border-bottom">
+                <h3 class="h6 fw-bold mb-2 d-flex align-items-center gap-2">
+                  <span class="step-number bg-primary text-white" style="width: 26px; height: 26px; font-size: 0.8rem;">2</span>
+                  1.2. Размещение блоков способов прокладки кабеля и их обязательные атрибуты
+                </h3>
+                <p class="small text-muted mb-2">
+                  Каждому участку трассы (механизированная траншея, ручная разработка, кабельный желоб, труба и др.) сопоставляется блок-вставка (<span class="badge bg-secondary-subtle border">INSERT</span>) на слое <strong>«Слой для ВОРов»</strong>. Имя блока (или эффективное имя динамического блока <code>EffectiveName</code>) определяет базовый способ прокладки. Блок должен содержать следующие атрибуты:
+                </p>
+
+                <div class="table-responsive rounded-2 border mb-3">
+                  <table class="table table-sm table-hover align-middle mb-0 small">
+                    <thead class="table-sticky-header">
+                      <tr>
+                        <th class="ps-3" style="width: 25%;">Тег атрибута</th>
+                        <th style="width: 18%;">Тип данных</th>
+                        <th style="width: 20%;">Пример значения</th>
+                        <th class="pe-3">Назначение и правила заполнения</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td class="ps-3 font-monospace fw-semibold">ДЛИНА</td>
+                        <td><span class="badge bg-light text-dark border">Число (м)</span></td>
+                        <td><code>50</code>, <code>120.5</code></td>
+                        <td class="pe-3">Протяженность участка траншеи в метрах. Для динамических блоков длина может регулироваться ручками растяжения — функция синхронизации <code>UpdateBlockLinks</code> автоматически считывает динамический параметр блока.</td>
+                      </tr>
+                      <tr>
+                        <td class="ps-3 font-monospace fw-semibold">СПОСОБ_ПРОКЛАДКИ</td>
+                        <td><span class="badge bg-light text-dark border">Текст</span></td>
+                        <td><code>Траншея</code>, <code>Кабельный желоб</code></td>
+                        <td class="pe-3">Технология укладки (заполняется автоматически именем блока при вызове команд связывания).</td>
+                      </tr>
+                      <tr>
+                        <td class="ps-3 font-monospace fw-semibold">КОЛИЧЕСТВО_КАБЕЛЕЙ</td>
+                        <td><span class="badge bg-info-subtle text-info-emphasis border">Автоматический</span></td>
+                        <td><code>Обновлено: 4 шт.</code></td>
+                        <td class="pe-3">Автоматически рассчитывается и записывается плагином при привязке. Наглядно информирует проектировщика на чертеже о плотности кабельного потока в данной траншее.</td>
+                      </tr>
+                      <tr>
+                        <td class="ps-3 font-monospace fw-semibold">ПОЛНОЕ_ПОКРЫТИЕ</td>
+                        <td><span class="badge bg-warning-subtle text-warning-emphasis border">Флаг (1/0)</span></td>
+                        <td><code>1</code>, <code>ДА</code>, <code>TRUE</code></td>
+                        <td class="pe-3"><strong>Режим 100% покрытия:</strong> привязанный блок автоматически перенимает полную паспортную длину кабеля из <code>MY_APP</code> и очищает все конфликтующие связи линии.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="stat-summary-card p-3">
+                  <div class="fw-bold text-primary mb-1 d-flex align-items-center gap-1">
+                    <i class="bx bx-git-repo-forked fs-5"></i> Пересечения путей и трубные переходы (автоматический дополнительный расчетный блок)
+                  </div>
+                  <p class="small text-muted mb-2">
+                    Если участок трассы пересекает железнодорожные пути или препятствия и требует прокладки защитных труб (ПНД, асбестоцементных), в блоке заполняются дополнительные атрибуты:
+                  </p>
+                  <ul class="small text-muted mb-2 ps-3">
+                    <li><code class="fw-semibold">ДЛИНА_ТРУБЫ</code> — длина одной секции трубы в метрах (например, <code>6</code> или <code>12</code>).</li>
+                    <li><code class="fw-semibold">КОЛИЧЕСТВО_ПЕРЕСЕЧЕНИЙ</code> — число пересекаемых путей или преград (например, <code>2</code> или <code>4</code>).</li>
+                    <li><code class="fw-semibold">КАБЕЛЕЙ_В_ТРУБЕ</code> — нормативная вместимость одной трубы по кабелям (например, <code>3</code> или <code>4</code>).</li>
+                  </ul>
+                  <div class="small p-2 rounded bg-body border">
+                    <span class="text-primary fw-semibold">Алгоритм расчета плагина:</span> При экспорте вычисляется число труб в пакете <span class="font-monospace">countPipes = ⌈N_кабелей / КАБЕЛЕЙ_В_ТРУБЕ⌉</span> и общая длина труб <span class="font-monospace">L = round(countPipes × КОЛИЧЕСТВО_ПЕРЕСЕЧЕНИЙ × ДЛИНА_ТРУБЫ)</span>. В JSON автоматически генерируется дополнительный расчетный блок <strong>«Траншея поперечная(трубы)»</strong> с полями <code>countPipes</code>, <code>lengthPipes</code> и <code>countIntersections</code>.
+                  </div>
+                </div>
+              </div>
+
+              <!-- 1.3 Привязка блоков к линиям кабелей -->
+              <div class="mb-4 pb-3 border-bottom">
+                <h3 class="h6 fw-bold mb-2 d-flex align-items-center gap-2">
+                  <span class="step-number bg-primary text-white" style="width: 26px; height: 26px; font-size: 0.8rem;">3</span>
+                  1.3. Привязка блоков способов прокладки к линиям кабелей (Команды САПР)
+                </h3>
+                <p class="small text-muted mb-3">
+                  Связывание блоков траншей с линиями кабелей формирует двустороннюю ассоциацию через <code>Handle</code> в словаре XData <code>MY_ATTR_LINK</code>. Программа предоставляет полный набор команд для управления связями:
+                </p>
+
+                <div class="row g-3 mb-3">
+                  <div class="col-12 col-md-6">
+                    <div class="p-3 rounded border h-100">
+                      <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-bold font-monospace text-primary">LinkBlockToLines</span>
+                        <span class="badge bg-primary-subtle text-primary border">Ручная привязка</span>
+                      </div>
+                      <p class="small text-muted mb-0">
+                        Пользователь указывает блок траншеи, затем выбирает (рамкой или кликом) линии кабелей на слое «Слой для ВОРов». Плагин взаимно связывает кабели с блоком и актуализирует счетчик жил.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="col-12 col-md-6">
+                    <div class="p-3 rounded border h-100">
+                      <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-bold font-monospace text-success">LinkBlockToIntersectLines</span>
+                        <span class="badge bg-success-subtle text-success border">По пересечению</span>
+                      </div>
+                      <p class="small text-muted mb-0">
+                        Полуавтоматический режим: пользователь выбирает блок, программа находит все линии кабелей на слое «Слой для ВОРов», пересекающие контур блока (<code>vla-IntersectWith</code>), и привязывает их в один клик.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="col-12 col-md-6">
+                    <div class="p-3 rounded border h-100">
+                      <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-bold font-monospace text-danger">UnlinkBlockFromLines</span>
+                        <span class="badge bg-danger-subtle text-danger border">Отвязка</span>
+                      </div>
+                      <p class="small text-muted mb-0">
+                        Позволяет отвязать ошибочно привязанные линии кабелей от блока при изменении трассировки или проектных решений.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="col-12 col-md-6">
+                    <div class="p-3 rounded border h-100">
+                      <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-bold font-monospace text-warning-emphasis">UpdateBlockLinks</span>
+                        <span class="badge bg-warning-subtle text-warning-emphasis border">Обязательно!</span>
+                      </div>
+                      <p class="small text-muted mb-0">
+                        Глобальная синхронизация проекта: обновляет длины динамических блоков (<code>fix-din-fields</code>), пересчитывает атрибут <code>КОЛИЧЕСТВО_КАБЕЛЕЙ</code> во всех блоках чертежа и очищает ссылки на удаленные объекты («мертвые Handle»).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 1.4 Напольное оборудование -->
+              <div class="mb-4 pb-3 border-bottom">
+                <h3 class="h6 fw-bold mb-2 d-flex align-items-center gap-2">
+                  <span class="step-number bg-primary text-white" style="width: 26px; height: 26px; font-size: 0.8rem;">4</span>
+                  1.4. Размещение и заполнение данных напольного оборудования (TracksideEquipment)
+                </h3>
+                <p class="small text-muted mb-2">
+                  Напольные устройства СЦБ (светофоры мачтовые и карликовые, стрелочные электроприводы, трансформаторные ящики ТЯ, путевые ящики ПЯ, разветвительные и соединительные муфты, релейные шкафы) размещаются в виде блоков (<span class="badge bg-secondary-subtle border">INSERT</span>). Для экспорта в раздел <code>TracksideEquipment</code> блоки должны иметь заполненные атрибуты:
+                </p>
+
+                <div class="table-responsive rounded-2 border mb-3">
+                  <table class="table table-sm table-hover align-middle mb-0 small">
+                    <thead class="table-sticky-header">
+                      <tr>
+                        <th class="ps-3" style="width: 25%;">Тег атрибута</th>
+                        <th style="width: 25%;">Пример значения</th>
+                        <th class="pe-3">Правила обработки плагином</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td class="ps-3 font-monospace fw-semibold">МАРКА</td>
+                        <td><code>СП-6К</code>, <code>Светофор мачтовый 3-значный</code>, <code>ПЯ-1</code>, <code>УКМ-12</code></td>
+                        <td class="pe-3">Марка устройства по проекту. Поиск атрибута выполняется гибко (без учета регистра, дефисов и подчеркиваний).</td>
+                      </tr>
+                      <tr>
+                        <td class="ps-3 font-monospace fw-semibold">СПОСОБ_УСТАНОВКИ</td>
+                        <td><code>на металлическом основании</code>, <code>на бетонном фундаменте</code>, <code>в грунте</code></td>
+                        <td class="pe-3">Способ монтажа. Если атрибут не заполнен или отсутствует, программа автоматически присваивает значение <code>"Не указано"</code>.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="small text-muted">
+                  <i class="bx bx-info-circle text-primary me-1"></i>Программа группирует оборудование по составному ключу <code>МАРКА + СПОСОБ_УСТАНОВКИ</code>, суммирует количество единиц (<code>countEquipment</code>) и сохраняет список <code>handles</code> всех экземпляров для быстрой навигации.
+                </div>
+              </div>
+
+              <!-- 1.5 Контроль чертежа -->
+              <div class="mb-4 pb-3 border-bottom">
+                <h3 class="h6 fw-bold mb-2 d-flex align-items-center gap-2">
+                  <span class="step-number bg-primary text-white" style="width: 26px; height: 26px; font-size: 0.8rem;">5</span>
+                  1.5. Инструменты аудита и контроля чертежа
+                </h3>
+                <p class="small text-muted mb-2">
+                  Для исключения пропусков и ошибок проектирования используйте сервисные команды плагина:
+                </p>
+                <div class="row g-2 mb-2 small">
+                  <div class="col-12 col-md-6">
+                    <div class="p-2 px-3 rounded bg-body-tertiary border">
+                      <span class="font-monospace fw-bold text-primary">CheckBlockLines</span> — визуализация связей. Выделите блок траншеи — подсвечиваются все его кабели; выделите линию кабеля — подсвечиваются все блоки участков прокладки.
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <div class="p-2 px-3 rounded bg-body-tertiary border">
+                      <span class="font-monospace fw-bold text-info">FINDBLOCKWITHOUTXDATA</span> — поиск «забытых» блоков. Подсчитывает и выводит список блоков на слое «Слой для ВОРов», к которым не привязан ни один кабель.
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <div class="p-2 px-3 rounded bg-body-tertiary border">
+                      <span class="font-monospace fw-bold text-info">FindObj</span> — мгновенный переход. Запрашивает Handle объекта (из протокола экспорта или отчета об ошибках) и зумирует экран на целевом приборе/линии.
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <div class="p-2 px-3 rounded bg-body-tertiary border">
+                      <span class="font-monospace fw-bold text-info">ShowXData</span> — инспектор расширенных данных. Выводит всплывающее окно со всей структурой зарегистрированных словарей XData выбранного элемента.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 1.6 Экспорт в JSON и Информационный центр -->
+              <div>
+                <h3 class="h6 fw-bold mb-2 d-flex align-items-center gap-2">
+                  <span class="step-number bg-success text-white" style="width: 26px; height: 26px; font-size: 0.8rem;">6</span>
+                  1.6. Экспорт в JSON и Информационный центр контроля (ExportXDataToJSON)
+                </h3>
+                <p class="small text-muted mb-3">
+                  Финальный экспорт запускается командой <kbd class="fs-6">ExportXDataToJSON</kbd>. Программа запрашивает путь сохранения файла <code>data_export.json</code>, производит математическую проверку чертежа и открывает интерактивный <strong>«Информационный центр экспорта»</strong> с тремя вкладками:
+                </p>
+
+                <div class="row g-3 mb-3">
+                  <div class="col-12 col-md-4">
+                    <div class="stat-summary-card">
+                      <div class="fw-bold text-primary mb-1 d-flex align-items-center gap-1">
+                        <i class="bx bx-bar-chart-alt-2 fs-5"></i> 1. Общая статистика
+                      </div>
+                      <p class="small text-muted mb-0">
+                        Показывает общее число экспортированных кабелей, блоков прокладки, уникальных типов оборудования, суммарное число единиц оборудования, а также счетчики предупреждений и ошибок.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="col-12 col-md-4">
+                    <div class="stat-summary-card">
+                      <div class="fw-bold text-warning mb-1 d-flex align-items-center gap-1">
+                        <i class="bx bx-error fs-5"></i> 2. Предупреждения
+                      </div>
+                      <p class="small text-muted mb-0">
+                        Выявляет неполное покрытие кабеля (когда сумма блоков меньше паспортной длины). Непокрытый остаток автоматически выносится в фиктивный блок «Остаточная длина» со способом <code>"Не указано"</code>. Кнопка <strong>«Показать объект на чертеже»</strong> мгновенно зумирует к кабелю.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="col-12 col-md-4">
+                    <div class="stat-summary-card">
+                      <div class="fw-bold text-danger mb-1 d-flex align-items-center gap-1">
+                        <i class="bx bx-x-circle fs-5"></i> 3. Ошибки
+                      </div>
+                      <p class="small text-muted mb-0">
+                        Критический контроль: перерасход длины (сумма блоков больше длины кабеля, выставляется <span class="font-monospace">lengthMismatch: true</span>), блоки с нулевой/отрицательной длиной, пустые блоки. Двойной клик или выбор строки подсвечивает проблемный объект на чертеже.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="fw-bold small text-muted mb-2">Пример структуры сгенерированного файла data_export.json:</div>
+                <div class="code-block-sample">
+<pre class="mb-0">{
+  "cables": [
+    {
+      "handle": "3A7F",
+      "cable": "СБВБПу 10х2(8)*",
+      "length": 680,
+      "type": "СБВБПу 10х2(8)*",
+      "lengthMismatch": false,
+      "routing type": { "Траншея механизированная": [500], "Траншея ручная": [180] }
+    }
+  ],
+  "routingTypeBlocks": [
+    {
+      "handle": "4B12",
+      "type": "Траншея механизированная",
+      "length": 500,
+      "cablesCount": 3,
+      "contained": ["СБВБПу 10х2(8)*(3A7F)", "ВБШвнг(А)-LS 2х2,5(3B01)"]
+    },
+    {
+      "handle": "4B12",
+      "type": "Траншея поперечная(трубы)",
+      "length": 24,
+      "countPipes": 2,
+      "lengthPipes": 6.0,
+      "countIntersections": 2,
+      "cablesCount": 3,
+      "contained": ["СБВБПу 10х2(8)*(3A7F)", "ВБШвнг(А)-LS 2х2,5(3B01)"]
+    }
+  ],
+  "TracksideEquipment": [
+    {
+      "EquipmentType": "СП-6К",
+      "InstallationMethod": "на металлическом основании",
+      "countEquipment": 12,
+      "handles": ["5C1", "5C2", "5C3"]
+    }
+  ]
+}</pre>
+                </div>
+
+                <div class="alert alert-success bg-success-subtle border-success-subtle d-flex align-items-center gap-2 p-3 mt-3 mb-0 rounded-3 small">
+                  <i class="bx bx-check-circle text-success fs-4"></i>
+                  <div>
+                    Полученный файл <code>data_export.json</code> полностью готов к загрузке в веб-модуль ВОР (перетаскиванием в окно браузера или нажатием кнопки <strong>«Загрузить свой файл (.json)»</strong>).
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+<!-- SECTION 2: ОБЗОР ИНТЕРФЕЙСА -->
           <section id="section-overview" class="card module-card">
             <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
               <i class='bx bx-layout text-primary fs-3'></i>
-              <h2 class="h5 my-0 fw-bold">1. Обзор рабочей области</h2>
+              <h2 class="h5 my-0 fw-bold">2. Обзор рабочей области</h2>
             </div>
             <div class="card-body p-4">
               <p class="text-muted mb-3">
@@ -335,11 +688,11 @@
             </div>
           </section>
 
-          <!-- SECTION 2: БЫСТРЫЙ СТАРТ -->
+          <!-- SECTION 3: БЫСТРЫЙ СТАРТ -->
           <section id="section-quickstart" class="card module-card">
             <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
               <i class='bx bx-play-circle text-success fs-3'></i>
-              <h2 class="h5 my-0 fw-bold">2. Порядок работы (Быстрый старт)</h2>
+              <h2 class="h5 my-0 fw-bold">3. Порядок работы (Быстрый старт)</h2>
             </div>
             <div class="card-body p-4">
               <div class="d-flex flex-column gap-3">
@@ -348,7 +701,7 @@
                   <div>
                     <h3 class="h6 fw-bold mb-1">Загрузите JSON-файл проекта</h3>
                     <p class="small text-muted mb-0">
-                      Перетащите файл выгрузки из AutoCAD (например, <code>data_export.json</code>) в пунктирную область первого столбца или нажмите <strong>«Загрузить свой файл (.json)»</strong>. Для демонстрации работы нажмите кнопку <strong>«Загрузить пример»</strong>. Программа автоматически определяет кодировку файла (<code>UTF-8</code>, <code>Windows-1251</code>, <code>UTF-16</code>) и сразу запускает расчет.
+                      Перетащите сформированный в САПР файл выгрузки (например, <code>data_export.json</code>, см. <a href="#section-cad-export" class="fw-semibold text-primary">раздел 1 «Подготовка в САПР»</a>) в пунктирную область первого столбца или нажмите <strong>«Загрузить свой файл (.json)»</strong>. Для демонстрации работы нажмите кнопку <strong>«Загрузить пример»</strong>. Программа автоматически определяет кодировку файла (<code>UTF-8</code>, <code>Windows-1251</code>, <code>UTF-16</code>) и сразу запускает расчет.
                     </p>
                   </div>
                 </div>
@@ -386,14 +739,14 @@
             </div>
           </section>
 
-          <!-- SECTION 3: ЛОГИКА РАСЧЕТОВ -->
+          <!-- SECTION 4: ЛОГИКА РАСЧЕТОВ -->
           <section id="section-calc-logic" class="card module-card">
             <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
               <i class='bx bx-calculator text-info fs-3'></i>
-              <h2 class="h5 my-0 fw-bold">3. Логика и правила выполнения расчетов</h2>
+              <h2 class="h5 my-0 fw-bold">4. Логика и правила выполнения расчетов</h2>
             </div>
             <div class="card-body p-4">
-              <h3 class="h6 fw-bold mb-2"><i class='bx bx-git-branch text-primary me-1'></i>3.1. Нормализация и распознавание марок кабелей</h3>
+              <h3 class="h6 fw-bold mb-2"><i class='bx bx-git-branch text-primary me-1'></i>4.1. Нормализация и распознавание марок кабелей</h3>
               <p class="small text-muted mb-3">
                 Программа автоматически приводит проектные обозначения кабелей к номенклатурным маркам из <strong>«Справочника кабелей»</strong>:
               </p>
@@ -455,7 +808,7 @@
                 </table>
               </div>
 
-              <h3 class="h6 fw-bold mb-2"><i class='bx bx-git-merge text-warning me-1'></i>3.2. Расчет количества соединительных муфт</h3>
+              <h3 class="h6 fw-bold mb-2"><i class='bx bx-git-merge text-warning me-1'></i>4.2. Расчет количества соединительных муфт</h3>
               <p class="small text-muted mb-3">
                 Для каждого отдельного кабеля в проекте его длина <code>L</code> сравнивается со <strong>строительной длиной</strong> <code>L_стр</code> из справочника кабелей (например, <code>300 м</code>, <code>600 м</code>, <code>1000 м</code> или <code>2000 м</code>):
               </p>
@@ -467,18 +820,18 @@
                 </div>
               </div>
 
-              <h3 class="h6 fw-bold mb-2"><i class='bx bx-sitemap text-success me-1'></i>3.3. Иерархическая группировка работ и материалов</h3>
+              <h3 class="h6 fw-bold mb-2"><i class='bx bx-sitemap text-success me-1'></i>4.3. Иерархическая группировка работ и материалов</h3>
               <p class="small text-muted mb-0">
                 В ведомостях ВОР (столбец 3) одноименные работы из разных правил в пределах одного раздела автоматически складываются в одну строку с формированием подробной суммы в графе <strong>«Формула»</strong>. Все вложенные материалы и оборудование группируются строго под своей родительской работой и получают подчиненные номера (например, <code>1.1</code>, <code>1.2</code> под работой <code>1</code>).
               </p>
             </div>
           </section>
 
-          <!-- SECTION 4: МОДАЛЬНОЕ ОКНО ПРАВИЛ -->
+          <!-- SECTION 5: МОДАЛЬНОЕ ОКНО ПРАВИЛ -->
           <section id="section-rules-modal" class="card module-card">
             <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
               <i class='bx bx-slider-alt text-warning fs-3'></i>
-              <h2 class="h5 my-0 fw-bold">4. Управление сметными нормами и справочниками</h2>
+              <h2 class="h5 my-0 fw-bold">5. Управление сметными нормами и справочниками</h2>
             </div>
             <div class="card-body p-4">
               <p class="small text-muted mb-3">
@@ -555,11 +908,11 @@
             </div>
           </section>
 
-          <!-- SECTION 5: СПРАВОЧНИК ФОРМУЛ И ПЕРЕМЕННЫХ -->
+          <!-- SECTION 6: СПРАВОЧНИК ФОРМУЛ И ПЕРЕМЕННЫХ -->
           <section id="section-formulas" class="card module-card">
             <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
               <i class='bx bx-code-curly text-danger fs-3'></i>
-              <h2 class="h5 my-0 fw-bold">5. Справочник переменных, шаблонов и условий в JSON</h2>
+              <h2 class="h5 my-0 fw-bold">6. Справочник переменных, шаблонов и условий в JSON</h2>
             </div>
             <div class="card-body p-4">
               <p class="small text-muted mb-3">
@@ -639,11 +992,11 @@
             </div>
           </section>
 
-          <!-- SECTION 6: ЭКСПОРТ -->
+          <!-- SECTION 7: ЭКСПОРТ -->
           <section id="section-export" class="card module-card">
             <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
               <i class='bx bx-download text-success fs-3'></i>
-              <h2 class="h5 my-0 fw-bold">6. Экспорт ВОР и предэкспортный контроль</h2>
+              <h2 class="h5 my-0 fw-bold">7. Экспорт ВОР и предэкспортный контроль</h2>
             </div>
             <div class="card-body p-4">
               <p class="small text-muted mb-3">
