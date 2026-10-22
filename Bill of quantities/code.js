@@ -3062,13 +3062,10 @@ function renderEquipmentStatement(equipmentData, equipmentWorksCalc) {
               ${missingBadges}
             </div>
             <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
-              Для данного оборудования работы и материалы не определены в правилах и не вошли в итоговую ведомость (ВОР). Рекомендуется дополнить сметные нормы.
+              Для данного оборудования работы и материалы не определены в правилах и не вошли в итоговую ведомость (ВОР). Рекомендуется дополнить сметные нормы через модальное окно правил.
             </div>
           </div>
         </div>
-        <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" id="addMissingEquipmentRulesBtn" style="font-size: 0.75rem;" title="Добавить эти позиции в раздел «Оборудование» правил">
-          <i class="bx bx-plus-circle"></i> Добавить в правила JSON
-        </button>
       </div>
     `;
   }
@@ -3150,13 +3147,6 @@ function renderEquipmentStatement(equipmentData, equipmentWorksCalc) {
       </table>
     </div>
   `;
-
-  const addMissingBtn = document.getElementById('addMissingEquipmentRulesBtn');
-  if (addMissingBtn) {
-    addMissingBtn.addEventListener('click', () => {
-      addMissingEquipmentToRules(equipmentWorksCalc.missingInRules);
-    });
-  }
 }
 
 // Universal table row generator for VOR tables (Строительные работы and Монтажные работы)
@@ -3285,13 +3275,10 @@ function renderInstallationWorks(cableWorksCalc) {
               ${missingBadges}
             </div>
             <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
-              Для данных способов прокладки работы не определены в правилах и не вошли в итоговую ведомость (ВОР). Рекомендуется дополнить сметные нормы соответствующими позициями работ и материалов.
+              Для данных способов прокладки работы не определены в правилах и не вошли в итоговую ведомость (ВОР). Дополните сметные нормы через модальное окно правил.
             </div>
           </div>
         </div>
-        <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" id="addMissingCableRulesBtn" style="font-size: 0.75rem;" title="Добавить эти позиции в раздел «Монтажные работы»">
-          <i class="bx bx-plus-circle"></i> Добавить в правила JSON
-        </button>
       </div>
     `;
   }
@@ -3317,9 +3304,6 @@ function renderInstallationWorks(cableWorksCalc) {
             </div>
           </div>
         </div>
-        <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" id="addMissingEquipmentRulesBtnInstallation" style="font-size: 0.75rem;" title="Добавить эти позиции в раздел «Оборудование»">
-          <i class="bx bx-plus-circle"></i> Добавить в правила JSON
-        </button>
       </div>
     `;
   }
@@ -3341,13 +3325,10 @@ function renderInstallationWorks(cableWorksCalc) {
               ${missingBadges}
             </div>
             <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
-              Для данных кабелей применен приблизительный вес 1 м (от 0.15 до 3 кг/м в зависимости от ёмкости). Рекомендуется дополнить справочник точными паспортными данными.
+              Для данных кабелей применен приблизительный вес 1 м (от 0.15 до 3 кг/м в зависимости от ёмкости). Дополните справочник через модальное окно правил.
             </div>
           </div>
         </div>
-        <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" id="addMissingCablesToCatalogBtn" style="font-size: 0.75rem;" title="Добавить заготовки для этих кабелей в раздел «Справочник кабелей»">
-          <i class="bx bx-plus-circle"></i> Добавить марки в справочник
-        </button>
       </div>
     `;
   }
@@ -3386,32 +3367,11 @@ function renderInstallationWorks(cableWorksCalc) {
       <div class="text-center py-4 px-2 text-muted small bg-light rounded border">
         <i class="bx bx-info-circle fs-4 d-block mb-1 text-secondary"></i>
         <div>Работы не определены для текущих способов прокладки кабелей и оборудования.</div>
-        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('editor')">
-          <i class="bx bx-edit"></i> Настроить раздел «Монтажные работы» и «Оборудование» в JSON
+        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('cards')">
+          <i class="bx bx-edit"></i> Настроить правила в модальном окне
         </button>
       </div>
     `;
-  }
-
-  const addMissingCableRulesBtn = document.getElementById('addMissingCableRulesBtn');
-  if (addMissingCableRulesBtn) {
-    addMissingCableRulesBtn.addEventListener('click', () => {
-      addMissingCableWaysToRules(cableWorksCalc.missingInRules);
-    });
-  }
-
-  const addMissingEquipmentRulesBtnInst = document.getElementById('addMissingEquipmentRulesBtnInstallation');
-  if (addMissingEquipmentRulesBtnInst) {
-    addMissingEquipmentRulesBtnInst.addEventListener('click', () => {
-      addMissingEquipmentToRules(cableWorksCalc.missingEquipment);
-    });
-  }
-
-  const addMissingCablesToCatalogBtn = document.getElementById('addMissingCablesToCatalogBtn');
-  if (addMissingCablesToCatalogBtn) {
-    addMissingCablesToCatalogBtn.addEventListener('click', () => {
-      addMissingCablesToCatalog(cableWorksCalc.missingInCatalog);
-    });
   }
 }
 
@@ -3556,13 +3516,10 @@ function renderConstructionWorks(worksCalc) {
               ${missingBadges}
             </div>
             <div class="text-muted" style="font-size: 0.78rem; line-height: 1.35;">
-              Для данных способов прокладки работы не определены в правилах и не вошли в итоговую ведомость (ВОР). Рекомендуется дополнить сметные нормы соответствующими позициями работ и материалов.
+              Для данных способов прокладки работы не определены в правилах и не вошли в итоговую ведомость (ВОР). Дополните сметные нормы через модальное окно правил.
             </div>
           </div>
         </div>
-        <button type="button" class="btn btn-xs btn-outline-dark d-inline-flex align-items-center gap-1 py-1 px-2 mt-1 mt-md-0 flex-shrink-0" id="addMissingRulesBtn" style="font-size: 0.75rem;" title="Добавить эти способы прокладки в правила JSON">
-          <i class="bx bx-plus-circle"></i> Добавить в правила JSON
-        </button>
       </div>
     `;
   }
@@ -3597,18 +3554,11 @@ function renderConstructionWorks(worksCalc) {
       <div class="text-center py-4 px-2 text-muted small bg-light rounded border">
         <i class="bx bx-info-circle fs-4 d-block mb-1 text-secondary"></i>
         <div>Работы не определены для текущих способов прокладки.</div>
-        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('editor')">
-          <i class="bx bx-edit"></i> Настроить правила в JSON
+        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('cards')">
+          <i class="bx bx-edit"></i> Настроить правила в модальном окне
         </button>
       </div>
     `;
-  }
-
-  const addMissingRulesBtn = document.getElementById('addMissingRulesBtn');
-  if (addMissingRulesBtn) {
-    addMissingRulesBtn.addEventListener('click', () => {
-      addMissingTrenchTypesToRules(worksCalc.missingInRules);
-    });
   }
 }
 

@@ -120,7 +120,6 @@ async function handleRulesFileInput(e) {
 
     modalDraftRules = parsed;
 
-    // Synchronize editor textarea and CodeMirror
     setWorksJsonEditorValue(JSON.stringify(parsed, null, 2));
     validateWorksJsonInput();
 
@@ -136,7 +135,7 @@ async function handleRulesFileInput(e) {
   }
 }
 
-// Reset rules in editor draft to standard works_rules.json (requires clicking Apply & Recalculate to commit)
+// Reset rules in editor draft to standard works_rules.json
 async function resetWorksRules() {
   let defaultData = null;
   try {
@@ -177,10 +176,6 @@ function downloadWorksRules() {
   URL.revokeObjectURL(url);
   showToast('JSON файл сметных норм скачан', 'success', 'Скачивание');
 }
-
-// --------------------------------------------------------------------------
-// UNIFIED CATALOG MODAL RENDERING HELPERS
-// --------------------------------------------------------------------------
 
 // Standard search query extractor with clear-button toggle
 function getModalSearchQuery(inputId, clearBtnId) {
@@ -302,7 +297,6 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
   const countBadge = document.getElementById('worksRulesCountBadge');
   const rules = resolveValidRules(rulesObj);
   
-  // Render cables, couplings, equipment and settings tabs content only when full refresh requested
   if (updateAllTabs) {
     renderCableCatalogModalContent(rules);
     renderCouplingCatalogModalContent(rules);
@@ -328,7 +322,6 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
     countBadge.textContent = `${totalRulesCount} способов в ${sections.length} разд. (${totalWorksCount} поз.)`;
   }
 
-  // Search filter query for Rules Cards
   const query = getModalSearchQuery('rulesCardsSearchInput', 'rulesCardsClearSearchBtn');
 
   if (sections.length === 0 || totalRulesCount === 0) {
@@ -355,26 +348,12 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
         <div class="d-flex align-items-start gap-2">
           <i class="bx bx-alarm-exclamation fs-4 text-warning flex-shrink-0 mt-0_5"></i>
           <div class="flex-grow-1">
-            <div class="fw-bold text-dark">В загруженном проекте есть позиции без правил сметных норм!</div>
-            <div class="text-body-secondary mt-1 mb-2">
+            <div class="fw-bold text-dark">В загруженном проекте есть позиции без сметных правил:</div>
+            <div class="text-body-secondary mt-1">
               ${parts.join('<br>')}
             </div>
-            <div class="d-flex flex-wrap gap-2">
-              ${missingCable.length > 0 ? `
-                <button type="button" class="btn btn-xs btn-outline-dark fw-semibold" id="modalAddMissingCableBtn">
-                  <i class="bx bx-plus-circle me-1"></i>Добавить позиции по кабелям (${missingCable.length})
-                </button>
-              ` : ''}
-              ${missingTrench.length > 0 ? `
-                <button type="button" class="btn btn-xs btn-outline-dark fw-semibold" id="modalAddMissingTrenchBtn">
-                  <i class="bx bx-plus-circle me-1"></i>Добавить позиции по траншеям (${missingTrench.length})
-                </button>
-              ` : ''}
-              ${missingEquipment.length > 0 ? `
-                <button type="button" class="btn btn-xs btn-outline-dark fw-semibold" id="modalAddMissingEquipmentBtn">
-                  <i class="bx bx-plus-circle me-1"></i>Добавить позиции по оборудованию (${missingEquipment.length})
-                </button>
-              ` : ''}
+            <div class="text-muted fs-xs mt-1">
+              Для формирования недостающих правил воспользуйтесь кнопками <strong>«Добавить способ»</strong>, <strong>«Добавить марку»</strong> или <strong>«Добавить оборудование»</strong> в соответствующих вкладках.
             </div>
           </div>
         </div>
@@ -388,7 +367,6 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
   sections.forEach((sec) => {
     const isCableSec = sec.name.toLowerCase().includes('монтаж') || sec.name.toLowerCase().includes('кабел');
     
-    // Filter rules inside section if search query is provided
     const matchingRules = sec.rules.filter(rule => {
       if (!query) return true;
       const rName = rule["Марка"] || rule["Название"] || rule.mark || rule.name || '';
@@ -429,7 +407,6 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
       let ruleWorksCount = 0;
       let ruleSubCount = 0;
 
-      // Render a work item along with any nested materials / equipment, with indent and '↳' prefix
       const renderWorkWithSubItems = (w, wIdx, tierContext = null) => {
         if (typeof w === 'string') {
           ruleWorksCount++;
@@ -590,7 +567,7 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
             </div>
             <div class="d-flex align-items-center gap-2">
               ${cardBadges.join('')}
-              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5" onclick="highlightAndScrollToJsonNode('${escapeHtml(rName)}', true)" title="Перейти к позиции в редакторе JSON">
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 btn-jump-to-json" data-json-target="${escapeHtml(rName)}" title="Перейти к позиции в редакторе JSON">
                 <i class='bx bx-code-alt me-0_5'></i>JSON
               </button>
             </div>
@@ -614,27 +591,6 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
   }
 
   container.innerHTML = missingNoticeHtml + html;
-
-  const modalAddMissingCableBtn = document.getElementById('modalAddMissingCableBtn');
-  if (modalAddMissingCableBtn && missingCable.length > 0) {
-    modalAddMissingCableBtn.addEventListener('click', () => {
-      addMissingCableWaysToRules(missingCable);
-    });
-  }
-
-  const modalAddMissingTrenchBtn = document.getElementById('modalAddMissingTrenchBtn');
-  if (modalAddMissingTrenchBtn && missingTrench.length > 0) {
-    modalAddMissingTrenchBtn.addEventListener('click', () => {
-      addMissingTrenchTypesToRules(missingTrench);
-    });
-  }
-
-  const modalAddMissingEquipmentBtn = document.getElementById('modalAddMissingEquipmentBtn');
-  if (modalAddMissingEquipmentBtn && missingEquipment.length > 0) {
-    modalAddMissingEquipmentBtn.addEventListener('click', () => {
-      addMissingEquipmentToRules(missingEquipment);
-    });
-  }
 }
 
 // Render Cable Catalog Tab Content
@@ -644,14 +600,11 @@ function renderCableCatalogModalContent(rulesObj = null) {
   if (!container) return;
 
   const rules = resolveValidRules(rulesObj);
-  // Extract catalog from draft rules or default
   const catalog = getCableCatalog(rules) || {};
   const groups = Object.keys(catalog);
 
-  // Search filter query
   const query = getModalSearchQuery('cableCatalogSearchInput', 'cableCatalogClearSearchBtn');
 
-  // Category filter
   const catFilter = document.getElementById('cableCatalogCategoryFilter');
   const catVal = catFilter ? catFilter.value : 'all';
 
@@ -663,16 +616,9 @@ function renderCableCatalogModalContent(rulesObj = null) {
     if (!groupObj || typeof groupObj !== 'object') return;
 
     const isOptCategory = String(groupObj["Категория"] || groupName || '').trim().toLowerCase() === 'оптический кабель';
-    // Filter by group category dropdown
-    if (catVal === 'optical' && !isOptCategory) {
-      return;
-    }
-    if (catVal === 'special' && !/особ/i.test(groupName)) {
-      return;
-    }
-    if (catVal === 'signaling' && (isOptCategory || /особ/i.test(groupName))) {
-      return;
-    }
+    if (catVal === 'optical' && !isOptCategory) return;
+    if (catVal === 'special' && !/особ/i.test(groupName)) return;
+    if (catVal === 'signaling' && (isOptCategory || /особ/i.test(groupName))) return;
 
     const typesObj = groupObj["Тип"] || {};
     const markNames = Object.keys(typesObj);
@@ -795,11 +741,7 @@ function renderCableCatalogModalContent(rulesObj = null) {
   container.innerHTML = renderCatalogHeaderBar(`Показано: <strong>${matchCount}</strong> из ${totalMarksCount} марок кабелей в справочнике`) + html;
 }
 
-// --------------------------------------------------------------------------
-// RENDER EQUIPMENT CATALOG TAB IN WORKS RULES MODAL
-// --------------------------------------------------------------------------
-
-// Helper to get equipment rules dictionary where mark is the key
+// Helper to get equipment rules dictionary
 function getEquipmentRulesDict(rulesData) {
   if (!rulesData || typeof rulesData !== 'object') return {};
   const raw = rulesData["Оборудование"];
@@ -845,7 +787,6 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
     tabBadge.textContent = totalEquipmentCount;
   }
 
-  // Search filter query
   const query = getModalSearchQuery('equipmentCatalogSearchInput', 'equipmentCatalogClearSearchBtn');
 
   const filtered = equipmentList.filter(item => {
@@ -992,7 +933,7 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             <span class="badge bg-primary-subtle text-primary border">${methodEntries.length} способов установки</span>
             ${cardWorksCount > 0 ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border">${cardWorksCount} норм</span>` : ''}
             ${cardSubCount > 0 ? `<span class="badge bg-warning-subtle text-warning-emphasis border">${cardSubCount} мат./обор.</span>` : ''}
-            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5" onclick="highlightAndScrollToJsonNode('${escapeHtml(mark)}', true)" title="Перейти к позиции в редакторе JSON">
+            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 btn-jump-to-json" data-json-target="${escapeHtml(mark)}" title="Перейти к позиции в редакторе JSON">
               <i class='bx bx-code-alt me-0_5'></i>JSON
             </button>
           </div>
@@ -1012,10 +953,9 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
 }
 
 // --------------------------------------------------------------------------
-// SETTINGS (НАСТРОЙКИ) TAB & RULES SPECIFICATION
+// SETTINGS TAB
 // --------------------------------------------------------------------------
 
-// Render the Settings tab content in Works Rules Modal
 function renderSettingsModalContent(rulesObj = null) {
   const rules = resolveValidRules(rulesObj);
   const settings = getRulesSettings(rules);
@@ -1042,7 +982,6 @@ function renderSettingsModalContent(rulesObj = null) {
   if (pluginVerInput) pluginVerInput.value = settings.pluginVersion;
 }
 
-// Save settings from UI form into draft JSON and CodeMirror editor (without applying to active rules)
 function saveSettingsFromUiToJson(showToastNotification = true) {
   const currentDraft = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
 
@@ -1064,7 +1003,6 @@ function saveSettingsFromUiToJson(showToastNotification = true) {
     "ОкруглениеМатериалов": !isNaN(decMats) ? Math.max(0, Math.min(10, decMats)) : 3
   };
 
-  // Preserve order with Настройки at top
   const newDraftObj = {
     "Настройки": updatedSettings
   };
@@ -1083,7 +1021,6 @@ function saveSettingsFromUiToJson(showToastNotification = true) {
   }
 }
 
-// Reset settings in draft editor to defaults (without applying to active rules)
 function resetDefaultSettings() {
   const defaultSettings = {
     "ТипНумерации": "иерархическая",
@@ -1114,7 +1051,7 @@ function resetDefaultSettings() {
 }
 
 // --------------------------------------------------------------------------
-// RENDER COUPLING CATALOG TAB IN WORKS RULES MODAL
+// RENDER COUPLING CATALOG TAB
 // --------------------------------------------------------------------------
 
 function renderCouplingCatalogModalContent(rulesObj = null) {
@@ -1131,7 +1068,6 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
     tabBadge.textContent = totalCouplingsCount;
   }
 
-  // Search filter query
   const query = getModalSearchQuery('couplingCatalogSearchInput', 'couplingCatalogClearSearchBtn');
 
   const filtered = entries.filter(([mark, data]) => {
@@ -1145,7 +1081,7 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
   if (filtered.length === 0) {
     container.innerHTML = renderCatalogEmptyState(
       'По вашему запросу муфты не найдены',
-      'Попробуйте изменить поисковый запрос или добавьте новую муфту через кнопку «Добавить шаблон муфты»'
+      'Попробуйте изменить поисковый запрос или добавьте новую муфту через кнопку «Добавить муфту»'
     );
     return;
   }
@@ -1205,12 +1141,10 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
   `;
 }
 
-
 // --------------------------------------------------------------------------
-// WORKS RULES & NORMS JSON EDITOR (WITH CODEMIRROR & CODE FOLDING)
+// WORKS RULES & NORMS JSON EDITOR (WITH CODEMIRROR)
 // --------------------------------------------------------------------------
 
-// Fold all collapsible blocks in JSON editor
 function foldAllWorksJson() {
   if (worksJsonCodeMirror) {
     worksJsonCodeMirror.operation(() => {
@@ -1222,7 +1156,6 @@ function foldAllWorksJson() {
   }
 }
 
-// Unfold all collapsible blocks in JSON editor
 function unfoldAllWorksJson() {
   if (worksJsonCodeMirror) {
     worksJsonCodeMirror.operation(() => {
@@ -1234,7 +1167,6 @@ function unfoldAllWorksJson() {
   }
 }
 
-// Initialize CodeMirror instance on textarea if available
 function initWorksJsonCodeMirror() {
   const textarea = document.getElementById('worksJsonEditorTextarea');
   if (!textarea) return null;
@@ -1270,7 +1202,6 @@ function initWorksJsonCodeMirror() {
       debouncedValidateCodeMirror();
     });
 
-    // Refresh layout when modal or tab is shown
     const modalEl = document.getElementById('worksRulesModal');
     if (modalEl) {
       modalEl.addEventListener('shown.bs.modal', () => {
@@ -1293,15 +1224,12 @@ function initWorksJsonCodeMirror() {
   return worksJsonCodeMirror;
 }
 
-// Helper to focus, center-scroll, select and visually highlight newly added JSON node in CodeMirror
 function highlightAndScrollToJsonNode(targetString, isKey = true) {
-  // 1. Switch to JSON editor tab
   const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
   if (jsonTabBtn && window.bootstrap && bootstrap.Tab) {
     bootstrap.Tab.getOrCreateInstance(jsonTabBtn).show();
   }
 
-  // 2. Perform CodeMirror scroll, selection, fold expansion and animated line highlight
   setTimeout(() => {
     if (!worksJsonCodeMirror) {
       const textarea = document.getElementById('worksJsonEditorTextarea');
@@ -1323,7 +1251,6 @@ function highlightAndScrollToJsonNode(targetString, isKey = true) {
     const doc = worksJsonCodeMirror.getDoc();
     const fullText = doc.getValue();
 
-    // Look specifically for the KEY declaration first, to avoid matching substrings in "Полное описание"
     let searchStr = isKey ? `"${targetString}":` : `"${targetString}"`;
     let foundIndex = fullText.lastIndexOf(searchStr);
     if (foundIndex === -1) {
@@ -1332,7 +1259,6 @@ function highlightAndScrollToJsonNode(targetString, isKey = true) {
     }
 
     if (foundIndex !== -1) {
-      // Find position of the exact target string inside the match for clean cursor selection
       const nameIndex = fullText.indexOf(targetString, foundIndex);
       const actualPos = nameIndex !== -1 ? nameIndex : foundIndex;
       const posFrom = doc.posFromIndex(actualPos);
@@ -1340,7 +1266,6 @@ function highlightAndScrollToJsonNode(targetString, isKey = true) {
 
       let startLine = posFrom.line;
 
-      // If rule item starts with '{' on line above
       if (!isKey && startLine > 0) {
         const prevLine = doc.getLine(startLine - 1).trim();
         if (prevLine === '{') {
@@ -1348,14 +1273,12 @@ function highlightAndScrollToJsonNode(targetString, isKey = true) {
         }
       }
 
-      // Unfold code around this line
       if (typeof worksJsonCodeMirror.foldCode === 'function') {
         for (let l = Math.max(0, startLine - 15); l <= Math.min(doc.lineCount() - 1, startLine + 50); l++) {
           worksJsonCodeMirror.foldCode({ line: l, ch: 0 }, null, "unfold");
         }
       }
 
-      // Determine exact end line of this JSON object by tracking bracket/brace depth
       let endLine = startLine;
       let openBraces = 0;
       let startedCounting = false;
@@ -1381,17 +1304,14 @@ function highlightAndScrollToJsonNode(targetString, isKey = true) {
         endLine = Math.min(doc.lineCount() - 1, startLine + (isKey ? 6 : 14));
       }
 
-      // Center the inserted block in the viewport
       const lineCoords = worksJsonCodeMirror.charCoords(posFrom, "local");
       const editorHeight = worksJsonCodeMirror.getWrapperElement().clientHeight || 420;
       const targetScrollTop = Math.max(0, lineCoords.top - Math.floor(editorHeight / 3));
       worksJsonCodeMirror.scrollTo(null, targetScrollTop);
 
-      // Select the key/name so user can immediately type a replacement
       doc.setSelection(posFrom, posTo);
       worksJsonCodeMirror.focus();
 
-      // Add animated glow pulse highlight to the EXACT lines of the added block
       const highlightedLines = [];
       for (let l = startLine; l <= endLine; l++) {
         worksJsonCodeMirror.addLineClass(l, 'background', 'cm-new-node-glow');
@@ -1407,7 +1327,6 @@ function highlightAndScrollToJsonNode(targetString, isKey = true) {
   }, 160);
 }
 
-// Open Works Rules Modal with specific tab active ('editor', 'cards', 'cables', 'couplings', 'equipment', or 'settings')
 function openWorksRulesModal(activeTab = 'editor') {
   const modalEl = document.getElementById('worksRulesModal');
   if (!modalEl) return;
@@ -1456,13 +1375,12 @@ function openWorksRulesModal(activeTab = 'editor') {
     try {
       if (worksJsonCodeMirror) worksJsonCodeMirror.refresh();
     } catch {
-      // ignore refresh errors
+      // ignore
     }
   }, 100);
 }
 window.openWorksRulesModal = openWorksRulesModal;
 
-// Validate Works Rules JSON in textarea/CodeMirror, update stats, status badge and error display
 function validateWorksJsonInput() {
   const val = getWorksJsonEditorValue();
   const badge = document.getElementById('worksJsonValidationBadge');
@@ -1490,7 +1408,6 @@ function validateWorksJsonInput() {
       });
     });
 
-    // Count cables in catalog
     const catalog = getCableCatalog(parsed) || {};
     let totalCablesCount = 0;
     if (catalog && typeof catalog === 'object') {
@@ -1502,14 +1419,12 @@ function validateWorksJsonInput() {
       });
     }
 
-    // Count couplings in catalog
     const couplingCatalog = getCouplingCatalog(parsed) || {};
     const totalCouplingsCount = (couplingCatalog && typeof couplingCatalog === 'object') ? Object.keys(couplingCatalog).length : 0;
 
     const tabCouplingsBadge = document.getElementById('tabWorksCouplingsCountBadge');
     if (tabCouplingsBadge) tabCouplingsBadge.textContent = totalCouplingsCount;
 
-    // Count equipment in rules
     const eqList = getEquipmentRulesList(parsed);
     const tabEquipmentBadge = document.getElementById('tabWorksEquipmentCountBadge');
     if (tabEquipmentBadge) tabEquipmentBadge.textContent = eqList.length;
@@ -1546,7 +1461,6 @@ function setupWorksRulesListeners() {
     const debouncedValidateTextarea = debounce(validateWorksJsonInput, 200);
     textarea.addEventListener('input', debouncedValidateTextarea);
 
-    // Support Tab key indentation inside fallback textarea
     textarea.addEventListener('keydown', function(e) {
       if (e.key === 'Tab') {
         e.preventDefault();
@@ -1559,19 +1473,12 @@ function setupWorksRulesListeners() {
     });
   }
 
-  // Fold all JSON nodes button
   const foldAllBtn = document.getElementById('foldAllWorksJsonBtn');
-  if (foldAllBtn) {
-    foldAllBtn.addEventListener('click', foldAllWorksJson);
-  }
+  if (foldAllBtn) foldAllBtn.addEventListener('click', foldAllWorksJson);
 
-  // Unfold all JSON nodes button
   const unfoldAllBtn = document.getElementById('unfoldAllWorksJsonBtn');
-  if (unfoldAllBtn) {
-    unfoldAllBtn.addEventListener('click', unfoldAllWorksJson);
-  }
+  if (unfoldAllBtn) unfoldAllBtn.addEventListener('click', unfoldAllWorksJson);
 
-  // Format JSON button
   const formatBtn = document.getElementById('formatWorksJsonBtn');
   if (formatBtn) {
     formatBtn.addEventListener('click', () => {
@@ -1587,123 +1494,384 @@ function setupWorksRulesListeners() {
     });
   }
 
-  // Add rule template button (+ Способ) and Quick Add in cards tab
-  const insertRuleSample = () => {
-    try {
-      const val = getWorksJsonEditorValue();
-      let currentObj;
-      try {
-        currentObj = JSON.parse(val);
-      } catch {
-        currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": [] }));
+  // =========================================================================
+  // ADD RULE MODAL (СТРОИТЕЛЬНЫЕ И МОНТАЖНЫЕ РАБОТЫ)
+  // =========================================================================
+
+  function appendAddRuleWorkMaterialRow(tbody, name = '', unit = 'м', formula = 'ДЛИНА', show = false, section = '') {
+    if (!tbody) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" class="form-control form-control-sm rule-mat-title" placeholder="Наименование материала" value="${escapeHtml(name)}" required></td>
+      <td style="width: 14%;"><input type="text" class="form-control form-control-sm rule-mat-unit" value="${escapeHtml(unit)}" placeholder="м/шт" required></td>
+      <td style="width: 20%;"><input type="text" class="form-control form-control-sm font-monospace rule-mat-formula" value="${escapeHtml(formula)}" placeholder="ДЛИНА" required></td>
+      <td style="width: 18%;"><input type="text" class="form-control form-control-sm rule-mat-section" value="${escapeHtml(section)}" placeholder="По умолч."></td>
+      <td style="width: 7%;" class="text-center"><input class="form-check-input rule-mat-show" type="checkbox" ${show ? 'checked' : ''} title="Показывать формулу"></td>
+      <td style="width: 6%;" class="text-center"><button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-remove-mat-row" title="Удалить материал"><i class='bx bx-trash'></i></button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  function refreshAddRuleWorkCardBadges() {
+    const container = document.getElementById('addRuleWorksCardsContainer');
+    if (!container) return;
+    const cards = container.querySelectorAll('.rule-work-card');
+    cards.forEach((card, idx) => {
+      const badge = card.querySelector('.rule-work-badge');
+      if (badge) badge.textContent = `Работа #${idx + 1}`;
+    });
+  }
+
+  function appendAddRuleWorkCard(title = '', unit = 'м', formula = 'ДЛИНА', showFormula = true, materials = [], condition = '', section = '') {
+    const container = document.getElementById('addRuleWorksCardsContainer');
+    if (!container) return;
+    const workIndex = container.children.length + 1;
+    const cardId = `ruleWorkCard_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    const card = document.createElement('div');
+    card.className = 'card border shadow-xs rule-work-card mb-2';
+    card.innerHTML = `
+      <div class="card-header bg-light py-2 px-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-primary-subtle text-primary border font-monospace rule-work-badge">Работа #${workIndex}</span>
+          <span class="fw-semibold small text-dark">Параметры сметной нормы</span>
+        </div>
+        <button type="button" class="btn btn-xs btn-outline-danger py-0 px-2 btn-remove-work-card" title="Удалить работу и её материалы">
+          <i class='bx bx-trash me-1'></i>Удалить работу
+        </button>
+      </div>
+      <div class="card-body p-2_5">
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Наименование работы <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm rule-work-title" placeholder="Наименование сметной работы" value="${escapeHtml(title)}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Ед. изм.</label>
+            <input type="text" class="form-control form-control-sm rule-work-unit" value="${escapeHtml(unit)}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Формула (ДЛИНА)</label>
+            <input type="text" class="form-control form-control-sm font-monospace rule-work-formula" value="${escapeHtml(formula)}" placeholder="ДЛИНА" required>
+          </div>
+          <div class="col-md-2 d-flex align-items-end pb-1">
+            <div class="form-check small mb-0">
+              <input class="form-check-input rule-work-show" type="checkbox" id="chkWorkShow_${cardId}" ${showFormula ? 'checked' : ''}>
+              <label class="form-check-label fs-xs" for="chkWorkShow_${cardId}">Показ в ВОР</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Условие применения (опционально)</label>
+            <input type="text" class="form-control form-control-sm font-monospace rule-work-condition" placeholder="Например: кабелей > 4" value="${escapeHtml(condition)}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Переопределение раздела ВОР (опционально)</label>
+            <input type="text" class="form-control form-control-sm rule-work-section" placeholder="Например: Монтажные работы" value="${escapeHtml(section)}">
+          </div>
+        </div>
+
+        <div class="p-2 rounded border bg-body-tertiary">
+          <div class="d-flex align-items-center justify-content-between mb-1_5">
+            <span class="fs-xs fw-semibold text-secondary d-flex align-items-center gap-1">
+              <i class='bx bx-package text-success'></i> Материалы для данной работы (вложенные):
+            </span>
+            <button type="button" class="btn btn-xs btn-outline-success py-0 px-1_5 btn-add-work-material">
+              <i class='bx bx-plus me-0_5'></i>Добавить материал
+            </button>
+          </div>
+          <div class="table-responsive bg-body rounded border">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr style="font-size: 0.72rem;">
+                  <th style="width: 35%;">Наименование материала</th>
+                  <th style="width: 14%;">Ед. изм.</th>
+                  <th style="width: 20%;">Формула</th>
+                  <th style="width: 18%;">Раздел</th>
+                  <th style="width: 7%;" class="text-center" title="Показывать формулу в ВОР">ВОР</th>
+                  <th style="width: 6%;" class="text-center"></th>
+                </tr>
+              </thead>
+              <tbody class="rule-work-materials-tbody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const matTbody = card.querySelector('.rule-work-materials-tbody');
+    if (Array.isArray(materials) && materials.length > 0) {
+      materials.forEach(m => {
+        appendAddRuleWorkMaterialRow(
+          matTbody,
+          m["Наименование"] || m.name || '',
+          m["Единицы измерения"] || m.unit || 'м',
+          m["Формула"] || m.formula || 'ДЛИНА',
+          shouldShowFormula(m),
+          m["Раздел"] || m.section || ''
+        );
+      });
+    }
+
+    container.appendChild(card);
+    refreshAddRuleWorkCardBadges();
+  }
+
+  const btnAddRuleWorkRow = document.getElementById('btnAddRuleWorkRow');
+  if (btnAddRuleWorkRow) {
+    btnAddRuleWorkRow.addEventListener('click', () => {
+      appendAddRuleWorkCard('', 'м', 'ДЛИНА', true, []);
+    });
+  }
+
+  const addRuleWorksCardsContainer = document.getElementById('addRuleWorksCardsContainer');
+  if (addRuleWorksCardsContainer) {
+    addRuleWorksCardsContainer.addEventListener('click', (e) => {
+      const addMatBtn = e.target.closest('.btn-add-work-material');
+      if (addMatBtn) {
+        const card = addMatBtn.closest('.rule-work-card');
+        const matTbody = card ? card.querySelector('.rule-work-materials-tbody') : null;
+        if (matTbody) {
+          appendAddRuleWorkMaterialRow(matTbody, '', 'шт', 'ДЛИНА', false, '');
+        }
+        return;
       }
 
-      const targetKey = (currentObj && typeof currentObj === 'object' && !Array.isArray(currentObj))
-        ? ((currentObj["Монтажные работы"] && typeof currentObj["Монтажные работы"] === 'object') ? "Монтажные работы" : "Строительные работы")
-        : "Монтажные работы";
-
-      const isMr = targetKey.toLowerCase().includes('монтаж');
-      let baseRuleName = isMr ? "Новый способ прокладки (например, ГНБ)" : "Новый способ разработки грунта";
-      
-      // Determine unique rule name if already exists
-      let sampleRuleName = baseRuleName;
-      if (currentObj && typeof currentObj === 'object') {
-        const rulesMap = (currentObj[targetKey] && typeof currentObj[targetKey] === 'object' && !Array.isArray(currentObj[targetKey])) ? currentObj[targetKey] : {};
-        let count = 1;
-        while (rulesMap[sampleRuleName]) {
-          count++;
-          sampleRuleName = `${baseRuleName} (${count})`;
-        }
+      const removeMatBtn = e.target.closest('.btn-remove-mat-row');
+      if (removeMatBtn) {
+        const tr = removeMatBtn.closest('tr');
+        if (tr) tr.remove();
+        return;
       }
 
-      const sample = isMr ? {
-        "Шаблон": `Прокладка кабеля массой 1 м, кг, до: {масса} (${sampleRuleName})`,
-        "Работы": {
-          "1": [
-            {
-              "Наименование": `Прокладка кабеля массой 1 м, кг, до: 1 (${sampleRuleName})`,
-              "МаксВес": 1,
-              "Единицы измерения": "м",
-              "Формула": "ДЛИНА",
-              "Тип": "работа",
-              "ОтображатьФормулу": true
-            }
-          ],
-          "2": [
-            {
-              "Наименование": `Прокладка кабеля массой 1 м, кг, до: 2 (${sampleRuleName})`,
-              "МаксВес": 2,
-              "Единицы измерения": "м",
-              "Формула": "ДЛИНА",
-              "Тип": "работа",
-              "ОтображатьФормулу": true
-            }
-          ],
-          "3": [
-            {
-              "Наименование": `Прокладка кабеля массой 1 м, кг, до: 3 (${sampleRuleName})`,
-              "МаксВес": 3,
-              "Единицы измерения": "м",
-              "Формула": "ДЛИНА",
-              "Тип": "работа",
-              "ОтображатьФормулу": true
-            }
-          ],
-          "оптический": [
-            {
-              "Наименование": `Прокладка оптического кабеля (${sampleRuleName})`,
-              "Категория": "Оптический кабель",
-              "Единицы измерения": "м",
-              "Формула": "ДЛИНА",
-              "Тип": "работа",
-              "ОтображатьФормулу": true
-            }
-          ]
-        }
-      } : {
-        "Работы": [
-          {
-            "Наименование": "Разработка грунта механизированным способом",
-            "Единицы измерения": "м3 грунта",
-            "Формула": "0,36*ДЛИНА",
-            "Тип": "работа",
-            "ОтображатьФормулу": true,
-            "Материалы": []
-          },
-          {
-            "Наименование": "Засыпка траншей механизированным способом",
-            "Единицы измерения": "м3 грунта",
-            "Формула": "0,36*ДЛИНА",
-            "Тип": "работа",
-            "ОтображатьФормулу": true,
-            "Материалы": []
+      const removeWorkBtn = e.target.closest('.btn-remove-work-card');
+      if (removeWorkBtn) {
+        const card = removeWorkBtn.closest('.rule-work-card');
+        if (card) {
+          card.remove();
+          refreshAddRuleWorkCardBadges();
+          if (addRuleWorksCardsContainer.children.length === 0) {
+            appendAddRuleWorkCard('', 'м', 'ДЛИНА', true, []);
           }
-        ]
-      };
-
-      if (!currentObj[targetKey] || typeof currentObj[targetKey] !== 'object' || Array.isArray(currentObj[targetKey])) {
-        currentObj[targetKey] = {};
+        }
+        return;
       }
-      currentObj[targetKey][sampleRuleName] = sample;
+    });
+  }
+
+  const radioConstruction = document.getElementById('addRuleSecConstruction');
+  const radioInstallation = document.getElementById('addRuleSecInstallation');
+  const constrContainer = document.getElementById('addRuleConstructionContainer');
+  const instContainer = document.getElementById('addRuleInstallationContainer');
+
+  const updateAddRuleSectionsVisibility = () => {
+    if (radioInstallation && radioInstallation.checked) {
+      if (constrContainer) constrContainer.classList.add('d-none');
+      if (instContainer) instContainer.classList.remove('d-none');
+    } else {
+      if (constrContainer) constrContainer.classList.remove('d-none');
+      if (instContainer) instContainer.classList.add('d-none');
+    }
+  };
+
+  if (radioConstruction) radioConstruction.addEventListener('change', updateAddRuleSectionsVisibility);
+  if (radioInstallation) radioInstallation.addEventListener('change', updateAddRuleSectionsVisibility);
+
+  const quickAddRuleInTabBtn = document.getElementById('quickAddRuleInTabBtn');
+  if (quickAddRuleInTabBtn) {
+    quickAddRuleInTabBtn.addEventListener('click', () => {
+      const form = document.getElementById('formAddRule');
+      if (form) form.reset();
+      if (radioConstruction) radioConstruction.checked = true;
+      updateAddRuleSectionsVisibility();
+      if (addRuleWorksCardsContainer) {
+        addRuleWorksCardsContainer.innerHTML = '';
+        appendAddRuleWorkCard('Разработка грунта в траншее вручную', 'м3 грунта', '0.4 * ДЛИНА', true, [
+          { "Наименование": "Песок для постели", "Единицы измерения": "м3", "Формула": "0.1 * ДЛИНА", "ОтображатьФормулу": false }
+        ]);
+        appendAddRuleWorkCard('Засыпка траншей вручную', 'м3 грунта', '0.4 * ДЛИНА', true, []);
+      }
+      const modalEl = document.getElementById('addRuleModal');
+      if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+    });
+  }
+
+  const btnSaveNewRule = document.getElementById('btnSaveNewRule');
+  if (btnSaveNewRule) {
+    btnSaveNewRule.addEventListener('click', () => {
+      const wayNameInput = document.getElementById('addRuleWayName');
+      const wayName = wayNameInput ? wayNameInput.value.trim() : '';
+      if (!wayName) {
+        showToast('Укажите наименование способа прокладки', 'warning', 'Проверка данных');
+        if (wayNameInput) wayNameInput.focus();
+        return;
+      }
+
+      const isInstallation = radioInstallation && radioInstallation.checked;
+      const targetSectionKey = isInstallation ? "Монтажные работы" : "Строительные работы";
+
+      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+      if (!currentObj[targetSectionKey] || typeof currentObj[targetSectionKey] !== 'object' || Array.isArray(currentObj[targetSectionKey])) {
+        currentObj[targetSectionKey] = {};
+      }
+
+      if (isInstallation) {
+        const createDefaultCableMaterial = () => ([
+          {
+            "Наименование": "{МАРКА_КАБЕЛЯ}",
+            "Единицы измерения": "км",
+            "Формула": "ДЛИНА/1000",
+            "Тип": "материал",
+            "ОтображатьФормулу": true
+          }
+        ]);
+
+        const t1Title = document.getElementById('addRuleInst1Title')?.value?.trim() || `Прокладка кабеля массой 1 м до 1 кг (${wayName})`;
+        const t1Unit = document.getElementById('addRuleInst1Unit')?.value?.trim() || 'м';
+        const t1Formula = document.getElementById('addRuleInst1Formula')?.value?.trim() || 'ДЛИНА';
+        const t1Show = Boolean(document.getElementById('addRuleInst1Show')?.checked);
+
+        const t2Title = document.getElementById('addRuleInst2Title')?.value?.trim() || `Прокладка кабеля массой 1 м до 2 кг (${wayName})`;
+        const t2Unit = document.getElementById('addRuleInst2Unit')?.value?.trim() || 'м';
+        const t2Formula = document.getElementById('addRuleInst2Formula')?.value?.trim() || 'ДЛИНА';
+        const t2Show = Boolean(document.getElementById('addRuleInst2Show')?.checked);
+
+        const t3Title = document.getElementById('addRuleInst3Title')?.value?.trim() || `Прокладка кабеля массой 1 м до 3 кг (${wayName})`;
+        const t3Unit = document.getElementById('addRuleInst3Unit')?.value?.trim() || 'м';
+        const t3Formula = document.getElementById('addRuleInst3Formula')?.value?.trim() || 'ДЛИНА';
+        const t3Show = Boolean(document.getElementById('addRuleInst3Show')?.checked);
+
+        const optTitle = document.getElementById('addRuleInstOptTitle')?.value?.trim() || `Прокладка оптического кабеля (${wayName})`;
+        const optUnit = document.getElementById('addRuleInstOptUnit')?.value?.trim() || 'м';
+        const optFormula = document.getElementById('addRuleInstOptFormula')?.value?.trim() || 'ДЛИНА';
+        const optShow = Boolean(document.getElementById('addRuleInstOptShow')?.checked);
+
+        currentObj[targetSectionKey][wayName] = {
+          "Шаблон": `Прокладка кабеля массой 1 м, кг, до: {масса} (${wayName})`,
+          "Работы": {
+            "1": [
+              {
+                "Наименование": t1Title,
+                "МаксВес": 1,
+                "Единицы измерения": t1Unit,
+                "Формула": t1Formula,
+                "Тип": "работа",
+                "ОтображатьФормулу": t1Show,
+                "Материалы": createDefaultCableMaterial()
+              }
+            ],
+            "2": [
+              {
+                "Наименование": t2Title,
+                "МаксВес": 2,
+                "Единицы измерения": t2Unit,
+                "Формула": t2Formula,
+                "Тип": "работа",
+                "ОтображатьФормулу": t2Show,
+                "Материалы": createDefaultCableMaterial()
+              }
+            ],
+            "3": [
+              {
+                "Наименование": t3Title,
+                "МаксВес": 3,
+                "Единицы измерения": t3Unit,
+                "Формула": t3Formula,
+                "Тип": "работа",
+                "ОтображатьФормулу": t3Show,
+                "Материалы": createDefaultCableMaterial()
+              }
+            ],
+            "оптический": [
+              {
+                "Наименование": optTitle,
+                "Категория": "Оптический кабель",
+                "Единицы измерения": optUnit,
+                "Формула": optFormula,
+                "Тип": "работа",
+                "ОтображатьФормулу": optShow,
+                "Материалы": createDefaultCableMaterial()
+              }
+            ]
+          }
+        };
+      } else {
+        const cards = document.querySelectorAll('#addRuleWorksCardsContainer .rule-work-card');
+        const works = [];
+        cards.forEach(card => {
+          const title = card.querySelector('.rule-work-title')?.value?.trim();
+          const unit = card.querySelector('.rule-work-unit')?.value?.trim() || 'м';
+          const formula = card.querySelector('.rule-work-formula')?.value?.trim() || 'ДЛИНА';
+          const show = Boolean(card.querySelector('.rule-work-show')?.checked);
+          const condition = card.querySelector('.rule-work-condition')?.value?.trim();
+          const sectionOverride = card.querySelector('.rule-work-section')?.value?.trim();
+          
+          if (title) {
+            const matRows = card.querySelectorAll('.rule-work-materials-tbody tr');
+            const materials = [];
+            matRows.forEach(mr => {
+              const mTitle = mr.querySelector('.rule-mat-title')?.value?.trim();
+              const mUnit = mr.querySelector('.rule-mat-unit')?.value?.trim() || 'шт';
+              const mFormula = mr.querySelector('.rule-mat-formula')?.value?.trim() || 'ДЛИНА';
+              const mSection = mr.querySelector('.rule-mat-section')?.value?.trim();
+              const mShow = Boolean(mr.querySelector('.rule-mat-show')?.checked);
+              if (mTitle) {
+                const matItem = {
+                  "Наименование": mTitle,
+                  "Единицы измерения": mUnit,
+                  "Формула": mFormula,
+                  "Тип": "материал",
+                  "ОтображатьФормулу": mShow
+                };
+                if (mSection) matItem["Раздел"] = mSection;
+                materials.push(matItem);
+              }
+            });
+
+            const workObj = {
+              "Наименование": title,
+              "Единицы измерения": unit,
+              "Формула": formula,
+              "Тип": "работа",
+              "ОтображатьФормулу": show
+            };
+            if (condition) workObj["Условие"] = condition;
+            if (sectionOverride) workObj["Раздел"] = sectionOverride;
+            workObj["Материалы"] = materials;
+
+            works.push(workObj);
+          }
+        });
+
+        if (works.length === 0) {
+          showToast('Добавьте хотя бы одну работу в состав способа', 'warning', 'Проверка данных');
+          return;
+        }
+
+        currentObj[targetSectionKey][wayName] = {
+          "Работы": works
+        };
+      }
 
       modalDraftRules = currentObj;
       setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
       validateWorksJsonInput();
+      renderRulesModalContent(modalDraftRules);
 
-      highlightAndScrollToJsonNode(sampleRuleName, false);
+      const modalEl = document.getElementById('addRuleModal');
+      if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
 
-      showToast(`Шаблон нового способа «${sampleRuleName}» добавлен в раздел «${targetKey}». Отредактируйте параметры и нажмите «Применить и пересчитать».`, 'success', 'Способ добавлен', 6000);
-    } catch (err) {
-      showToast('Ошибка при добавлении шаблона: ' + err.message, 'error', 'Ошибка');
-    }
-  };
-
-  const quickAddRuleInTabBtn = document.getElementById('quickAddRuleInTabBtn');
-  if (quickAddRuleInTabBtn) {
-    quickAddRuleInTabBtn.addEventListener('click', insertRuleSample);
+      showToast(`Способ «${wayName}» успешно добавлен в раздел «${targetSectionKey}». Нажмите «Применить и пересчитать работы» для применения.`, 'success', 'Правило добавлено', 6000);
+    });
   }
 
-  // Rules cards search listeners
   const rulesCardsSearchInput = document.getElementById('rulesCardsSearchInput');
   const rulesCardsClearSearchBtn = document.getElementById('rulesCardsClearSearchBtn');
   if (rulesCardsSearchInput) {
@@ -1714,102 +1882,150 @@ function setupWorksRulesListeners() {
       rulesCardsClearSearchBtn.addEventListener('click', () => {
         debouncedRenderRules.cancel();
         rulesCardsSearchInput.value = '';
-        renderRulesModalContent();
+        renderRulesModalContent(null, false);
         rulesCardsSearchInput.focus();
       });
     }
   }
 
-  // Add cable template button (+ Кабель) in toolbar and in cables tab
-  const insertCableSample = () => {
-    try {
-      const val = getWorksJsonEditorValue();
-      let currentObj;
-      try {
-        currentObj = JSON.parse(val);
-      } catch {
-        currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {} }));
+  // =========================================================================
+  // ADD CABLE MODAL
+  // =========================================================================
+
+  const quickAddCableInTabBtn = document.getElementById('quickAddCableInTabBtn');
+  if (quickAddCableInTabBtn) {
+    const dropdownList = document.getElementById('dropdownCableGroupList');
+    if (dropdownList && !dropdownList.dataset.bound) {
+      dropdownList.dataset.bound = 'true';
+      dropdownList.addEventListener('click', (e) => {
+        const link = e.target.closest('a[data-group]');
+        if (link) {
+          e.preventDefault();
+          const grp = link.getAttribute('data-group') ?? '';
+          const nm = link.getAttribute('data-name') ?? '';
+          const groupKeyInput = document.getElementById('addCableGroupKey');
+          const groupNameInput = document.getElementById('addCableGroupName');
+          if (groupKeyInput) groupKeyInput.value = grp;
+          if (groupNameInput) groupNameInput.value = nm;
+        }
+      });
+    }
+
+    quickAddCableInTabBtn.addEventListener('click', () => {
+      const form = document.getElementById('formAddCable');
+      if (form) form.reset();
+
+      const draft = getDraftRulesFromEditor();
+      const cableCatalog = (draft && draft["Справочник кабелей"]) || (cachedDefaultRules && cachedDefaultRules["Справочник кабелей"]) || {};
+
+      const groupDatalist = document.getElementById('datalistCableGroups');
+      if (groupDatalist) {
+        groupDatalist.innerHTML = Object.entries(cableCatalog).map(([k, v]) => {
+          const gName = (v && v["Название"]) || (k === '' ? 'Основная группа' : k);
+          const label = k === '' ? '"" (Основная группа СБВБПу)' : `${k} (${gName})`;
+          return `<option value="${escapeHtml(k)}">${escapeHtml(label)}</option>`;
+        }).join('');
       }
 
-      if (!currentObj || typeof currentObj !== 'object' || Array.isArray(currentObj)) {
-        currentObj = { "Строительные работы": {}, "Монтажные работы": {}, "Справочник кабелей": {} };
+      const cpList = document.getElementById('datalistCouplingsList');
+      if (cpList) {
+        const cpCatalog = (draft && draft["Справочник муфт"]) || (cachedDefaultRules && cachedDefaultRules["Справочник муфт"]) || {};
+        cpList.innerHTML = Object.keys(cpCatalog).map(k => `<option value="${escapeHtml(k)}">${escapeHtml(cpCatalog[k]["Полное наименование"] || '')}</option>`).join('');
       }
 
+      const catFilter = document.getElementById('cableCatalogCategoryFilter');
+      const catVal = catFilter ? catFilter.value : 'all';
+      const groupKeyInput = document.getElementById('addCableGroupKey');
+      const groupNameInput = document.getElementById('addCableGroupName');
+      const weightInput = document.getElementById('addCableWeight');
+      const lenInput = document.getElementById('addCableBuildingLength');
+      const coupInput = document.getElementById('addCableCoupling');
+
+      if (catVal === 'optical') {
+        if (groupKeyInput) groupKeyInput.value = 'Оптический кабель';
+        if (groupNameInput) groupNameInput.value = 'Оптический кабель';
+        if (weightInput) weightInput.value = '0.28';
+        if (lenInput) lenInput.value = '2000';
+        if (coupInput) coupInput.value = 'МТОК-А1/216-1Т3-44';
+      } else {
+        if (groupKeyInput) groupKeyInput.value = '*';
+        if (groupNameInput) groupNameInput.value = 'СБВБэпПуц';
+        if (weightInput) weightInput.value = '0.35';
+        if (lenInput) lenInput.value = '1000';
+        if (coupInput) coupInput.value = 'МСХз40-9-24х0,9';
+      }
+
+      const modalEl = document.getElementById('addCableModal');
+      if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+    });
+  }
+
+  const btnSaveNewCable = document.getElementById('btnSaveNewCable');
+  if (btnSaveNewCable) {
+    btnSaveNewCable.addEventListener('click', () => {
+      const groupKeyInput = document.getElementById('addCableGroupKey');
+      const groupKey = groupKeyInput ? groupKeyInput.value.trim() : '';
+
+      const groupNameInput = document.getElementById('addCableGroupName');
+      const groupName = (groupNameInput ? groupNameInput.value.trim() : '') || (groupKey === '' ? 'СБВБПу' : groupKey);
+
+      const markInput = document.getElementById('addCableMark');
+      const mark = markInput ? markInput.value.trim() : '';
+      if (!mark) {
+        showToast('Укажите марку/обозначение кабеля', 'warning', 'Проверка данных');
+        if (markInput) markInput.focus();
+        return;
+      }
+
+      const weight = parseFloat(document.getElementById('addCableWeight')?.value || '0.35') || 0.35;
+      const buildingLength = parseInt(document.getElementById('addCableBuildingLength')?.value || '1000', 10) || 1000;
+      const coupling = document.getElementById('addCableCoupling')?.value?.trim() || '';
+      const description = document.getElementById('addCableDescription')?.value?.trim() || (groupName ? `${groupName} ${mark}` : `Кабель ${mark}`);
+      const isOptical = groupKey === 'Оптический кабель' || groupName.toLowerCase().includes('оптич') || mark.toLowerCase().includes('окк');
+
+      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
       if (!currentObj["Справочник кабелей"] || typeof currentObj["Справочник кабелей"] !== 'object') {
         const existingCat = (cachedDefaultRules && cachedDefaultRules["Справочник кабелей"]) ? cachedDefaultRules["Справочник кабелей"] : {};
         currentObj["Справочник кабелей"] = JSON.parse(JSON.stringify(existingCat));
       }
 
-      // Check current category filter in UI to insert into relevant section
-      const catFilter = document.getElementById('cableCatalogCategoryFilter');
-      const catVal = catFilter ? catFilter.value : 'all';
-
-      let targetCategoryName = "Особый кабель";
-      let isOptical = false;
-      let defaultCoupling = "МСХз40-9-24х0,9";
-      let defaultWeight = 0.45;
-      let defaultLength = 600;
-      let defaultDesc = "Кабель для сигнализации и блокировки";
-
-      if (catVal === 'optical') {
-        targetCategoryName = "Оптический кабель";
-        isOptical = true;
-        defaultCoupling = "МТОК-А1/216-1Т3-44";
-        defaultWeight = 0.28;
-        defaultLength = 2000;
-        defaultDesc = "Кабель связи оптический бронированный";
-      }
-
-      if (!currentObj["Справочник кабелей"][targetCategoryName] || typeof currentObj["Справочник кабелей"][targetCategoryName] !== 'object') {
-        currentObj["Справочник кабелей"][targetCategoryName] = {
-          "Название": targetCategoryName,
+      if (!currentObj["Справочник кабелей"][groupKey] || typeof currentObj["Справочник кабелей"][groupKey] !== 'object') {
+        currentObj["Справочник кабелей"][groupKey] = {
+          "Название": groupName,
           ...(isOptical ? { "Категория": "Оптический кабель" } : {}),
           "Тип": {}
         };
       }
 
-      if (!currentObj["Справочник кабелей"][targetCategoryName]["Тип"] || typeof currentObj["Справочник кабелей"][targetCategoryName]["Тип"] !== 'object') {
-        currentObj["Справочник кабелей"][targetCategoryName]["Тип"] = {};
+      if (!currentObj["Справочник кабелей"][groupKey]["Тип"] || typeof currentObj["Справочник кабелей"][groupKey]["Тип"] !== 'object') {
+        currentObj["Справочник кабелей"][groupKey]["Тип"] = {};
       }
 
-      const typesMap = currentObj["Справочник кабелей"][targetCategoryName]["Тип"];
-
-      // Generate a unique mark name so multiple clicks add distinct entries
-      let sampleMark = isOptical ? "ОКБ-Новый-Кабель-16(2)" : "Новая-Марка-Кабеля 5х2х0,9";
-      let counter = 1;
-      while (typesMap[sampleMark]) {
-        counter++;
-        sampleMark = isOptical 
-          ? `ОКБ-Новый-Кабель-16(2)-${counter}` 
-          : `Новая-Марка-Кабеля-${counter} 5х2х0,9`;
-      }
-
-      typesMap[sampleMark] = {
-        "Строительная длина": defaultLength,
-        "Муфта": defaultCoupling,
-        "Вес": defaultWeight,
+      currentObj["Справочник кабелей"][groupKey]["Тип"][mark] = {
+        "Строительная длина": buildingLength,
+        "Муфта": coupling,
+        "Вес": weight,
         ...(isOptical ? { "Категория": "Оптический кабель" } : {}),
-        "Полное описание": `${defaultDesc} ${sampleMark}`
+        "Полное описание": description
       };
 
       modalDraftRules = currentObj;
       setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
       validateWorksJsonInput();
+      renderCableCatalogModalContent(modalDraftRules);
 
-      highlightAndScrollToJsonNode(sampleMark, true);
+      const modalEl = document.getElementById('addCableModal');
+      if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
 
-      showToast(`Шаблон кабеля «${sampleMark}» добавлен в «Справочник кабелей» (категория: «${targetCategoryName}»). Отредактируйте параметры и нажмите «Применить и пересчитать».`, 'success', 'Шаблон кабеля добавлен', 6000);
-    } catch (err) {
-      showToast('Ошибка при добавлении шаблона кабеля: ' + err.message, 'error', 'Ошибка');
-    }
-  };
-
-  const quickAddCableInTabBtn = document.getElementById('quickAddCableInTabBtn');
-  if (quickAddCableInTabBtn) {
-    quickAddCableInTabBtn.addEventListener('click', insertCableSample);
+      const displayGroup = groupKey === '' ? 'Основная группа ("")' : `группа "${groupKey}"`;
+      showToast(`Марка кабеля «${mark}» успешно добавлена в ${displayGroup}. Нажмите «Применить и пересчитать работы» для применения.`, 'success', 'Марка добавлена', 6000);
+    });
   }
 
-  // Cable catalog tab search and filter listeners
   const cableSearchInput = document.getElementById('cableCatalogSearchInput');
   const cableClearSearchBtn = document.getElementById('cableCatalogClearSearchBtn');
   if (cableSearchInput) {
@@ -1831,51 +2047,452 @@ function setupWorksRulesListeners() {
     cableCatFilter.addEventListener('change', renderCableCatalogModalContent);
   }
 
-  // Add coupling template sample (+ Муфта)
-  const insertCouplingSample = () => {
-    try {
-      const val = getWorksJsonEditorValue();
-      let currentObj;
-      try {
-        currentObj = JSON.parse(val);
-      } catch {
-        currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || {}));
+  // =========================================================================
+  // ADD COUPLING MODAL
+  // =========================================================================
+
+  const quickAddCouplingInTabBtn = document.getElementById('quickAddCouplingInTabBtn');
+  if (quickAddCouplingInTabBtn) {
+    quickAddCouplingInTabBtn.addEventListener('click', () => {
+      const form = document.getElementById('formAddCoupling');
+      if (form) form.reset();
+      const unitInput = document.getElementById('addCouplingUnit');
+      if (unitInput) unitInput.value = 'шт';
+      const optCheck = document.getElementById('addCouplingIsOptical');
+      if (optCheck) optCheck.checked = false;
+
+      const modalEl = document.getElementById('addCouplingModal');
+      if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+    });
+  }
+
+  const btnSaveNewCoupling = document.getElementById('btnSaveNewCoupling');
+  if (btnSaveNewCoupling) {
+    btnSaveNewCoupling.addEventListener('click', () => {
+      const markInput = document.getElementById('addCouplingMark');
+      const mark = markInput ? markInput.value.trim() : '';
+      if (!mark) {
+        showToast('Укажите марку/тип муфты', 'warning', 'Проверка данных');
+        if (markInput) markInput.focus();
+        return;
       }
 
+      const fullName = document.getElementById('addCouplingFullName')?.value?.trim() || `Муфта кабельная соединительная ${mark}`;
+      const maxCores = parseInt(document.getElementById('addCouplingMaxCores')?.value || '24', 10) || 24;
+      const unit = document.getElementById('addCouplingUnit')?.value?.trim() || 'шт';
+      const isOptical = Boolean(document.getElementById('addCouplingIsOptical')?.checked);
+
+      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
       if (!currentObj["Справочник муфт"] || typeof currentObj["Справочник муфт"] !== 'object' || Array.isArray(currentObj["Справочник муфт"])) {
         currentObj["Справочник муфт"] = {};
       }
 
-      let sampleMark = "МСХз-Новая-48";
-      let counter = 1;
-      while (currentObj["Справочник муфт"][sampleMark]) {
-        counter++;
-        sampleMark = `МСХз-Новая-48-${counter}`;
+      const couplingEntry = {
+        "Полное наименование": fullName,
+        "МаксЖил": maxCores,
+        "Единицы измерения": unit
+      };
+      if (isOptical) {
+        couplingEntry["Категория"] = "Оптическая муфта";
       }
 
-      currentObj["Справочник муфт"][sampleMark] = {
-        "Полное наименование": `Муфта кабельная соединительная подземная холодноусаживаемая ${sampleMark}`,
-        "МаксЖил": 48,
-        "Единицы измерения": "шт"
-      };
+      currentObj["Справочник муфт"][mark] = couplingEntry;
 
       modalDraftRules = currentObj;
       setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
       validateWorksJsonInput();
+      renderCouplingCatalogModalContent(modalDraftRules);
 
-      highlightAndScrollToJsonNode(sampleMark, true);
+      const modalEl = document.getElementById('addCouplingModal');
+      if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
 
-      showToast(`Шаблон муфты «${sampleMark}» добавлен в «Справочник муфт». Отредактируйте параметры и нажмите «Применить и пересчитать».`, 'success', 'Шаблон муфты добавлен', 6000);
-    } catch (err) {
-      showToast('Ошибка при добавлении шаблона муфты: ' + err.message, 'error', 'Ошибка');
+      showToast(`Муфта «${mark}» успешно добавлена в справочник муфт. Нажмите «Применить и пересчитать работы» для применения.`, 'success', 'Муфта добавлена', 6000);
+    });
+  }
+
+  // =========================================================================
+  // ADD EQUIPMENT MODAL (МНОЖЕСТВЕННЫЕ РАБОТЫ, МАТЕРИАЛЫ И ПРОВЕРКА ДУБЛИКАТОВ)
+  // =========================================================================
+
+  function appendAddEquipNestedItemRow(tbody, name = '', type = 'материал', unit = 'шт', formula = 'КОЛИЧЕСТВО', show = true) {
+    if (!tbody) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <input type="text" class="form-control form-control-sm equip-item-name" placeholder="Наименование позиции" value="${escapeHtml(name)}" required>
+      </td>
+      <td style="width: 20%;">
+        <select class="form-select form-select-sm equip-item-type">
+          <option value="оборудование" ${type === 'оборудование' ? 'selected' : ''}>оборудование</option>
+          <option value="материал" ${type === 'материал' ? 'selected' : ''}>материал</option>
+        </select>
+      </td>
+      <td style="width: 14%;">
+        <input type="text" class="form-control form-control-sm equip-item-unit" value="${escapeHtml(unit)}" placeholder="шт" required>
+      </td>
+      <td style="width: 20%;">
+        <input type="text" class="form-control form-control-sm font-monospace equip-item-formula" value="${escapeHtml(formula)}" placeholder="КОЛИЧЕСТВО" required>
+      </td>
+      <td style="width: 8%;" class="text-center">
+        <input class="form-check-input equip-item-show" type="checkbox" ${show ? 'checked' : ''} title="Показывать формулу в ВОР">
+      </td>
+      <td style="width: 6%;" class="text-center">
+        <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-remove-equip-item-row" title="Удалить позицию">
+          <i class='bx bx-trash'></i>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  function refreshAddEquipWorkCardBadges() {
+    const container = document.getElementById('addEquipWorksContainer');
+    if (!container) return;
+    const cards = container.querySelectorAll('.equip-work-card');
+    cards.forEach((card, idx) => {
+      const badge = card.querySelector('.equip-work-badge');
+      if (badge) badge.textContent = `Работа #${idx + 1}`;
+    });
+  }
+
+  function appendAddEquipWorkCard(title = '', unit = 'шт', formula = 'КОЛИЧЕСТВО', showFormula = false, section = 'Монтажные работы', nestedItems = []) {
+    const container = document.getElementById('addEquipWorksContainer');
+    if (!container) return;
+    const workIndex = container.children.length + 1;
+    const cardId = `equipWorkCard_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    const card = document.createElement('div');
+    card.className = 'card border shadow-xs equip-work-card mb-2';
+    card.innerHTML = `
+      <div class="card-header bg-light py-2 px-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-primary-subtle text-primary border font-monospace equip-work-badge">Работа #${workIndex}</span>
+          <span class="fw-semibold small text-dark">Параметры сметной нормы</span>
+        </div>
+        <button type="button" class="btn btn-xs btn-outline-danger py-0 px-2 btn-remove-equip-work-card" title="Удалить работу и её позиции">
+          <i class='bx bx-trash me-1'></i>Удалить работу
+        </button>
+      </div>
+      <div class="card-body p-2_5">
+        <div class="row g-2 mb-2">
+          <div class="col-md-5">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Наименование работы <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm equip-work-title" placeholder="Наименование сметной работы" value="${escapeHtml(title)}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Ед. изм.</label>
+            <input type="text" class="form-control form-control-sm equip-work-unit" value="${escapeHtml(unit)}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Формула</label>
+            <input type="text" class="form-control form-control-sm font-monospace equip-work-formula" value="${escapeHtml(formula)}" placeholder="КОЛИЧЕСТВО" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Раздел сметы</label>
+            <select class="form-select form-select-sm equip-work-section">
+              <option value="Монтажные работы" ${section === 'Монтажные работы' ? 'selected' : ''}>Монтажные работы</option>
+              <option value="Строительные работы" ${section === 'Строительные работы' ? 'selected' : ''}>Строительные работы</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-check small mb-2">
+          <input class="form-check-input equip-work-show" type="checkbox" id="chkEquipWorkShow_${cardId}" ${showFormula ? 'checked' : ''}>
+          <label class="form-check-label fs-xs" for="chkEquipWorkShow_${cardId}">Отображать формулу работы в ведомости (ВОР)</label>
+        </div>
+
+        <div class="p-2 rounded border bg-body-tertiary">
+          <div class="d-flex align-items-center justify-content-between mb-1_5">
+            <span class="fs-xs fw-semibold text-secondary d-flex align-items-center gap-1">
+              <i class='bx bx-package text-success'></i> Вложенные позиции работы (ключ «Материалы»):
+            </span>
+            <button type="button" class="btn btn-xs btn-outline-success py-0 px-1_5 btn-add-equip-nested-item">
+              <i class='bx bx-plus me-0_5'></i>Добавить позицию
+            </button>
+          </div>
+          <div class="table-responsive bg-body rounded border">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light" style="font-size: 0.72rem;">
+                <tr>
+                  <th style="width: 32%;">Наименование позиции</th>
+                  <th style="width: 20%;">Тип позиции</th>
+                  <th style="width: 14%;">Ед. изм.</th>
+                  <th style="width: 20%;">Формула</th>
+                  <th style="width: 8%;" class="text-center" title="Показывать формулу">ВОР</th>
+                  <th style="width: 6%;" class="text-center"></th>
+                </tr>
+              </thead>
+              <tbody class="equip-work-nested-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const tbody = card.querySelector('.equip-work-nested-tbody');
+    if (Array.isArray(nestedItems) && nestedItems.length > 0) {
+      nestedItems.forEach(item => {
+        appendAddEquipNestedItemRow(
+          tbody,
+          item["Наименование"] || item.name || '',
+          item["Тип"] || item.type || 'материал',
+          item["Единицы измерения"] || item.unit || 'шт',
+          item["Формула"] || item.formula || 'КОЛИЧЕСТВО',
+          item["ОтображатьФормулу"] !== undefined ? Boolean(item["ОтображатьФормулу"]) : true
+        );
+      });
     }
-  };
 
-  // Tab show listeners to auto-refresh visual tabs with latest JSON data (without modifying current active rules)
+    container.appendChild(card);
+    refreshAddEquipWorkCardBadges();
+  }
+
+  // Проверка дубликата способа установки для активной марки
+  function checkEquipMethodExists() {
+    const markInput = document.getElementById('addEquipMark');
+    const methodInput = document.getElementById('addEquipMethod');
+    const warningAlert = document.getElementById('addEquipExistWarning');
+    const strategyContainer = document.getElementById('addEquipMergeStrategyContainer');
+
+    if (!markInput || !methodInput || !warningAlert) return;
+
+    const mark = markInput.value.trim();
+    const method = methodInput.value.trim() || 'Не указано';
+
+    const draft = getDraftRulesFromEditor();
+    const eqCatalog = (draft && draft["Оборудование"]) || (cachedDefaultRules && cachedDefaultRules["Оборудование"]) || {};
+
+    let exists = false;
+    if (eqCatalog[mark] && eqCatalog[mark]["Работы"] && eqCatalog[mark]["Работы"][method]) {
+      exists = true;
+    }
+
+    if (exists) {
+      warningAlert.classList.remove('d-none');
+      if (strategyContainer) strategyContainer.classList.remove('d-none');
+    } else {
+      warningAlert.classList.add('d-none');
+      if (strategyContainer) strategyContainer.classList.add('d-none');
+    }
+  }
+
+  const addEquipWorksContainer = document.getElementById('addEquipWorksContainer');
+  if (addEquipWorksContainer) {
+    addEquipWorksContainer.addEventListener('click', (e) => {
+      const addNestedBtn = e.target.closest('.btn-add-equip-nested-item');
+      if (addNestedBtn) {
+        const card = addNestedBtn.closest('.equip-work-card');
+        const tbody = card ? card.querySelector('.equip-work-nested-tbody') : null;
+        if (tbody) {
+          appendAddEquipNestedItemRow(tbody, '', 'материал', 'шт', 'КОЛИЧЕСТВО', true);
+        }
+        return;
+      }
+
+      const removeRowBtn = e.target.closest('.btn-remove-equip-item-row');
+      if (removeRowBtn) {
+        const tr = removeRowBtn.closest('tr');
+        if (tr) tr.remove();
+        return;
+      }
+
+      const removeWorkBtn = e.target.closest('.btn-remove-equip-work-card');
+      if (removeWorkBtn) {
+        const card = removeWorkBtn.closest('.equip-work-card');
+        if (card) {
+          card.remove();
+          refreshAddEquipWorkCardBadges();
+          if (addEquipWorksContainer.children.length === 0) {
+            appendAddEquipWorkCard('Монтаж оборудования', 'шт', 'КОЛИЧЕСТВО', false, 'Монтажные работы', []);
+          }
+        }
+        return;
+      }
+    });
+
+    addEquipWorksContainer.addEventListener('input', (e) => {
+      if (e.target.classList.contains('equip-work-title') || e.target.classList.contains('equip-item-name')) {
+        e.target.dataset.autoFilled = 'false';
+      }
+    });
+  }
+
+  const btnAddEquipWorkCard = document.getElementById('btnAddEquipWorkCard');
+  if (btnAddEquipWorkCard) {
+    btnAddEquipWorkCard.addEventListener('click', () => {
+      appendAddEquipWorkCard('', 'шт', 'КОЛИЧЕСТВО', false, 'Монтажные работы', []);
+    });
+  }
+
+  const addEquipMarkInput = document.getElementById('addEquipMark');
+  if (addEquipMarkInput) {
+    addEquipMarkInput.addEventListener('input', () => {
+      const mark = addEquipMarkInput.value.trim();
+      const firstWorkTitle = document.querySelector('#addEquipWorksContainer .equip-work-card:first-child .equip-work-title');
+      if (firstWorkTitle && (!firstWorkTitle.value.trim() || firstWorkTitle.dataset.autoFilled === 'true')) {
+        firstWorkTitle.value = mark ? `Монтаж оборудования типа ${mark}` : '';
+        firstWorkTitle.dataset.autoFilled = 'true';
+      }
+      const firstItemName = document.querySelector('#addEquipWorksContainer .equip-work-card:first-child .equip-item-name');
+      const firstItemType = document.querySelector('#addEquipWorksContainer .equip-work-card:first-child .equip-item-type');
+      if (firstItemName && firstItemType && firstItemType.value === 'оборудование' && (!firstItemName.value.trim() || firstItemName.dataset.autoFilled === 'true')) {
+        firstItemName.value = mark;
+        firstItemName.dataset.autoFilled = 'true';
+      }
+      checkEquipMethodExists();
+    });
+  }
+
+  const addEquipMethodInput = document.getElementById('addEquipMethod');
+  if (addEquipMethodInput) {
+    addEquipMethodInput.addEventListener('input', checkEquipMethodExists);
+    addEquipMethodInput.addEventListener('change', checkEquipMethodExists);
+  }
+
+  const quickAddEquipmentInTabBtn = document.getElementById('quickAddEquipmentInTabBtn');
+  if (quickAddEquipmentInTabBtn) {
+    quickAddEquipmentInTabBtn.addEventListener('click', () => {
+      const form = document.getElementById('formAddEquipment');
+      if (form) form.reset();
+
+      const methodInput = document.getElementById('addEquipMethod');
+      if (methodInput) methodInput.value = 'Не указано';
+
+      const methodsList = document.getElementById('datalistEquipMethods');
+      if (methodsList) {
+        const draft = getDraftRulesFromEditor();
+        const eqCatalog = (draft && draft["Оборудование"]) || (cachedDefaultRules && cachedDefaultRules["Оборудование"]) || {};
+        const knownMethods = new Set(['Не указано', 'На стрелочном башмаке', 'На бетонном фундаменте', 'В релейном шкафу', 'Боковые пути']);
+        Object.values(eqCatalog).forEach(e => {
+          if (e && e["Работы"] && typeof e["Работы"] === 'object') {
+            Object.keys(e["Работы"]).forEach(m => knownMethods.add(m));
+          }
+        });
+        methodsList.innerHTML = Array.from(knownMethods).map(m => `<option value="${escapeHtml(m)}"></option>`).join('');
+      }
+
+      if (addEquipWorksContainer) {
+        addEquipWorksContainer.innerHTML = '';
+        appendAddEquipWorkCard('', 'шт', 'КОЛИЧЕСТВО', false, 'Монтажные работы', [
+          { "Наименование": "", "Тип": "оборудование", "Единицы измерения": "шт", "Формула": "КОЛИЧЕСТВО", "ОтображатьФормулу": true },
+          { "Наименование": "", "Тип": "материал", "Единицы измерения": "шт", "Формула": "КОЛИЧЕСТВО", "ОтображатьФормулу": true }
+        ]);
+      }
+
+      checkEquipMethodExists();
+
+      const modalEl = document.getElementById('addEquipmentModal');
+      if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+    });
+  }
+
+  const btnSaveNewEquipment = document.getElementById('btnSaveNewEquipment');
+  if (btnSaveNewEquipment) {
+    btnSaveNewEquipment.addEventListener('click', () => {
+      const markInput = document.getElementById('addEquipMark');
+      const mark = markInput ? markInput.value.trim() : '';
+      if (!mark) {
+        showToast('Укажите марку/тип оборудования', 'warning', 'Проверка данных');
+        if (markInput) markInput.focus();
+        return;
+      }
+
+      const methodInput = document.getElementById('addEquipMethod');
+      const method = (methodInput ? methodInput.value.trim() : '') || 'Не указано';
+      const mergeStrategy = document.getElementById('addEquipMergeStrategy')?.value || 'append';
+
+      const workCards = document.querySelectorAll('#addEquipWorksContainer .equip-work-card');
+      const parsedWorks = [];
+
+      workCards.forEach(card => {
+        const title = card.querySelector('.equip-work-title')?.value?.trim();
+        const unit = card.querySelector('.equip-work-unit')?.value?.trim() || 'шт';
+        const formula = card.querySelector('.equip-work-formula')?.value?.trim() || 'КОЛИЧЕСТВО';
+        const show = Boolean(card.querySelector('.equip-work-show')?.checked);
+        const section = card.querySelector('.equip-work-section')?.value || 'Монтажные работы';
+
+        if (!title) return;
+
+        const nestedItems = [];
+        const itemRows = card.querySelectorAll('.equip-work-nested-tbody tr');
+        itemRows.forEach(r => {
+          const mName = r.querySelector('.equip-item-name')?.value?.trim();
+          const mType = r.querySelector('.equip-item-type')?.value?.trim() || 'материал';
+          const mUnit = r.querySelector('.equip-item-unit')?.value?.trim() || 'шт';
+          const mFormula = r.querySelector('.equip-item-formula')?.value?.trim() || 'КОЛИЧЕСТВО';
+          const mShow = Boolean(r.querySelector('.equip-item-show')?.checked);
+          if (mName) {
+            nestedItems.push({
+              "Наименование": mName,
+              "Единицы измерения": mUnit,
+              "Формула": mFormula,
+              "Тип": mType,
+              "ОтображатьФормулу": mShow,
+              "Раздел": section
+            });
+          }
+        });
+
+        parsedWorks.push({
+          "Наименование": title,
+          "Единицы измерения": unit,
+          "Формула": formula,
+          "Тип": "работа",
+          "ОтображатьФормулу": show,
+          "Раздел": section,
+          "Материалы": nestedItems
+        });
+      });
+
+      if (parsedWorks.length === 0) {
+        showToast('Добавьте хотя бы одну работу с наименованием', 'warning', 'Проверка данных');
+        return;
+      }
+
+      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+      if (!currentObj["Оборудование"] || typeof currentObj["Оборудование"] !== 'object' || Array.isArray(currentObj["Оборудование"])) {
+        currentObj["Оборудование"] = {};
+      }
+      if (!currentObj["Оборудование"][mark] || typeof currentObj["Оборудование"][mark] !== 'object') {
+        currentObj["Оборудование"][mark] = { "Работы": {} };
+      }
+      if (!currentObj["Оборудование"][mark]["Работы"] || typeof currentObj["Оборудование"][mark]["Работы"] !== 'object') {
+        currentObj["Оборудование"][mark]["Работы"] = {};
+      }
+
+      if (mergeStrategy === 'append' && Array.isArray(currentObj["Оборудование"][mark]["Работы"][method])) {
+        currentObj["Оборудование"][mark]["Работы"][method].push(...parsedWorks);
+      } else {
+        currentObj["Оборудование"][mark]["Работы"][method] = parsedWorks;
+      }
+
+      modalDraftRules = currentObj;
+      setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
+      validateWorksJsonInput();
+      renderEquipmentCatalogModalContent(modalDraftRules);
+
+      const modalEl = document.getElementById('addEquipmentModal');
+      if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
+
+      showToast(`Оборудование «${mark}» [${method}]: успешно добавлено ${parsedWorks.length} работ. Нажмите «Применить и пересчитать работы» для применения.`, 'success', 'Оборудование добавлено', 6000);
+    });
+  }
+
+  // =========================================================================
+  // ТАБЫ, ПОИСК И НАСТРОЙКИ
+  // =========================================================================
+
   const cardsTabBtn = document.getElementById('tabWorksCardsBtn');
   if (cardsTabBtn) {
     cardsTabBtn.addEventListener('shown.bs.tab', () => {
-      renderRulesModalContent(getDraftRulesFromEditor());
+      renderRulesModalContent(getDraftRulesFromEditor(), false);
     });
   }
 
@@ -1900,7 +2517,6 @@ function setupWorksRulesListeners() {
     });
   }
 
-  // Settings tab show listener
   const settingsTabBtn = document.getElementById('tabWorksSettingsBtn');
   if (settingsTabBtn) {
     settingsTabBtn.addEventListener('shown.bs.tab', () => {
@@ -1908,18 +2524,12 @@ function setupWorksRulesListeners() {
     });
   }
 
-  // Settings action buttons
   const syncSettingsBtn = document.getElementById('syncSettingsToJsonBtn');
-  if (syncSettingsBtn) {
-    syncSettingsBtn.addEventListener('click', () => saveSettingsFromUiToJson(true));
-  }
+  if (syncSettingsBtn) syncSettingsBtn.addEventListener('click', () => saveSettingsFromUiToJson(true));
 
   const resetSettingsBtn = document.getElementById('resetDefaultSettingsBtn');
-  if (resetSettingsBtn) {
-    resetSettingsBtn.addEventListener('click', resetDefaultSettings);
-  }
+  if (resetSettingsBtn) resetSettingsBtn.addEventListener('click', resetDefaultSettings);
 
-  // Auto-sync settings inputs on change
   [
     'settingNumberingMode',
     'settingDecimalsWorks', 'settingDecimalsMaterials',
@@ -1927,76 +2537,9 @@ function setupWorksRulesListeners() {
     'settingSoftName', 'settingPluginVersion'
   ].forEach(id => {
     const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('change', () => saveSettingsFromUiToJson(false));
-    }
+    if (el) el.addEventListener('change', () => saveSettingsFromUiToJson(false));
   });
 
-  // Add equipment sample (+ Оборудование)
-  const insertEquipmentSample = () => {
-    try {
-      const val = getWorksJsonEditorValue();
-      let currentObj;
-      try {
-        currentObj = JSON.parse(val);
-      } catch {
-        currentObj = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || {}));
-      }
-
-      if (!currentObj["Оборудование"] || typeof currentObj["Оборудование"] !== 'object' || Array.isArray(currentObj["Оборудование"])) {
-        currentObj["Оборудование"] = {};
-      }
-
-      let sampleMark = "Шкаф-ШРУ-М";
-      let counter = 1;
-      while (currentObj["Оборудование"][sampleMark]) {
-        counter++;
-        sampleMark = `Шкаф-ШРУ-М-${counter}`;
-      }
-
-      currentObj["Оборудование"][sampleMark] = {
-        "Работы": {
-          "Не указано": [
-            {
-              "Наименование": `Установка оборудования типа ${sampleMark}`,
-              "Единицы измерения": "шт",
-              "Формула": "КОЛИЧЕСТВО",
-              "Тип": "работа",
-              "ОтображатьФормулу": true,
-              "Раздел": "Монтажные работы",
-              "Материалы": [
-                {
-                  "Наименование": sampleMark,
-                  "Единицы измерения": "шт",
-                  "Формула": "КОЛИЧЕСТВО",
-                  "Тип": "оборудование",
-                  "ОтображатьФормулу": true,
-                  "Раздел": "Монтажные работы"
-                }
-              ]
-            }
-          ]
-        }
-      };
-
-      modalDraftRules = currentObj;
-      setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-      validateWorksJsonInput();
-
-      highlightAndScrollToJsonNode(sampleMark, true);
-
-      showToast(`Шаблон оборудования «${sampleMark}» добавлен в раздел «Оборудование». Отредактируйте параметры и нажмите «Применить и пересчитать».`, 'success', 'Оборудование добавлено', 6000);
-    } catch (err) {
-      showToast('Ошибка при добавлении оборудования: ' + err.message, 'error', 'Ошибка');
-    }
-  };
-
-  const quickAddEquipmentInTabBtn = document.getElementById('quickAddEquipmentInTabBtn');
-  if (quickAddEquipmentInTabBtn) {
-    quickAddEquipmentInTabBtn.addEventListener('click', insertEquipmentSample);
-  }
-
-  // Equipment tab search listeners
   const equipmentSearchInput = document.getElementById('equipmentCatalogSearchInput');
   const equipmentClearSearchBtn = document.getElementById('equipmentCatalogClearSearchBtn');
   if (equipmentSearchInput) {
@@ -2013,12 +2556,6 @@ function setupWorksRulesListeners() {
     }
   }
 
-  const quickAddCouplingInTabBtn = document.getElementById('quickAddCouplingInTabBtn');
-  if (quickAddCouplingInTabBtn) {
-    quickAddCouplingInTabBtn.addEventListener('click', insertCouplingSample);
-  }
-
-  // Coupling catalog tab search and filter listeners
   const couplingSearchInput = document.getElementById('couplingCatalogSearchInput');
   const couplingClearSearchBtn = document.getElementById('couplingCatalogClearSearchBtn');
   if (couplingSearchInput) {
@@ -2035,25 +2572,15 @@ function setupWorksRulesListeners() {
     }
   }
 
-  // Reset rules button
   const resetBtn = document.getElementById('resetRulesBtn');
-  if (resetBtn) {
-    resetBtn.addEventListener('click', resetWorksRules);
-  }
+  if (resetBtn) resetBtn.addEventListener('click', resetWorksRules);
 
-  // Download rules JSON button
   const downloadBtn = document.getElementById('downloadRulesBtn');
-  if (downloadBtn) {
-    downloadBtn.addEventListener('click', downloadWorksRules);
-  }
+  if (downloadBtn) downloadBtn.addEventListener('click', downloadWorksRules);
 
-  // Upload rules JSON file button
   const rulesFileInput = document.getElementById('rulesFileInput');
-  if (rulesFileInput) {
-    rulesFileInput.addEventListener('change', handleRulesFileInput);
-  }
+  if (rulesFileInput) rulesFileInput.addEventListener('change', handleRulesFileInput);
 
-  // Apply Works Rules & Recalculate button
   const applyBtn = document.getElementById('applyWorksRulesBtn');
   if (applyBtn) {
     applyBtn.addEventListener('click', () => {
@@ -2071,7 +2598,6 @@ function setupWorksRulesListeners() {
 
         renderRulesModalContent(currentWorksRules);
 
-        // Recalculate volumes if data is loaded
         if (currentData) {
           calculateVolumes();
         }
@@ -2090,305 +2616,28 @@ function setupWorksRulesListeners() {
       }
     });
   }
-}
 
-// Add missing trench types to rules and open editor
-// Add missing trench types to draft rules and open editor
-function addMissingTrenchTypesToRules(missingList) {
-  if (!missingList || missingList.length === 0) return;
-
-  const draftObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || { "Строительные работы": {} }));
-  if (!draftObj["Строительные работы"] || typeof draftObj["Строительные работы"] !== 'object' || Array.isArray(draftObj["Строительные работы"])) {
-    draftObj["Строительные работы"] = {};
-  }
-
-  let addedCount = 0;
-  missingList.forEach(m => {
-    const typeName = (typeof m === 'object' ? (m.ruleName || m.type) : m) || '';
-    if (!typeName) return;
-    const existingKey = Object.keys(draftObj["Строительные работы"]).find(k => matchesRule(typeName, k));
-    if (!existingKey) {
-      draftObj["Строительные работы"][typeName] = {
-        "Работы": [
-          {
-            "Наименование": `Разработка грунта в траншеях (${typeName})`,
-            "Единицы измерения": "м3 грунта",
-            "Формула": "0,36*ДЛИНА",
-            "Тип": "работа",
-            "ОтображатьФормулу": true,
-            "Материалы": []
-          },
-          {
-            "Наименование": `Засыпка траншей (${typeName})`,
-            "Единицы измерения": "м3 грунта",
-            "Формула": "0,36*ДЛИНА",
-            "Тип": "работа",
-            "ОтображатьФормулу": true,
-            "Материалы": []
-          }
-        ]
-      };
-      addedCount++;
+  // Переход к узлу JSON
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-jump-to-json');
+    if (btn) {
+      const target = btn.getAttribute('data-json-target');
+      if (target) {
+        highlightAndScrollToJsonNode(target, true);
+      }
     }
   });
 
-  modalDraftRules = draftObj;
-  openWorksRulesModal('editor');
-  setWorksJsonEditorValue(JSON.stringify(draftObj, null, 2));
-  validateWorksJsonInput();
-  showToast(`Добавлено способов прокладки в раздел «Строительные работы»: ${addedCount}. Отредактируйте формулы и нажмите «Применить и пересчитать».`, 'info', 'Правила дополнены');
-}
-
-// Add missing cable routing types or missing work items to "Монтажные работы" in draft rules and open editor
-function addMissingCableWaysToRules(missingList) {
-  if (!missingList || missingList.length === 0) return;
-
-  const draftObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {} }));
-  if (!draftObj["Монтажные работы"] || typeof draftObj["Монтажные работы"] !== 'object' || Array.isArray(draftObj["Монтажные работы"])) {
-    draftObj["Монтажные работы"] = {};
-  }
-
-  const createDefaultMrObj = (typeName) => ({
-    "1": [
-      {
-        "Наименование": `Прокладка кабеля массой 1 м, кг, до: 1 (${typeName})`,
-        "МаксВес": 1,
-        "Единицы измерения": "м",
-        "Формула": "ДЛИНА",
-        "Тип": "работа",
-        "ОтображатьФормулу": true
-      }
-    ],
-    "2": [
-      {
-        "Наименование": `Прокладка кабеля массой 1 м, кг, до: 2 (${typeName})`,
-        "МаксВес": 2,
-        "Единицы измерения": "м",
-        "Формула": "ДЛИНА",
-        "Тип": "работа",
-        "ОтображатьФормулу": true
-      }
-    ],
-    "3": [
-      {
-        "Наименование": `Прокладка кабеля массой 1 м, кг, до: 3 (${typeName})`,
-        "МаксВес": 3,
-        "Единицы измерения": "м",
-        "Формула": "ДЛИНА",
-        "Тип": "работа",
-        "ОтображатьФормулу": true
-      }
-    ],
-    "оптический": [
-      {
-        "Наименование": `Прокладка оптического кабеля (${typeName})`,
-        "Категория": "Оптический кабель",
-        "Единицы измерения": "м",
-        "Формула": "ДЛИНА",
-        "Тип": "работа",
-        "ОтображатьФормулу": true
-      }
-    ]
-  });
-
-  let addedCount = 0;
-  missingList.forEach(m => {
-    const typeName = (typeof m === 'object' ? (m.ruleName || m.type) : m) || '';
-    if (!typeName) return;
-    const existingKey = Object.keys(draftObj["Монтажные работы"]).find(k => matchesRule(typeName, k));
-    if (!existingKey) {
-      draftObj["Монтажные работы"][typeName] = {
-        "Шаблон": `Прокладка кабеля массой 1 м, кг, до: {масса} (${typeName})`,
-        "Работы": createDefaultMrObj(typeName)
-      };
-      addedCount++;
-    } else {
-      const targetRule = draftObj["Монтажные работы"][existingKey];
-      if (!targetRule["Работы"] || typeof targetRule["Работы"] !== 'object') {
-        targetRule["Работы"] = createDefaultMrObj(existingKey);
-        addedCount++;
-      } else if (m && typeof m === 'object' && m.missingType === 'optical') {
-        if (!targetRule["Работы"]["оптический"]) {
-          targetRule["Работы"]["оптический"] = [
-            {
-              "Наименование": `Прокладка оптического кабеля (${existingKey})`,
-              "Единицы измерения": "м",
-              "Категория": "Оптический кабель",
-              "Формула": "ДЛИНА",
-              "Тип": "работа",
-              "ОтображатьФормулу": true
-            }
-          ];
-          addedCount++;
+  // Сохранение скролла в основном окне при закрытии дочерних модалок
+  ['addRuleModal', 'addCableModal', 'addCouplingModal', 'addEquipmentModal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('hidden.bs.modal', () => {
+        const parentModal = document.getElementById('worksRulesModal');
+        if (parentModal && parentModal.classList.contains('show')) {
+          document.body.classList.add('modal-open');
         }
-      } else if (m && typeof m === 'object' && m.missingType === 'tier') {
-        const tierKey = String(m.tierMax || 1);
-        if (!targetRule["Работы"][tierKey]) {
-          targetRule["Работы"][tierKey] = [
-            {
-              "Наименование": `Прокладка кабеля массой 1 м, кг, до: ${tierKey} (${existingKey})`,
-              "Единицы измерения": "м",
-              "МаксВес": Number(tierKey) || 1,
-              "Формула": "ДЛИНА",
-              "Тип": "работа",
-              "ОтображатьФормулу": true
-            }
-          ];
-          addedCount++;
-        }
-      } else if (m && typeof m === 'object' && m.missingType === 'empty_rule') {
-        targetRule["Работы"] = createDefaultMrObj(existingKey);
-        addedCount++;
-      }
+      });
     }
   });
-
-  modalDraftRules = draftObj;
-  openWorksRulesModal('editor');
-  setWorksJsonEditorValue(JSON.stringify(draftObj, null, 2));
-  validateWorksJsonInput();
-  showToast(`Добавлено позиций в раздел «Монтажные работы»: ${addedCount}. Отредактируйте наименования/формулы и нажмите «Применить и пересчитать».`, 'info', 'Правила дополнены');
 }
-
-// Add missing cable types to "Справочник кабелей" in draft rules and open editor
-function addMissingCablesToCatalog(missingList) {
-  if (!missingList || missingList.length === 0) return;
-
-  const draftObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {} }));
-  if (!draftObj["Справочник кабелей"] || typeof draftObj["Справочник кабелей"] !== 'object') {
-    const existingCat = (cachedDefaultRules && cachedDefaultRules["Справочник кабелей"]) ? cachedDefaultRules["Справочник кабелей"] : {};
-    draftObj["Справочник кабелей"] = JSON.parse(JSON.stringify(existingCat));
-  }
-  if (!draftObj["Справочник кабелей"]["Особый кабель"]) {
-    draftObj["Справочник кабелей"]["Особый кабель"] = { "Название": "Особый кабель", "Тип": {} };
-  }
-  if (!draftObj["Справочник кабелей"]["Особый кабель"]["Тип"] || typeof draftObj["Справочник кабелей"]["Особый кабель"]["Тип"] !== 'object') {
-    draftObj["Справочник кабелей"]["Особый кабель"]["Тип"] = {};
-  }
-  if (!draftObj["Справочник кабелей"]["Оптический кабель"]) {
-    draftObj["Справочник кабелей"]["Оптический кабель"] = { "Название": "Оптический кабель", "Категория": "Оптический кабель", "Тип": {} };
-  }
-  if (!draftObj["Справочник кабелей"]["Оптический кабель"]["Тип"] || typeof draftObj["Справочник кабелей"]["Оптический кабель"]["Тип"] !== 'object') {
-    draftObj["Справочник кабелей"]["Оптический кабель"]["Тип"] = {};
-  }
-
-  let addedCount = 0;
-  const addedTypes = [];
-
-  missingList.forEach(m => {
-    const typeName = m.type || m;
-    const isOpt = Boolean(m && typeof m === 'object' && m.isOptical);
-    const targetSection = isOpt ? "Оптический кабель" : "Особый кабель";
-
-    if (!draftObj["Справочник кабелей"][targetSection]["Тип"][typeName]) {
-      draftObj["Справочник кабелей"][targetSection]["Тип"][typeName] = isOpt ? {
-        "Строительная длина": 2000,
-        "Муфта": "МТОК-А1/216-1Т3-44",
-        "Вес": 0.28,
-        "Категория": "Оптический кабель",
-        "Полное описание": `Кабель связи оптический ${typeName}`
-      } : {
-        "Строительная длина": 300,
-        "Муфта": "Уточнить",
-        "Вес": m.fallbackWeight || 0.35,
-        "Полное описание": `Кабель ${typeName}`
-      };
-      addedCount++;
-      addedTypes.push(typeName);
-    }
-  });
-
-  modalDraftRules = draftObj;
-  openWorksRulesModal('editor');
-  setWorksJsonEditorValue(JSON.stringify(draftObj, null, 2));
-  validateWorksJsonInput();
-  showToast(
-    `В раздел «Справочник кабелей» добавлены заготовки для ${addedCount} марок: ${addedTypes.join(', ')}. Укажите паспортные характеристики и нажмите «Применить и пересчитать».`,
-    'info',
-    'Справочник кабелей дополнен',
-    8000
-  );
-}
-
-// Add missing equipment items to "Оборудование" section in draft rules and open editor
-function addMissingEquipmentToRules(missingList) {
-  if (!missingList || missingList.length === 0) {
-    showToast('Нет недостающих позиций оборудования для добавления', 'info', 'Правила');
-    return;
-  }
-
-  const draftObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} }));
-  if (!draftObj["Оборудование"] || typeof draftObj["Оборудование"] !== 'object' || Array.isArray(draftObj["Оборудование"])) {
-    draftObj["Оборудование"] = {};
-  }
-
-  let addedCount = 0;
-  const addedMarks = [];
-
-  missingList.forEach(m => {
-    const mark = (m.mark || m.type || 'Оборудование').trim();
-    const method = (m.method || 'Не указано').trim();
-
-    const newWorksForMethod = [
-      {
-        "Наименование": `Установка оборудования типа ${mark}${method.toLowerCase() !== 'не указано' ? ` (${method})` : ''}`,
-        "Единицы измерения": "шт",
-        "Формула": "КОЛИЧЕСТВО",
-        "Тип": "работа",
-        "ОтображатьФормулу": true,
-        "Раздел": "Монтажные работы"
-      },
-      {
-        "Наименование": `${mark}`,
-        "Единицы измерения": "шт",
-        "Формула": "КОЛИЧЕСТВО",
-        "Тип": "оборудование",
-        "ОтображатьФормулу": true,
-        "Раздел": "Монтажные работы"
-      }
-    ];
-
-    let existingEntry = draftObj["Оборудование"][mark];
-    if (!existingEntry) {
-      const foundKey = Object.keys(draftObj["Оборудование"]).find(k => k.trim().toLowerCase() === mark.toLowerCase());
-      if (foundKey) {
-        existingEntry = draftObj["Оборудование"][foundKey];
-      }
-    }
-
-    if (existingEntry) {
-      if (!existingEntry["Работы"] || typeof existingEntry["Работы"] !== 'object') {
-        existingEntry["Работы"] = {};
-      }
-      if (!existingEntry["Работы"][method]) {
-        existingEntry["Работы"][method] = newWorksForMethod;
-        addedCount++;
-        addedMarks.push(`${mark} [${method}]`);
-      }
-    } else {
-      draftObj["Оборудование"][mark] = {
-        "Работы": {
-          [method]: newWorksForMethod
-        }
-      };
-      addedCount++;
-      addedMarks.push(`${mark} [${method}]`);
-    }
-  });
-
-  modalDraftRules = draftObj;
-  openWorksRulesModal('editor');
-  setWorksJsonEditorValue(JSON.stringify(draftObj, null, 2));
-  validateWorksJsonInput();
-  if (addedMarks.length > 0) {
-    const firstMark = addedMarks[0].split(' ')[0];
-    highlightAndScrollToJsonNode(firstMark, true);
-  }
-  showToast(
-    `В раздел «Оборудование» добавлены заготовки для ${addedCount} позиций: ${addedMarks.join(', ')}. Скорректируйте наименования/формулы и нажмите «Применить и пересчитать».`,
-    'info',
-    'Раздел оборудования дополнен',
-    8000
-  );
-}
-

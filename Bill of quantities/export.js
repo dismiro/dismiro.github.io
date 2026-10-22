@@ -504,8 +504,8 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
             <span class="badge bg-warning text-dark"><i class='bx bx-cube me-1'></i>Оборудование</span>
             <span class="fw-semibold small">Не объявлено в разделе «Оборудование» (${equipmentMissing.length} поз.)</span>
           </div>
-          <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnAddEquipmentFromModal">
-            <i class='bx bx-plus-circle'></i> Добавить марки в JSON правил
+          <button type="button" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1" id="btnGoToEquipmentRules">
+            <i class='bx bx-slider-alt'></i> Открыть правила
           </button>
         </div>
         <div class="table-responsive" style="max-height: 220px;">
@@ -547,8 +547,8 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
             <span class="badge bg-warning text-dark"><i class='bx bx-layer me-1'></i>Строительные работы</span>
             <span class="fw-semibold small">Не объявлены способы прокладки (${trenchMissing.length} поз.)</span>
           </div>
-          <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnAddTrenchFromModal">
-            <i class='bx bx-plus-circle'></i> Добавить способы в JSON правил
+          <button type="button" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1" id="btnGoToTrenchRules">
+            <i class='bx bx-slider-alt'></i> Открыть правила
           </button>
         </div>
         <div class="table-responsive" style="max-height: 220px;">
@@ -592,8 +592,8 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
             <span class="badge bg-warning text-dark"><i class='bx bx-wrench me-1'></i>Монтажные работы</span>
             <span class="fw-semibold small">Не объявлены сметные нормы кабелей (${cableMissing.length} поз.)</span>
           </div>
-          <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnAddCableWaysFromModal">
-            <i class='bx bx-plus-circle'></i> Добавить работы в JSON правил
+          <button type="button" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1" id="btnGoToCableRules">
+            <i class='bx bx-slider-alt'></i> Открыть правила
           </button>
         </div>
         <div class="table-responsive" style="max-height: 220px;">
@@ -635,8 +635,8 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
             <span class="badge bg-secondary"><i class='bx bx-book-open me-1'></i>Справочник кабелей</span>
             <span class="fw-semibold small">Марки отсутствуют в справочнике весов (${cableMissingInCatalog.length} поз.)</span>
           </div>
-          <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnAddCablesToCatalogFromModal">
-            <i class='bx bx-plus-circle'></i> Добавить марки в справочник
+          <button type="button" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1" id="btnGoToCatalogRules">
+            <i class='bx bx-slider-alt'></i> Открыть справочник
           </button>
         </div>
         <div class="table-responsive" style="max-height: 220px;">
@@ -731,8 +731,8 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
             <span class="badge bg-warning text-dark"><i class='bx bx-git-merge me-1'></i>Превышение группы муфт</span>
             <span class="fw-semibold small">Емкость превышает максимальную сметную группу правил (${couplingsExceeded.length} поз.)</span>
           </div>
-          <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnOpenCouplingRulesFromModal">
-            <i class='bx bx-plus-circle'></i> Добавить нормы в JSON правил
+          <button type="button" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1" id="btnOpenCouplingRulesFromModal">
+            <i class='bx bx-slider-alt'></i> Открыть правила муфт
           </button>
         </div>
         <div class="table-responsive" style="max-height: 220px;">
@@ -766,39 +766,39 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
     });
   }
 
-  const btnEq = bodyEl.querySelector('#btnAddEquipmentFromModal');
+  const btnEq = bodyEl.querySelector('#btnGoToEquipmentRules');
   if (btnEq) {
     btnEq.addEventListener('click', () => {
       const modalInstance = bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
-      addMissingEquipmentToRules(equipmentMissing);
+      openWorksRulesModal('equipment');
     });
   }
 
-  const btnTr = bodyEl.querySelector('#btnAddTrenchFromModal');
+  const btnTr = bodyEl.querySelector('#btnGoToTrenchRules');
   if (btnTr) {
     btnTr.addEventListener('click', () => {
       const modalInstance = bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
-      addMissingTrenchTypesToRules(trenchMissing);
+      openWorksRulesModal('cards');
     });
   }
 
-  const btnCb = bodyEl.querySelector('#btnAddCableWaysFromModal');
+  const btnCb = bodyEl.querySelector('#btnGoToCableRules');
   if (btnCb) {
     btnCb.addEventListener('click', () => {
       const modalInstance = bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
-      addMissingCableWaysToRules(cableMissing);
+      openWorksRulesModal('cards');
     });
   }
 
-  const btnCat = bodyEl.querySelector('#btnAddCablesToCatalogFromModal');
+  const btnCat = bodyEl.querySelector('#btnGoToCatalogRules');
   if (btnCat) {
     btnCat.addEventListener('click', () => {
       const modalInstance = bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
-      addMissingCablesToCatalog(cableMissingInCatalog);
+      openWorksRulesModal('cables');
     });
   }
 
