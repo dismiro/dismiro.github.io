@@ -83,25 +83,157 @@ function resolveValidRules(rulesObj) {
   return getDraftRulesFromEditor();
 }
 
-// Initialize rules on page load from external works_rules.json
+// ---------------------------------------------------------------------------
+// LOCALSTORAGE PERSISTENCE MECHANISM
+// ---------------------------------------------------------------------------
+const LOCAL_STORAGE_RULES_KEY = 'si_works_rules_v1';
+const LOCAL_STORAGE_RULES_META_KEY = 'si_works_rules_v1_meta';
+
+function saveWorksRulesToLocalStorage(rules) {
+  if (!rules || typeof rules !== 'object') return false;
+  try {
+    const jsonStr = JSON.stringify(rules);
+    localStorage.setItem(LOCAL_STORAGE_RULES_KEY, jsonStr);
+    const meta = {
+      savedAt: Date.now(),
+      sizeBytes: new Blob([jsonStr]).size,
+      version: 1
+    };
+    localStorage.setItem(LOCAL_STORAGE_RULES_META_KEY, JSON.stringify(meta));
+    updateStorageStatusUi();
+    return true;
+  } catch (err) {
+    console.error('Ошибка сохранения правил в LocalStorage:', err);
+    showToast('Не удалось сохранить правила в LocalStorage: ' + (err.message || err), 'warning', 'LocalStorage');
+    return false;
+  }
+}
+
+function loadWorksRulesFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_RULES_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (err) {
+    console.warn('Ошибка чтения правил из LocalStorage:', err);
+  }
+  return null;
+}
+
+function clearWorksRulesFromLocalStorage() {
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_RULES_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_RULES_META_KEY);
+    updateStorageStatusUi();
+    return true;
+  } catch (err) {
+    console.warn('Ошибка очистки LocalStorage:', err);
+    return false;
+  }
+}
+
+function updateStorageStatusUi() {
+  const raw = localStorage.getItem(LOCAL_STORAGE_RULES_KEY);
+  let meta = null;
+  try {
+    const rawMeta = localStorage.getItem(LOCAL_STORAGE_RULES_META_KEY);
+    if (rawMeta) meta = JSON.parse(rawMeta);
+  } catch (e) {}
+
+  const hasSaved = Boolean(raw);
+  const headerBadge = document.getElementById('worksRulesStorageBadge');
+  const settingsBadge = document.getElementById('settingsStorageStatusBadge');
+  const sizeSpan = document.getElementById('storageSizeSpan');
+  const dateSpan = document.getElementById('storageDateSpan');
+  const footerIcon = document.getElementById('footerStorageSavedIcon');
+  const footerText = document.getElementById('footerStorageText');
+
+  const sizeKb = raw ? (raw.length / 1024).toFixed(1) + ' КБ' : '0 КБ';
+  const dateStr = (meta && meta.savedAt) ? new Date(meta.savedAt).toLocaleString('ru-RU') : (hasSaved ? 'Сохранено' : '—');
+
+  if (headerBadge) {
+    if (hasSaved) {
+      headerBadge.className = 'badge bg-primary-subtle text-primary border border-primary-subtle ms-1';
+      headerBadge.innerHTML = `<i class='bx bx-check-circle me-1'></i>LocalStorage (${sizeKb})`;
+      headerBadge.title = `Сохранено в браузере: ${dateStr}`;
+    } else {
+      headerBadge.className = 'badge bg-light text-muted border ms-1';
+      headerBadge.innerHTML = `<i class='bx bx-file me-1'></i>works_rules.json`;
+      headerBadge.title = 'Правила загружаются из стандартного файла works_rules.json';
+    }
+  }
+
+  if (settingsBadge) {
+    if (hasSaved) {
+      settingsBadge.className = 'badge bg-success-subtle text-success border border-success-subtle';
+      settingsBadge.textContent = 'Сохранено в LocalStorage';
+    } else {
+      settingsBadge.className = 'badge bg-secondary-subtle text-secondary-emphasis border';
+      settingsBadge.textContent = 'Используется works_rules.json';
+    }
+  }
+
+  if (sizeSpan) sizeSpan.textContent = sizeKb;
+  if (dateSpan) dateSpan.textContent = dateStr;
+
+  if (footerIcon) {
+    if (hasSaved) footerIcon.className = 'bx bx-check-circle text-success';
+    else footerIcon.className = 'bx bx-file text-secondary';
+  }
+  if (footerText) {
+    footerText.textContent = hasSaved ? `LocalStorage: ${sizeKb}` : 'works_rules.json (файл)';
+  }
+}
+
+window.saveWorksRulesToLocalStorage = saveWorksRulesToLocalStorage;
+window.loadWorksRulesFromLocalStorage = loadWorksRulesFromLocalStorage;
+window.clearWorksRulesFromLocalStorage = clearWorksRulesFromLocalStorage;
+window.updateStorageStatusUi = updateStorageStatusUi;
+
+// Initialize rules on page load from external works_rules.json or LocalStorage
 async function initWorksRules() {
+  let defaultData = null;
   try {
     const res = await fetch('./works_rules.json?t=' + Date.now());
     if (res.ok) {
       const data = await res.json();
       if (data && typeof data === 'object') {
         cachedDefaultRules = JSON.parse(JSON.stringify(data));
-        currentWorksRules = JSON.parse(JSON.stringify(data));
-        modalDraftRules = JSON.parse(JSON.stringify(data));
-        renderRulesModalContent(currentWorksRules);
-        if (currentData) {
-          calculateVolumes();
-        }
-        return currentWorksRules;
+        window.cachedDefaultRules = cachedDefaultRules;
+        defaultData = JSON.parse(JSON.stringify(data));
       }
     }
   } catch (err) {
     console.warn('Не удалось загрузить стандартный файл works_rules.json:', err);
+  }
+
+  // Check if custom rules are saved in LocalStorage
+  const localRules = loadWorksRulesFromLocalStorage();
+  if (localRules) {
+    currentWorksRules = JSON.parse(JSON.stringify(localRules));
+    window.currentWorksRules = currentWorksRules;
+    modalDraftRules = JSON.parse(JSON.stringify(localRules));
+    renderRulesModalContent(currentWorksRules);
+    updateStorageStatusUi();
+    if (currentData) {
+      calculateVolumes();
+    }
+    return currentWorksRules;
+  }
+
+  if (defaultData) {
+    currentWorksRules = JSON.parse(JSON.stringify(defaultData));
+    window.currentWorksRules = currentWorksRules;
+    modalDraftRules = JSON.parse(JSON.stringify(defaultData));
+    renderRulesModalContent(currentWorksRules);
+    updateStorageStatusUi();
+    if (currentData) {
+      calculateVolumes();
+    }
+    return currentWorksRules;
   }
 }
 
@@ -135,7 +267,7 @@ async function handleRulesFileInput(e) {
   }
 }
 
-// Reset rules in editor draft to standard works_rules.json
+// Reset rules in editor draft to standard works_rules.json and clear LocalStorage
 async function resetWorksRules() {
   let defaultData = null;
   try {
@@ -154,11 +286,12 @@ async function resetWorksRules() {
   }
 
   if (defaultData) {
-    modalDraftRules = defaultData;
+    modalDraftRules = JSON.parse(JSON.stringify(defaultData));
     setWorksJsonEditorValue(JSON.stringify(defaultData, null, 2));
     validateWorksJsonInput();
     renderRulesModalContent(defaultData);
-    showToast('Стандартные нормы загружены в редактор. Нажмите «Применить и пересчитать», чтобы активировать их.', 'info', 'Сброс в редакторе');
+    clearWorksRulesFromLocalStorage();
+    showToast('Стандартные нормы загружены в редактор, сохраненные правила удалены из LocalStorage. Нажмите «Применить и пересчитать», чтобы активировать их.', 'info', 'Сброс к заводским нормам');
   }
 }
 
@@ -200,14 +333,11 @@ function renderCatalogEmptyState(title, subtitle, icon = 'bx-search-alt') {
   `;
 }
 
-// Standard top header info bar with match counter and JSON editor tip
-function renderCatalogHeaderBar(infoText, hintText = 'Для добавления или корректировки параметров откройте вкладку <strong>«Редактор JSON»</strong>') {
+// Standard top header info bar with match counter
+function renderCatalogHeaderBar(infoText) {
   return `
     <div class="small text-muted mb-2 d-flex justify-content-between align-items-center flex-wrap gap-1">
       <div>${infoText}</div>
-      <div class="fs-xs text-muted">
-        <i class='bx bx-info-circle me-1'></i>${hintText}
-      </div>
     </div>
   `;
 }
@@ -277,7 +407,9 @@ function renderModalWorkItemHtml(w, wIdx, options = {}) {
         <div class="${isSub ? 'fw-medium' : 'fw-semibold'} text-body">
           ${prefix}${escapeHtml(w["Наименование"] || w.name || '')}${extraBadges}
         </div>
-        ${unit ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap font-monospace">${escapeHtml(unit)}</span>` : ''}
+        <div class="d-flex align-items-center gap-1">
+          ${unit ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border text-nowrap font-monospace">${escapeHtml(unit)}</span>` : ''}
+        </div>
       </div>
       <div class="d-flex align-items-center gap-1 text-muted fs-xs flex-wrap">
         <span class="fw-medium">Формула:</span>
@@ -505,10 +637,23 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
                 const matchOver = cleanKey.match(/(?:свыше|более|от|>)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
                 if (matchOver) tierThreshold = parseFloat(matchOver[1].replace(',', '.'));
               }
+              if (tierThreshold === null && items && items.length > 0) {
+                for (const it of items) {
+                  if (it && typeof it === 'object' && it["МаксВес"] !== undefined) {
+                    const mw = parseFloat(String(it["МаксВес"]).replace(',', '.'));
+                    if (!isNaN(mw)) {
+                      tierThreshold = mw;
+                      break;
+                    }
+                  }
+                }
+              }
               if (tierThreshold !== null) {
                 groupTitle = tierIsOver 
                   ? `Категория свыше ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`
                   : `Категория до ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`;
+              } else {
+                groupTitle = `Категория "${escapeHtml(key)}"`;
               }
             }
           }
@@ -565,10 +710,13 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
               <i class="bx bx-git-commit text-primary"></i>
               <span>${rIdx + 1}. ${escapeHtml(rName)}</span>
             </div>
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-1_5">
               ${cardBadges.join('')}
-              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 btn-jump-to-json" data-json-target="${escapeHtml(rName)}" title="Перейти к позиции в редакторе JSON">
-                <i class='bx bx-code-alt me-0_5'></i>JSON
+              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Редактировать этот способ прокладки">
+                <i class='bx bx-edit-alt me-0_5'></i>Изменить
+              </button>
+              <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Удалить этот способ прокладки из правил">
+                <i class='bx bx-trash'></i>
               </button>
             </div>
           </div>
@@ -593,6 +741,54 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
   container.innerHTML = missingNoticeHtml + html;
 }
 
+// Dynamically populate Cable Group dropdown and datalist from active rules catalog
+function populateDynamicCableGroups(rulesObj = null) {
+  const rules = resolveValidRules(rulesObj);
+  const catalog = getCableCatalog(rules) || {};
+  const entries = Object.entries(catalog);
+
+  // 1. Populate dropdown menu (#dropdownCableGroupList)
+  const dropdownList = document.getElementById('dropdownCableGroupList');
+  if (dropdownList) {
+    if (entries.length === 0) {
+      dropdownList.innerHTML = `
+        <li><span class="dropdown-item-text small text-muted fst-italic py-2 px-3">Справочник кабелей пуст</span></li>
+      `;
+    } else {
+      dropdownList.innerHTML = entries.map(([grpKey, grpVal]) => {
+        const rawName = (grpVal && typeof grpVal === 'object' && (grpVal["Название"] || grpVal["Наименование"])) || '';
+        const effectiveName = rawName || (grpKey === '' ? 'Основная группа' : grpKey);
+        const codeDisplay = grpKey === '' ? '<code>"" (пусто)</code>' : `<code>"${escapeHtml(grpKey)}"</code>`;
+        const count = (grpVal && grpVal["Тип"] && typeof grpVal["Тип"] === 'object') ? Object.keys(grpVal["Тип"]).length : 0;
+        const countBadge = count > 0 ? `<span class="badge bg-light text-muted border ms-auto fs-xs">${count} мар.</span>` : '';
+        const isOpt = Boolean(grpVal?.["Категория"] === 'Оптический кабель' || String(grpKey).toLowerCase().includes('оптич') || String(effectiveName).toLowerCase().includes('оптич'));
+        const optBadge = isOpt ? `<span class="badge bg-info-subtle text-info border ms-1 fs-xs">ВОЛС</span>` : '';
+
+        return `
+          <li>
+            <a class="dropdown-item small d-flex align-items-center justify-content-between gap-2 py-1_5" href="#" data-group="${escapeHtml(grpKey)}" data-name="${escapeHtml(effectiveName)}">
+              <div class="text-truncate">
+                ${codeDisplay} — <span class="fw-medium">${escapeHtml(effectiveName)}</span>${optBadge}
+              </div>
+              ${countBadge}
+            </a>
+          </li>
+        `;
+      }).join('');
+    }
+  }
+
+  // 2. Populate datalist (#datalistCableGroups)
+  const groupDatalist = document.getElementById('datalistCableGroups');
+  if (groupDatalist) {
+    groupDatalist.innerHTML = entries.map(([k, v]) => {
+      const gName = (v && typeof v === 'object' && (v["Название"] || v["Наименование"])) || (k === '' ? 'Основная группа' : k);
+      const label = k === '' ? '"" (Основная группа)' : `${k} (${gName})`;
+      return `<option value="${escapeHtml(k)}">${escapeHtml(label)}</option>`;
+    }).join('');
+  }
+}
+
 // Render Cable Catalog Tab Content
 function renderCableCatalogModalContent(rulesObj = null) {
   const container = document.getElementById('cableCatalogContainer');
@@ -602,6 +798,9 @@ function renderCableCatalogModalContent(rulesObj = null) {
   const rules = resolveValidRules(rulesObj);
   const catalog = getCableCatalog(rules) || {};
   const groups = Object.keys(catalog);
+
+  // Dynamically populate Cable Group dropdown and datalist with active rules
+  populateDynamicCableGroups(rules);
 
   const query = getModalSearchQuery('cableCatalogSearchInput', 'cableCatalogClearSearchBtn');
 
@@ -615,10 +814,12 @@ function renderCableCatalogModalContent(rulesObj = null) {
     const groupObj = catalog[groupName];
     if (!groupObj || typeof groupObj !== 'object') return;
 
-    const isOptCategory = String(groupObj["Категория"] || groupName || '').trim().toLowerCase() === 'оптический кабель';
+    const brandName = groupObj["Название"] || (groupName === '' ? 'СБВБПу' : groupName);
+    const groupCat = groupObj["Категория"] || '';
+    const isOptCategory = String(groupCat || groupName || brandName || '').trim().toLowerCase() === 'оптический кабель';
     if (catVal === 'optical' && !isOptCategory) return;
-    if (catVal === 'special' && !/особ/i.test(groupName)) return;
-    if (catVal === 'signaling' && (isOptCategory || /особ/i.test(groupName))) return;
+    if (catVal === 'special' && !/особ/i.test(groupName) && !/особ/i.test(brandName)) return;
+    if (catVal === 'signaling' && (isOptCategory || /особ/i.test(groupName) || /особ/i.test(brandName))) return;
 
     const typesObj = groupObj["Тип"] || {};
     const markNames = Object.keys(typesObj);
@@ -633,10 +834,10 @@ function renderCableCatalogModalContent(rulesObj = null) {
       const coupling = item["Муфта"] || '';
       const buildLen = item["Строительная длина"] !== undefined ? String(item["Строительная длина"]) : '';
       const weight = item["Вес"] !== undefined ? String(item["Вес"]) : '';
-      const cat = item["Категория"] || groupObj["Категория"] || '';
+      const cat = item["Категория"] || groupCat || '';
 
       if (query) {
-        const fullHaystack = `${markKey} ${groupName} ${desc} ${coupling} ${buildLen} ${weight} ${cat}`.toLowerCase();
+        const fullHaystack = `${markKey} ${groupName} ${brandName} ${desc} ${coupling} ${buildLen} ${weight} ${cat}`.toLowerCase();
         if (!fullHaystack.includes(query)) return;
       }
 
@@ -647,12 +848,15 @@ function renderCableCatalogModalContent(rulesObj = null) {
       });
     });
 
-    if (filteredMarks.length > 0) {
+    const matchesGroupDirectly = query && `${groupName} ${brandName} ${groupCat}`.toLowerCase().includes(query);
+
+    if (filteredMarks.length > 0 || !query || matchesGroupDirectly) {
       renderedGroups.push({
-        name: groupName,
-        category: groupObj["Категория"] || '',
-        description: groupObj["Название"] || groupName,
-        marks: filteredMarks
+        key: groupName,
+        brandName: brandName,
+        category: groupCat,
+        marks: filteredMarks,
+        totalInGroup: markNames.length
       });
     }
   });
@@ -671,62 +875,123 @@ function renderCableCatalogModalContent(rulesObj = null) {
 
   renderedGroups.forEach(g => {
     matchCount += g.marks.length;
-    const isOptGroup = String(g.category || g.name || '').trim().toLowerCase() === 'оптический кабель';
+    const isOptGroup = String(g.category || g.brandName || g.key || '').trim().toLowerCase() === 'оптический кабель';
+    const isSpecialGroup = /особ/i.test(g.key) || /особ/i.test(g.brandName);
 
-    const rowsHtml = g.marks.map(m => {
-      const d = m.data;
-      const isOptical = String(d["Категория"] || g.category || '').trim().toLowerCase() === 'оптический кабель';
-      const markBadge = isOptical 
-        ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle fs-xs ms-1">Оптич.</span>`
-        : '';
+    let codeBadge = '';
+    if (g.key === '') {
+      codeBadge = `<span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace px-2 py-1" title="Основная марка без специального символа">"" (без знака)</span>`;
+    } else if (g.key === '\\U+0394') {
+      codeBadge = `<span class="badge bg-primary-subtle text-primary border font-monospace px-2 py-1" title="Греческая буква Дельта (AutoCAD: \\U+0394)">\\U+0394 (Δ)</span>`;
+    } else {
+      codeBadge = `<span class="badge bg-primary-subtle text-primary border font-monospace px-2 py-1" title="Условное обозначение на схеме">${escapeHtml(g.key)}</span>`;
+    }
 
-      const lenFormatted = d["Строительная длина"] !== undefined && d["Строительная длина"] !== null
-        ? `<span class="badge bg-light text-dark border font-monospace">${Number(d["Строительная длина"]).toLocaleString('ru-RU')} м</span>`
-        : '<span class="text-muted">—</span>';
+    let catBadge = '';
+    if (isOptGroup) {
+      catBadge = `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle small ms-1">ВОЛС</span>`;
+    } else if (isSpecialGroup) {
+      catBadge = `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle small ms-1">Особый</span>`;
+    } else if (g.category) {
+      catBadge = `<span class="badge bg-light text-muted border small ms-1">${escapeHtml(g.category)}</span>`;
+    }
 
-      const weightFormatted = d["Вес"] !== undefined && d["Вес"] !== null
-        ? `<span class="font-monospace fw-semibold">${Number(d["Вес"]).toFixed(d["Вес"] < 0.1 ? 3 : 2)}</span>`
-        : '<span class="text-muted">—</span>';
-
-      const couplingFormatted = d["Муфта"] 
-        ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle text-wrap">${escapeHtml(d["Муфта"])}</span>`
-        : '<span class="text-muted small">без муфты</span>';
-
-      return `
+    let rowsHtml = '';
+    if (g.marks.length === 0) {
+      rowsHtml = `
         <tr>
-          <td class="ps-3">
-            <div class="fw-bold text-dark font-monospace">${escapeHtml(m.mark)} ${markBadge}</div>
-            <div class="fs-xs text-muted">Группа: ${escapeHtml(m.groupName)}</div>
+          <td colspan="6" class="text-center py-3 text-muted small">
+            <i class='bx bx-info-circle me-1 text-primary'></i> В этой группе пока нет марок кабелей.
+            <button type="button" class="btn btn-xs btn-outline-primary ms-2 btn-add-mark-to-group" data-group-key="${escapeHtml(g.key)}" data-group-name="${escapeHtml(g.brandName)}">
+              <i class='bx bx-plus me-0_5'></i>Добавить первую марку
+            </button>
           </td>
-          <td>
-            <div class="text-body" style="max-width: 380px; line-height: 1.35;">${escapeHtml(d["Полное описание"] || m.mark)}</div>
-          </td>
-          <td class="text-center">${lenFormatted}</td>
-          <td class="text-center">${weightFormatted}</td>
-          <td class="pe-3">${couplingFormatted}</td>
         </tr>
       `;
-    }).join('');
+    } else {
+      const displayGroupSymbol = g.key === '' ? '"" (без знака)' : (g.key === '\\U+0394' ? '\\U+0394 (Δ)' : `"${g.key}"`);
+
+      rowsHtml = g.marks.map(m => {
+        const d = m.data;
+        const isOptical = String(d["Категория"] || g.category || '').trim().toLowerCase() === 'оптический кабель';
+        const markBadge = isOptical 
+          ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle fs-xs ms-1">Оптич.</span>`
+          : '';
+
+        const lenFormatted = d["Строительная длина"] !== undefined && d["Строительная длина"] !== null
+          ? `<span class="badge bg-light text-dark border font-monospace">${Number(d["Строительная длина"]).toLocaleString('ru-RU')} м</span>`
+          : '<span class="text-muted">—</span>';
+
+        const weightFormatted = d["Вес"] !== undefined && d["Вес"] !== null
+          ? `<span class="font-monospace fw-semibold">${Number(d["Вес"]).toFixed(d["Вес"] < 0.1 ? 3 : 2)}</span>`
+          : '<span class="text-muted">—</span>';
+
+        const couplingFormatted = d["Муфта"] 
+          ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle text-wrap">${escapeHtml(d["Муфта"])}</span>`
+          : '<span class="text-muted small">без муфты</span>';
+
+        return `
+          <tr>
+            <td class="ps-3">
+              <div class="fw-bold text-dark font-monospace">${escapeHtml(m.mark)} ${markBadge}</div>
+              <div class="fs-xs text-muted">
+                Обозначение: <span class="font-monospace fw-semibold text-primary">${escapeHtml(displayGroupSymbol)}</span>
+                <span class="fst-italic text-secondary">(${escapeHtml(g.brandName)})</span>
+              </div>
+            </td>
+            <td>
+              <div class="text-body" style="max-width: 380px; line-height: 1.35;">${escapeHtml(d["Полное описание"] || m.mark)}</div>
+            </td>
+            <td class="text-center">${lenFormatted}</td>
+            <td class="text-center">${weightFormatted}</td>
+            <td>${couplingFormatted}</td>
+            <td class="text-end pe-3 text-nowrap">
+              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Редактировать параметры марки кабеля">
+                <i class='bx bx-edit-alt me-0_5'></i>Изменить
+              </button>
+              <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Удалить эту марку кабеля из справочника">
+                <i class='bx bx-trash'></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
 
     html += `
       <div class="card border shadow-sm mb-3">
         <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <div class="fw-bold d-flex align-items-center gap-2">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
             <i class="bx ${isOptGroup ? 'bx-broadcast text-info' : 'bx-cable text-primary'} fs-5"></i>
-            <span class="fs-6">${escapeHtml(g.name)}</span>
-            ${isOptGroup ? '<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle small">ВОЛС</span>' : ''}
+            <div class="d-flex align-items-center gap-2">
+              ${codeBadge}
+              <span class="fs-6 fw-bold text-dark">${escapeHtml(g.brandName)}</span>
+              ${catBadge}
+            </div>
           </div>
-          <span class="badge bg-secondary-subtle text-secondary-emphasis border">${g.marks.length} марок</span>
+          <div class="d-flex align-items-center gap-1 flex-wrap">
+            <span class="badge bg-secondary-subtle text-secondary-emphasis border me-1">${g.marks.length} марок</span>
+            <button type="button" class="btn btn-xs btn-outline-secondary py-1 px-2 btn-edit-cable-group d-inline-flex align-items-center gap-1" data-group-key="${escapeHtml(g.key)}" title="Изменить соответствие наименования марки «${escapeHtml(g.brandName)}» и условного обозначения">
+              <i class='bx bx-edit-alt'></i> Изменить группу
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-add-mark-to-group d-inline-flex align-items-center gap-1" data-group-key="${escapeHtml(g.key)}" data-group-name="${escapeHtml(g.brandName)}" title="Добавить типоразмер кабеля в эту группу">
+              <i class='bx bx-plus'></i> Добавить марку
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-1_5 btn-delete-cable-group" data-group-key="${escapeHtml(g.key)}" data-group-name="${escapeHtml(g.brandName)}" title="Удалить эту группу кабелей и условное обозначение">
+              <i class='bx bx-trash'></i>
+            </button>
+          </div>
         </div>
         <div class="card-body p-0 table-responsive">
           <table class="table table-sm table-hover align-middle mb-0 text-start">
             <thead class="table-light text-muted small border-bottom">
               <tr>
-                <th style="width: 28%;" class="ps-3">Марка / Обозначение</th>
-                <th style="width: 32%;">Полное наименование по ТУ/ГОСТ</th>
-                <th style="width: 14%;" class="text-center">Строит. длина, м</th>
-                <th style="width: 12%;" class="text-center">Вес, кг/м</th>
-                <th style="width: 14%;" class="pe-3">Тип муфты</th>
+                <th style="width: 25%;" class="ps-3">Марка / Обозначение</th>
+                <th style="width: 28%;">Полное наименование по ТУ/ГОСТ</th>
+                <th style="width: 12%;" class="text-center">Строит. длина, м</th>
+                <th style="width: 10%;" class="text-center">Вес, кг/м</th>
+                <th style="width: 11%;">Тип муфты</th>
+                <th style="width: 14%;" class="text-end pe-3">Действия</th>
               </tr>
             </thead>
             <tbody class="small">
@@ -912,7 +1177,15 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             <span class="fw-bold text-primary small d-flex align-items-center gap-1">
               <i class="bx bx-wrench"></i> Способ установки: «${escapeHtml(methodName)}»
             </span>
-            <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs">${worksList.length} поз.</span>
+            <div class="d-flex align-items-center gap-1">
+              <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs">${worksList.length} поз.</span>
+              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Редактировать сметные нормы для способа «${escapeHtml(methodName)}»">
+                <i class='bx bx-edit-alt me-0_5'></i>Изменить способ
+              </button>
+              <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Удалить этот способ установки">
+                <i class='bx bx-trash'></i>
+              </button>
+            </div>
           </div>
           ${worksItemsHtml || '<div class="text-muted small ps-2">Работы и материалы не определены</div>'}
         </div>
@@ -929,12 +1202,15 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             ${fullDesc ? `<span class="text-muted small fw-normal ms-1">(${escapeHtml(fullDesc)})</span>` : ''}
             ${unitTop ? `<span class="badge bg-body text-body border font-monospace ms-1" style="font-size: 0.72rem;">${escapeHtml(unitTop)}</span>` : ''}
           </div>
-          <div class="d-flex align-items-center gap-2">
+          <div class="d-flex align-items-center gap-1_5">
             <span class="badge bg-primary-subtle text-primary border">${methodEntries.length} способов установки</span>
             ${cardWorksCount > 0 ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border">${cardWorksCount} норм</span>` : ''}
             ${cardSubCount > 0 ? `<span class="badge bg-warning-subtle text-warning-emphasis border">${cardSubCount} мат./обор.</span>` : ''}
-            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 btn-jump-to-json" data-json-target="${escapeHtml(mark)}" title="Перейти к позиции в редакторе JSON">
-              <i class='bx bx-code-alt me-0_5'></i>JSON
+            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Редактировать позицию оборудования">
+              <i class='bx bx-edit-alt me-0_5'></i>Изменить
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Удалить всё оборудование «${escapeHtml(mark)}»">
+              <i class='bx bx-trash'></i>
             </button>
           </div>
         </div>
@@ -1112,7 +1388,15 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
         <td class="text-center">
           <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle font-monospace" style="font-size: 0.75rem;">до ${tier} ${unitLabel}</span>
         </td>
-        <td class="text-center font-monospace text-muted small pe-3">${escapeHtml(unit)}</td>
+        <td class="text-center font-monospace text-muted small">${escapeHtml(unit)}</td>
+        <td class="text-end pe-3 text-nowrap">
+          <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Редактировать муфту">
+            <i class='bx bx-edit-alt me-0_5'></i>Изменить
+          </button>
+          <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Удалить эту муфту из справочника">
+            <i class='bx bx-trash'></i>
+          </button>
+        </td>
       </tr>
     `;
   }).join('');
@@ -1125,11 +1409,12 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
           <thead class="table-light">
             <tr>
               <th style="width: 40px;" class="text-center ps-3">№</th>
-              <th style="width: 240px;">Обозначение / Марка</th>
+              <th style="width: 220px;">Обозначение / Марка</th>
               <th>Полное наименование</th>
-              <th style="width: 120px;" class="text-center">Макс. жил</th>
-              <th style="width: 140px;" class="text-center">Группа установки</th>
-              <th style="width: 70px;" class="text-center pe-3">Ед. изм.</th>
+              <th style="width: 110px;" class="text-center">Макс. жил</th>
+              <th style="width: 130px;" class="text-center">Группа установки</th>
+              <th style="width: 70px;" class="text-center">Ед. изм.</th>
+              <th style="width: 120px;" class="text-end pe-3">Действия</th>
             </tr>
           </thead>
           <tbody>
@@ -1224,108 +1509,6 @@ function initWorksJsonCodeMirror() {
   return worksJsonCodeMirror;
 }
 
-function highlightAndScrollToJsonNode(targetString, isKey = true) {
-  const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
-  if (jsonTabBtn && window.bootstrap && bootstrap.Tab) {
-    bootstrap.Tab.getOrCreateInstance(jsonTabBtn).show();
-  }
-
-  setTimeout(() => {
-    if (!worksJsonCodeMirror) {
-      const textarea = document.getElementById('worksJsonEditorTextarea');
-      if (textarea) {
-        const searchPattern = isKey ? `"${targetString}":` : `"${targetString}"`;
-        let idx = textarea.value.lastIndexOf(searchPattern);
-        if (idx === -1) idx = textarea.value.lastIndexOf(targetString);
-        if (idx !== -1) {
-          const startIdx = idx + (isKey ? 1 : (textarea.value.charAt(idx) === '"' ? 1 : 0));
-          textarea.focus();
-          textarea.setSelectionRange(startIdx, startIdx + targetString.length);
-        }
-      }
-      return;
-    }
-
-    worksJsonCodeMirror.refresh();
-
-    const doc = worksJsonCodeMirror.getDoc();
-    const fullText = doc.getValue();
-
-    let searchStr = isKey ? `"${targetString}":` : `"${targetString}"`;
-    let foundIndex = fullText.lastIndexOf(searchStr);
-    if (foundIndex === -1) {
-      searchStr = targetString;
-      foundIndex = fullText.lastIndexOf(searchStr);
-    }
-
-    if (foundIndex !== -1) {
-      const nameIndex = fullText.indexOf(targetString, foundIndex);
-      const actualPos = nameIndex !== -1 ? nameIndex : foundIndex;
-      const posFrom = doc.posFromIndex(actualPos);
-      const posTo = doc.posFromIndex(actualPos + targetString.length);
-
-      let startLine = posFrom.line;
-
-      if (!isKey && startLine > 0) {
-        const prevLine = doc.getLine(startLine - 1).trim();
-        if (prevLine === '{') {
-          startLine = startLine - 1;
-        }
-      }
-
-      if (typeof worksJsonCodeMirror.foldCode === 'function') {
-        for (let l = Math.max(0, startLine - 15); l <= Math.min(doc.lineCount() - 1, startLine + 50); l++) {
-          worksJsonCodeMirror.foldCode({ line: l, ch: 0 }, null, "unfold");
-        }
-      }
-
-      let endLine = startLine;
-      let openBraces = 0;
-      let startedCounting = false;
-      
-      for (let l = startLine; l < doc.lineCount(); l++) {
-        const lineText = doc.getLine(l);
-        for (let ch = 0; ch < lineText.length; ch++) {
-          const c = lineText[ch];
-          if (c === '{' || c === '[') {
-            openBraces++;
-            startedCounting = true;
-          } else if (c === '}' || c === ']') {
-            openBraces--;
-          }
-        }
-        if (startedCounting && openBraces <= 0) {
-          endLine = l;
-          break;
-        }
-      }
-
-      if (endLine < startLine) {
-        endLine = Math.min(doc.lineCount() - 1, startLine + (isKey ? 6 : 14));
-      }
-
-      const lineCoords = worksJsonCodeMirror.charCoords(posFrom, "local");
-      const editorHeight = worksJsonCodeMirror.getWrapperElement().clientHeight || 420;
-      const targetScrollTop = Math.max(0, lineCoords.top - Math.floor(editorHeight / 3));
-      worksJsonCodeMirror.scrollTo(null, targetScrollTop);
-
-      doc.setSelection(posFrom, posTo);
-      worksJsonCodeMirror.focus();
-
-      const highlightedLines = [];
-      for (let l = startLine; l <= endLine; l++) {
-        worksJsonCodeMirror.addLineClass(l, 'background', 'cm-new-node-glow');
-        highlightedLines.push(l);
-      }
-
-      setTimeout(() => {
-        highlightedLines.forEach(l => {
-          worksJsonCodeMirror.removeLineClass(l, 'background', 'cm-new-node-glow');
-        });
-      }, 3600);
-    }
-  }, 160);
-}
 
 function openWorksRulesModal(activeTab = 'editor') {
   const modalEl = document.getElementById('worksRulesModal');
@@ -1343,6 +1526,7 @@ function openWorksRulesModal(activeTab = 'editor') {
 
   try {
     renderRulesModalContent(modalDraftRules);
+    updateStorageStatusUi();
   } catch (err) {
     console.warn('Modal content render warning:', err);
   }
@@ -1495,166 +1679,938 @@ function setupWorksRulesListeners() {
   }
 
   // =========================================================================
-  // ADD RULE MODAL (СТРОИТЕЛЬНЫЕ И МОНТАЖНЫЕ РАБОТЫ)
+  // UNIFIED WORK ITEMS AND NESTED RESOURCES COMPONENT (WORKS & MATERIALS)
   // =========================================================================
 
-  function appendAddRuleWorkMaterialRow(tbody, name = '', unit = 'м', formula = 'ДЛИНА', show = false, section = '') {
+  let addRuleEditContext = null;      // { mode: 'create'|'edit', originalSection: '', originalRuleName: '', ruleObj: null }
+  let addCableEditContext = null;     // { mode: 'create'|'edit', originalGroup: '', originalMark: '', cableData: null }
+  let addCouplingEditContext = null;  // { mode: 'create'|'edit', originalMark: '', couplingData: null }
+  let addEquipEditContext = null;     // { mode: 'create'|'edit', originalMark: '', originalMethod: '', eqData: null }
+
+  function resetRuleModalToAddMode() {
+    addRuleEditContext = null;
+    const titleEl = document.getElementById('addRuleModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class='bx bx-plus-circle text-primary fs-5'></i> Добавление способа прокладки и сметных норм`;
+    }
+    const btnSave = document.getElementById('btnSaveNewRule');
+    if (btnSave) {
+      btnSave.innerHTML = `<i class='bx bx-check'></i> Добавить способ в правила`;
+    }
+    const btnDel = document.getElementById('btnDeleteCurrentRuleInModal');
+    if (btnDel) btnDel.classList.add('d-none');
+    const tplInput = document.getElementById('addRuleInstTemplate');
+    if (tplInput) tplInput.value = '';
+    const instTiers = document.getElementById('addRuleInstallationTiersContainer');
+    if (instTiers) {
+      applyInstallationPreset('standard', '');
+    }
+  }
+
+  function resetCableModalToAddMode() {
+    addCableEditContext = null;
+    const titleEl = document.getElementById('addCableModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class='bx bx-plus-circle text-primary fs-5'></i> Добавление марки кабеля в справочник`;
+    }
+    const btnSave = document.getElementById('btnSaveNewCable');
+    if (btnSave) {
+      btnSave.innerHTML = `<i class='bx bx-check'></i> Добавить марку`;
+    }
+    const btnDel = document.getElementById('btnDeleteCurrentCableInModal');
+    if (btnDel) btnDel.classList.add('d-none');
+    populateDynamicCableGroups();
+  }
+
+  function resetCouplingModalToAddMode() {
+    addCouplingEditContext = null;
+    const titleEl = document.getElementById('addCouplingModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class='bx bx-plus-circle text-primary fs-5'></i> Добавление соединительной муфты в справочник`;
+    }
+    const btnSave = document.getElementById('btnSaveNewCoupling');
+    if (btnSave) {
+      btnSave.innerHTML = `<i class='bx bx-check'></i> Добавить муфту`;
+    }
+    const btnDel = document.getElementById('btnDeleteCurrentCouplingInModal');
+    if (btnDel) btnDel.classList.add('d-none');
+  }
+
+  function resetEquipmentModalToAddMode() {
+    addEquipEditContext = null;
+    const titleEl = document.getElementById('addEquipmentModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class='bx bx-plus-circle text-primary fs-5'></i> Добавление оборудования и сметных норм`;
+    }
+    const btnSave = document.getElementById('btnSaveNewEquipment');
+    if (btnSave) {
+      btnSave.innerHTML = `<i class='bx bx-check'></i> Добавить оборудование`;
+    }
+    const btnDelMethod = document.getElementById('btnDeleteCurrentEquipMethodInModal');
+    if (btnDelMethod) btnDelMethod.classList.add('d-none');
+    const btnDelAll = document.getElementById('btnDeleteCurrentEquipAllInModal');
+    if (btnDelAll) btnDelAll.classList.add('d-none');
+  }
+
+  function appendUnifiedNestedItemRow(tbody, name = '', type = 'материал', unit = 'шт', formula = 'КОЛИЧЕСТВО', show = true, section = '') {
     if (!tbody) return;
     const tr = document.createElement('tr');
+    tr.className = 'unified-nested-item-row';
     tr.innerHTML = `
-      <td><input type="text" class="form-control form-control-sm rule-mat-title" placeholder="Наименование материала" value="${escapeHtml(name)}" required></td>
-      <td style="width: 14%;"><input type="text" class="form-control form-control-sm rule-mat-unit" value="${escapeHtml(unit)}" placeholder="м/шт" required></td>
-      <td style="width: 20%;"><input type="text" class="form-control form-control-sm font-monospace rule-mat-formula" value="${escapeHtml(formula)}" placeholder="ДЛИНА" required></td>
-      <td style="width: 18%;"><input type="text" class="form-control form-control-sm rule-mat-section" value="${escapeHtml(section)}" placeholder="По умолч."></td>
-      <td style="width: 7%;" class="text-center"><input class="form-check-input rule-mat-show" type="checkbox" ${show ? 'checked' : ''} title="Показывать формулу"></td>
-      <td style="width: 6%;" class="text-center"><button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-remove-mat-row" title="Удалить материал"><i class='bx bx-trash'></i></button></td>
+      <td>
+        <input type="text" class="form-control form-control-sm unified-nested-name" placeholder="Наименование позиции" value="${escapeHtml(name)}" required>
+      </td>
+      <td style="width: 16%;">
+        <select class="form-select form-select-sm unified-nested-type">
+          <option value="материал" ${type === 'материал' ? 'selected' : ''}>материал</option>
+          <option value="оборудование" ${type === 'оборудование' ? 'selected' : ''}>оборудование</option>
+        </select>
+      </td>
+      <td style="width: 10%;">
+        <input type="text" class="form-control form-control-sm unified-nested-unit" value="${escapeHtml(unit)}" placeholder="шт/м" required>
+      </td>
+      <td style="width: 16%;">
+        <input type="text" class="form-control form-control-sm font-monospace unified-nested-formula" value="${escapeHtml(formula)}" placeholder="Формула" required>
+      </td>
+      <td style="width: 15%;">
+        <input type="text" class="form-control form-control-sm unified-nested-section" value="${escapeHtml(section)}" placeholder="По умолч.">
+      </td>
+      <td style="width: 6%;" class="text-center">
+        <input class="form-check-input unified-nested-show" type="checkbox" ${show ? 'checked' : ''} title="Показывать формулу">
+      </td>
+      <td style="width: 5%;" class="text-center">
+        <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-remove-nested-row" title="Удалить позицию">
+          <i class='bx bx-trash'></i>
+        </button>
+      </td>
     `;
     tbody.appendChild(tr);
   }
 
-  function refreshAddRuleWorkCardBadges() {
-    const container = document.getElementById('addRuleWorksCardsContainer');
+  function refreshUnifiedWorkCardBadges(container) {
     if (!container) return;
-    const cards = container.querySelectorAll('.rule-work-card');
+    const cards = container.querySelectorAll('.unified-work-card');
     cards.forEach((card, idx) => {
-      const badge = card.querySelector('.rule-work-badge');
+      const badge = card.querySelector('.unified-work-badge');
       if (badge) badge.textContent = `Работа #${idx + 1}`;
     });
   }
 
-  function appendAddRuleWorkCard(title = '', unit = 'м', formula = 'ДЛИНА', showFormula = true, materials = [], condition = '', section = '') {
-    const container = document.getElementById('addRuleWorksCardsContainer');
+  function appendUnifiedWorkCard(container, workData = null, options = {}) {
     if (!container) return;
+    const work = workData || {};
     const workIndex = container.children.length + 1;
-    const cardId = `ruleWorkCard_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const cardId = `unifiedWorkCard_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    const title = work["Наименование"] || work.name || '';
+    const unit = work["Единицы измерения"] || work.unit || (options.defaultUnit || 'м');
+    const formula = work["Формула"] || work.formula || (options.defaultFormula || 'ДЛИНА');
+    const rawType = (work["Тип"] || work.type || (options.defaultType || 'работа')).toLowerCase();
+    const type = rawType === 'оборудование' ? 'оборудование' : (rawType === 'материал' ? 'материал' : 'работа');
+    const showFormula = work["ОтображатьФормулу"] !== undefined ? Boolean(work["ОтображатьФормулу"]) : (options.defaultShowFormula !== undefined ? options.defaultShowFormula : true);
+    const condition = work["Условие"] || work.condition || '';
+    const section = work["Раздел"] || work.section || (options.defaultSection || '');
+    const rounding = (work["Округление"] !== undefined && work["Округление"] !== null) ? work["Округление"] : '';
+
+    const nestedResources = getWorkItemNestedResources(work);
 
     const card = document.createElement('div');
-    card.className = 'card border shadow-xs rule-work-card mb-2';
+    card.className = 'card border shadow-xs unified-work-card mb-2';
     card.innerHTML = `
-      <div class="card-header bg-light py-2 px-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div class="card-header bg-light py-1_5 px-2_5 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-primary-subtle text-primary border font-monospace rule-work-badge">Работа #${workIndex}</span>
-          <span class="fw-semibold small text-dark">Параметры сметной нормы</span>
+          <span class="badge bg-primary-subtle text-primary border font-monospace unified-work-badge">Работа #${workIndex}</span>
         </div>
-        <button type="button" class="btn btn-xs btn-outline-danger py-0 px-2 btn-remove-work-card" title="Удалить работу и её материалы">
-          <i class='bx bx-trash me-1'></i>Удалить работу
-        </button>
+        <div class="d-flex align-items-center gap-3">
+          <div class="form-check form-check-inline small mb-0 me-0">
+            <input class="form-check-input unified-work-show" type="checkbox" id="chkShow_${cardId}" ${showFormula ? 'checked' : ''}>
+            <label class="form-check-label fs-xs user-select-none" for="chkShow_${cardId}">Показывать формулу</label>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-danger py-0 px-2 btn-remove-unified-work-card" title="Удалить работу и её позиции">
+            <i class='bx bx-trash me-1'></i>Удалить работу
+          </button>
+        </div>
       </div>
       <div class="card-body p-2_5">
         <div class="row g-2 mb-2">
-          <div class="col-md-6">
+          <div class="col-md-5">
             <label class="form-label fs-xs fw-semibold mb-0 text-muted">Наименование работы <span class="text-danger">*</span></label>
-            <input type="text" class="form-control form-control-sm rule-work-title" placeholder="Наименование сметной работы" value="${escapeHtml(title)}" required>
+            <input type="text" class="form-control form-control-sm unified-work-title" placeholder="Наименование сметной работы" value="${escapeHtml(title)}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Тип позиции</label>
+            <select class="form-select form-select-sm unified-work-type">
+              <option value="работа" ${type === 'работа' ? 'selected' : ''}>работа</option>
+              <option value="материал" ${type === 'материал' ? 'selected' : ''}>материал</option>
+              <option value="оборудование" ${type === 'оборудование' ? 'selected' : ''}>оборудование</option>
+            </select>
           </div>
           <div class="col-md-2">
             <label class="form-label fs-xs fw-semibold mb-0 text-muted">Ед. изм.</label>
-            <input type="text" class="form-control form-control-sm rule-work-unit" value="${escapeHtml(unit)}" required>
+            <input type="text" class="form-control form-control-sm unified-work-unit" value="${escapeHtml(unit)}" placeholder="м/шт" required>
           </div>
-          <div class="col-md-2">
-            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Формула (ДЛИНА)</label>
-            <input type="text" class="form-control form-control-sm font-monospace rule-work-formula" value="${escapeHtml(formula)}" placeholder="ДЛИНА" required>
-          </div>
-          <div class="col-md-2 d-flex align-items-end pb-1">
-            <div class="form-check small mb-0">
-              <input class="form-check-input rule-work-show" type="checkbox" id="chkWorkShow_${cardId}" ${showFormula ? 'checked' : ''}>
-              <label class="form-check-label fs-xs" for="chkWorkShow_${cardId}">Показ в ВОР</label>
-            </div>
+          <div class="col-md-3">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Формула (расчет)</label>
+            <input type="text" class="form-control form-control-sm font-monospace unified-work-formula" value="${escapeHtml(formula)}" placeholder="${escapeHtml(options.defaultFormula || 'ДЛИНА')}" required>
           </div>
         </div>
 
         <div class="row g-2 mb-2">
-          <div class="col-md-6">
-            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Условие применения (опционально)</label>
-            <input type="text" class="form-control form-control-sm font-monospace rule-work-condition" placeholder="Например: кабелей > 4" value="${escapeHtml(condition)}">
+          <div class="col-md-5">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Раздел сметы (опционально)</label>
+            <input type="text" class="form-control form-control-sm unified-work-section" placeholder="${escapeHtml(options.defaultSection || 'По умолчанию')}" value="${escapeHtml(section)}">
           </div>
-          <div class="col-md-6">
-            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Переопределение раздела ВОР (опционально)</label>
-            <input type="text" class="form-control form-control-sm rule-work-section" placeholder="Например: Монтажные работы" value="${escapeHtml(section)}">
+          <div class="col-md-4">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Условие применения</label>
+            <input type="text" class="form-control form-control-sm font-monospace unified-work-condition" placeholder="Введите условие" value="${escapeHtml(condition)}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Округление (зн.)</label>
+            <input type="number" min="0" max="6" class="form-control form-control-sm font-monospace unified-work-rounding" placeholder="По умолч." value="${escapeHtml(String(rounding))}">
           </div>
         </div>
 
         <div class="p-2 rounded border bg-body-tertiary">
           <div class="d-flex align-items-center justify-content-between mb-1_5">
             <span class="fs-xs fw-semibold text-secondary d-flex align-items-center gap-1">
-              <i class='bx bx-package text-success'></i> Материалы для данной работы (вложенные):
+              <i class='bx bx-package text-success'></i> Вложенные материалы и оборудование (ключ «Материалы»):
             </span>
-            <button type="button" class="btn btn-xs btn-outline-success py-0 px-1_5 btn-add-work-material">
-              <i class='bx bx-plus me-0_5'></i>Добавить материал
+            <button type="button" class="btn btn-xs btn-outline-success py-0 px-1_5 btn-add-nested-row">
+              <i class='bx bx-plus me-0_5'></i>Добавить позицию
             </button>
           </div>
           <div class="table-responsive bg-body rounded border">
             <table class="table table-sm table-hover align-middle mb-0">
-              <thead class="table-light">
-                <tr style="font-size: 0.72rem;">
-                  <th style="width: 35%;">Наименование материала</th>
-                  <th style="width: 14%;">Ед. изм.</th>
-                  <th style="width: 20%;">Формула</th>
-                  <th style="width: 18%;">Раздел</th>
-                  <th style="width: 7%;" class="text-center" title="Показывать формулу в ВОР">ВОР</th>
-                  <th style="width: 6%;" class="text-center"></th>
+              <thead class="table-light" style="font-size: 0.72rem;">
+                <tr>
+                  <th style="width: 32%;">Наименование</th>
+                  <th style="width: 16%;">Тип</th>
+                  <th style="width: 10%;">Ед. изм.</th>
+                  <th style="width: 16%;">Формула</th>
+                  <th style="width: 15%;">Раздел</th>
+                  <th style="width: 6%;" class="text-center" title="Показывать формулу">ВОР</th>
+                  <th style="width: 5%;" class="text-center"></th>
                 </tr>
               </thead>
-              <tbody class="rule-work-materials-tbody">
-              </tbody>
+              <tbody class="unified-nested-tbody"></tbody>
             </table>
           </div>
         </div>
       </div>
     `;
 
-    const matTbody = card.querySelector('.rule-work-materials-tbody');
-    if (Array.isArray(materials) && materials.length > 0) {
-      materials.forEach(m => {
-        appendAddRuleWorkMaterialRow(
-          matTbody,
-          m["Наименование"] || m.name || '',
-          m["Единицы измерения"] || m.unit || 'м',
-          m["Формула"] || m.formula || 'ДЛИНА',
-          shouldShowFormula(m),
-          m["Раздел"] || m.section || ''
-        );
+    const tbody = card.querySelector('.unified-nested-tbody');
+    if (nestedResources.length > 0) {
+      nestedResources.forEach(res => {
+        if (typeof res === 'string') {
+          appendUnifiedNestedItemRow(tbody, res, 'материал', 'шт', formula, false, section);
+        } else {
+          const resType = (res["Тип"] || res.type || 'материал').toLowerCase() === 'оборудование' ? 'оборудование' : 'материал';
+          appendUnifiedNestedItemRow(
+            tbody,
+            res["Наименование"] || res.name || '',
+            resType,
+            res["Единицы измерения"] || res.unit || (resType === 'оборудование' ? 'шт' : 'м'),
+            res["Формула"] || res.formula || formula,
+            res["ОтображатьФормулу"] !== undefined ? Boolean(res["ОтображатьФормулу"]) : false,
+            res["Раздел"] || res.section || ''
+          );
+        }
       });
     }
 
     container.appendChild(card);
-    refreshAddRuleWorkCardBadges();
+    refreshUnifiedWorkCardBadges(container);
+  }
+
+  function collectUnifiedWorksData(container) {
+    if (!container) return [];
+    const cards = container.querySelectorAll('.unified-work-card');
+    const works = [];
+    cards.forEach(card => {
+      const title = card.querySelector('.unified-work-title')?.value?.trim();
+      if (!title) return;
+      const type = card.querySelector('.unified-work-type')?.value?.trim() || 'работа';
+      const unit = card.querySelector('.unified-work-unit')?.value?.trim() || 'шт';
+      const formula = card.querySelector('.unified-work-formula')?.value?.trim() || 'КОЛИЧЕСТВО';
+      const section = card.querySelector('.unified-work-section')?.value?.trim() || '';
+      const show = Boolean(card.querySelector('.unified-work-show')?.checked);
+      const condition = card.querySelector('.unified-work-condition')?.value?.trim() || '';
+      const roundingVal = card.querySelector('.unified-work-rounding')?.value?.trim();
+      const rounding = roundingVal !== '' && !isNaN(Number(roundingVal)) ? Number(roundingVal) : null;
+
+      const nestedItems = [];
+      const nestedRows = card.querySelectorAll('.unified-nested-tbody tr');
+      nestedRows.forEach(nr => {
+        const nName = nr.querySelector('.unified-nested-name')?.value?.trim();
+        if (!nName) return;
+        const nType = nr.querySelector('.unified-nested-type')?.value?.trim() || 'материал';
+        const nUnit = nr.querySelector('.unified-nested-unit')?.value?.trim() || 'шт';
+        const nFormula = nr.querySelector('.unified-nested-formula')?.value?.trim() || formula;
+        const nSection = nr.querySelector('.unified-nested-section')?.value?.trim() || section;
+        const nShow = Boolean(nr.querySelector('.unified-nested-show')?.checked);
+
+        const nItem = {
+          "Наименование": nName,
+          "Тип": nType,
+          "Единицы измерения": nUnit,
+          "Формула": nFormula,
+          "ОтображатьФормулу": nShow
+        };
+        if (nSection) nItem["Раздел"] = nSection;
+        nestedItems.push(nItem);
+      });
+
+      const workObj = {
+        "Наименование": title,
+        "Единицы измерения": unit,
+        "Формула": formula,
+        "Тип": type,
+        "ОтображатьФормулу": show
+      };
+      if (section) workObj["Раздел"] = section;
+      if (condition) workObj["Условие"] = condition;
+      if (rounding !== null) workObj["Округление"] = rounding;
+      if (nestedItems.length > 0) {
+        workObj["Материалы"] = nestedItems;
+      }
+
+      works.push(workObj);
+    });
+    return works;
+  }
+
+  // -------------------------------------------------------------------------
+  // ADAPTIVE CABLE WEIGHT TIERS & INSTALLATION WORKS
+  // -------------------------------------------------------------------------
+
+  let tierDomCounter = 0;
+
+  function createInstallationTierCard(data = {}, options = {}) {
+    tierDomCounter++;
+    const tierId = `tier_${Date.now()}_${tierDomCounter}`;
+    const card = document.createElement('div');
+    card.className = 'card p-2_5 border bg-body-tertiary tier-card shadow-xs';
+    card.setAttribute('data-tier-id', tierId);
+
+    const wayName = options.ruleName || document.getElementById('addRuleWayName')?.value?.trim() || '';
+    const template = options.template || document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
+
+    // Determine initial type, key and threshold
+    let initialKey = String(data.key !== undefined ? data.key : (data.threshold !== undefined && data.threshold !== null ? data.threshold : '1')).trim();
+    let initialType = data.type;
+    let initialThreshold = data.threshold !== undefined ? data.threshold : null;
+
+    if (!initialType) {
+      const lowerKey = initialKey.toLowerCase();
+      if (lowerKey.includes('оптич') || lowerKey.includes('волс') || data.isOptical) {
+        initialType = 'optical';
+      } else if (lowerKey.includes('свыше') || lowerKey.includes('более') || lowerKey.includes('от') || lowerKey.includes('>') || data.isOver) {
+        initialType = 'over';
+      } else if (!isNaN(parseFloat(initialKey.replace(',', '.'))) || lowerKey.includes('до')) {
+        initialType = 'up_to';
+      } else {
+        initialType = 'custom';
+      }
+    }
+
+    if (initialThreshold === null) {
+      const cleanKey = initialKey.replace(',', '.');
+      const numK = parseFloat(cleanKey);
+      if (!isNaN(numK) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
+        initialThreshold = numK;
+      } else {
+        const m = cleanKey.match(/(?:до|макс(?:имум)?|свыше|более|от|>)[_\s]*[:;]?[_\s]*(\d+(?:[.,]\d+)?)/i);
+        if (m) initialThreshold = parseFloat(m[1].replace(',', '.'));
+      }
+      if (initialThreshold === null && data.maxWeight !== undefined) {
+        initialThreshold = data.maxWeight;
+      }
+    }
+
+    if (initialType === 'up_to' && initialThreshold === null) initialThreshold = 1;
+    if (initialType === 'over' && initialThreshold === null) initialThreshold = 3;
+    if (initialType === 'optical') {
+      initialKey = 'оптический';
+      initialThreshold = '';
+    }
+
+    const defaultTitle = initialType === 'optical'
+      ? (wayName ? `Прокладка оптического кабеля (${wayName})` : 'Прокладка оптического кабеля')
+      : (template && (template.includes('{масса}') || template.includes('{вес}'))
+          ? template.replace(/\{масса\}|\{вес\}/gi, String(initialThreshold || '')).trim()
+          : (initialType === 'over'
+              ? (wayName ? `Прокладка кабеля массой 1 м свыше ${initialThreshold || 3} кг (${wayName})` : `Прокладка кабеля массой 1 м свыше ${initialThreshold || 3} кг`)
+              : (wayName ? `Прокладка кабеля массой 1 м, кг, до: ${initialThreshold || 1} (${wayName})` : `Прокладка кабеля массой 1 м, кг, до: ${initialThreshold || 1}`)));
+
+    const titleVal = data.title !== undefined ? data.title : defaultTitle;
+    const unitVal = data.unit !== undefined ? data.unit : 'м';
+    const formulaVal = data.formula !== undefined ? data.formula : 'ДЛИНА';
+    const showFormula = data.showFormula !== undefined ? Boolean(data.showFormula) : true;
+
+    // Materials: if explicit array is passed, use it; otherwise default to {МАРКА_КАБЕЛЯ}
+    const initialMaterials = Array.isArray(data.materials)
+      ? data.materials
+      : (data.includeCableMaterial === false
+          ? (Array.isArray(data.extraMaterials) ? data.extraMaterials : [])
+          : [
+              {
+                "Наименование": "{МАРКА_КАБЕЛЯ}",
+                "Тип": "материал",
+                "Единицы измерения": "км",
+                "Формула": "ДЛИНА/1000",
+                "ОтображатьФормулу": true,
+                "Раздел": "Монтажные работы"
+              },
+              ...(Array.isArray(data.extraMaterials) ? data.extraMaterials : [])
+            ]);
+
+    card.innerHTML = `
+      <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2 pb-1_5 border-bottom">
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-secondary-subtle text-secondary-emphasis border tier-index-badge">Ступень</span>
+          <span class="badge bg-primary-subtle text-primary border tier-condition-badge">вес ≤ 1 кг/м</span>
+          <span class="fs-xs text-muted font-monospace tier-key-preview">ключ: "${escapeHtml(initialKey)}"</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="form-check form-check-inline small mb-0 me-1">
+            <input class="form-check-input tier-work-show-formula" type="checkbox" ${showFormula ? 'checked' : ''} id="sh_${tierId}">
+            <label class="form-check-label fs-xs user-select-none" for="sh_${tierId}">Показ формулы</label>
+          </div>
+          <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 btn-move-tier-up" title="Поднять выше"><i class='bx bx-chevron-up'></i></button>
+            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 btn-move-tier-down" title="Опустить ниже"><i class='bx bx-chevron-down'></i></button>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-remove-tier" title="Удалить эту категорию"><i class='bx bx-trash'></i></button>
+        </div>
+      </div>
+
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-md-4">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Тип категории</label>
+          <select class="form-select form-select-sm tier-type-select">
+            <option value="up_to" ${initialType === 'up_to' ? 'selected' : ''}>Масса 1 м до X кг (≤)</option>
+            <option value="over" ${initialType === 'over' ? 'selected' : ''}>Масса 1 м свыше X кг (>)</option>
+            <option value="optical" ${initialType === 'optical' ? 'selected' : ''}>Оптический кабель (ВОЛС)</option>
+            <option value="custom" ${initialType === 'custom' ? 'selected' : ''}>Пользовательский ключ</option>
+          </select>
+        </div>
+        <div class="col-md-3 tier-threshold-col" style="${initialType === 'optical' ? 'display: none;' : ''}">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Порог (кг/м)</label>
+          <input type="number" step="0.1" min="0" class="form-control form-control-sm tier-threshold-input font-monospace" placeholder="1" value="${initialThreshold !== null && initialThreshold !== undefined ? initialThreshold : ''}">
+        </div>
+        <div class="col-md-5 tier-key-col">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">JSON ключ</label>
+          <input type="text" class="form-control form-control-sm tier-key-input font-monospace" placeholder="1" value="${escapeHtml(initialKey)}" required>
+        </div>
+      </div>
+
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-md-6">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Наименование сметной работы <span class="text-danger">*</span></label>
+          <input type="text" class="form-control form-control-sm tier-work-title" placeholder="Наименование сметной работы" value="${escapeHtml(titleVal)}" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Ед. изм.</label>
+          <input type="text" class="form-control form-control-sm tier-work-unit" placeholder="м" value="${escapeHtml(unitVal)}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Формула работы</label>
+          <input type="text" class="form-control form-control-sm font-monospace tier-work-formula" placeholder="ДЛИНА" value="${escapeHtml(formulaVal)}" required>
+        </div>
+      </div>
+
+      <!-- Materials and associated resources section (open & editable) -->
+      <div class="p-2 rounded border bg-body mt-2">
+        <div class="d-flex align-items-center justify-content-between mb-1_5">
+          <div class="d-flex align-items-center gap-1_5">
+            <i class='bx bx-layer text-success fs-6'></i>
+            <span class="fs-xs fw-semibold text-dark">Материалы монтажной работы (ключ «Материалы»):</span>
+            <span class="badge bg-secondary-subtle text-secondary-emphasis border tier-materials-count" style="font-size: 0.68rem;">${initialMaterials.length}</span>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-success py-0 px-2 btn-add-tier-mat d-inline-flex align-items-center gap-1" title="Добавить дополнительный материал или сопутствующий ресурс">
+            <i class='bx bx-plus'></i> Добавить материал
+          </button>
+        </div>
+        <div class="table-responsive border rounded bg-body">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light" style="font-size: 0.72rem;">
+              <tr>
+                <th style="width: 32%;">Наименование ресурса</th>
+                <th style="width: 16%;">Тип</th>
+                <th style="width: 10%;">Ед. изм.</th>
+                <th style="width: 16%;">Формула</th>
+                <th style="width: 15%;">Раздел</th>
+                <th style="width: 6%;" class="text-center" title="Показывать формулу">ВОР</th>
+                <th style="width: 5%;" class="text-center"></th>
+              </tr>
+            </thead>
+            <tbody class="tier-materials-tbody unified-nested-tbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    // Populate materials directly into editable table rows
+    const matsTbody = card.querySelector('.tier-materials-tbody');
+    if (matsTbody && initialMaterials.length > 0) {
+      initialMaterials.forEach(m => {
+        if (!m) return;
+        if (typeof m === 'string') {
+          appendUnifiedNestedItemRow(matsTbody, m, 'материал', 'м', 'ДЛИНА', true, 'Монтажные работы');
+        } else {
+          const mType = (m["Тип"] || m.type || 'материал').toLowerCase() === 'оборудование' ? 'оборудование' : 'материал';
+          appendUnifiedNestedItemRow(
+            matsTbody,
+            m["Наименование"] || m.name || '',
+            mType,
+            m["Единицы измерения"] || m.unit || (mType === 'оборудование' ? 'шт' : 'км'),
+            m["Формула"] || m.formula || 'ДЛИНА/1000',
+            m["ОтображатьФормулу"] !== undefined ? Boolean(m["ОтображатьФормулу"]) : true,
+            m["Раздел"] || m.section || ''
+          );
+        }
+      });
+    }
+
+    // Attach handler for adding material row on this card
+    const addTierMatBtn = card.querySelector('.btn-add-tier-mat');
+    if (addTierMatBtn && matsTbody) {
+      addTierMatBtn.addEventListener('click', () => {
+        appendUnifiedNestedItemRow(matsTbody, '', 'материал', 'м', 'ДЛИНА', true, '');
+        const cnt = card.querySelector('.tier-materials-count');
+        if (cnt) cnt.textContent = matsTbody.children.length;
+      });
+    }
+
+    // Attach internal sync handlers
+    const typeSelect = card.querySelector('.tier-type-select');
+    const thresholdCol = card.querySelector('.tier-threshold-col');
+    const thresholdInput = card.querySelector('.tier-threshold-input');
+    const keyInput = card.querySelector('.tier-key-input');
+    const condBadge = card.querySelector('.tier-condition-badge');
+    const keyPreview = card.querySelector('.tier-key-preview');
+    const titleInput = card.querySelector('.tier-work-title');
+
+    const updateCardConditionAndKey = (isUserManualKey = false) => {
+      const type = typeSelect.value;
+      const tVal = thresholdInput.value.trim().replace(',', '.');
+      const numT = parseFloat(tVal);
+
+      if (type === 'optical') {
+        thresholdCol.style.display = 'none';
+        condBadge.className = 'badge bg-info-subtle text-info border tier-condition-badge';
+        condBadge.innerHTML = 'ВОЛС (оптика)';
+        if (!isUserManualKey) keyInput.value = 'оптический';
+      } else if (type === 'over') {
+        thresholdCol.style.display = '';
+        condBadge.className = 'badge bg-warning-subtle text-warning-emphasis border tier-condition-badge';
+        condBadge.innerHTML = !isNaN(numT) ? `вес &gt; ${numT} кг/м` : 'вес &gt; X кг/м';
+        if (!isUserManualKey) keyInput.value = !isNaN(numT) ? `свыше ${numT}` : 'свыше 3';
+      } else if (type === 'up_to') {
+        thresholdCol.style.display = '';
+        condBadge.className = 'badge bg-primary-subtle text-primary border tier-condition-badge';
+        condBadge.innerHTML = !isNaN(numT) ? `вес &le; ${numT} кг/м` : 'вес &le; X кг/м';
+        if (!isUserManualKey) keyInput.value = !isNaN(numT) ? String(numT) : '1';
+      } else {
+        thresholdCol.style.display = '';
+        condBadge.className = 'badge bg-secondary-subtle text-secondary-emphasis border tier-condition-badge';
+        condBadge.innerHTML = 'Кастомный ключ';
+      }
+
+      keyPreview.textContent = `ключ: "${keyInput.value.trim()}"`;
+    };
+
+    typeSelect.addEventListener('change', () => {
+      updateCardConditionAndKey(false);
+      const currTitle = titleInput.value.trim();
+      const currentWay = document.getElementById('addRuleWayName')?.value?.trim() || '';
+      const currentTpl = document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
+      const type = typeSelect.value;
+      const tVal = thresholdInput.value.trim().replace(',', '.');
+
+      if (!currTitle || currTitle.startsWith('Прокладка кабеля') || currTitle.startsWith('Прокладка оптического')) {
+        if (type === 'optical') {
+          titleInput.value = currentWay ? `Прокладка оптического кабеля (${currentWay})` : 'Прокладка оптического кабеля';
+        } else if (currentTpl && (currentTpl.includes('{масса}') || currentTpl.includes('{вес}'))) {
+          titleInput.value = currentTpl.replace(/\{масса\}|\{вес\}/gi, tVal || '1').trim();
+        } else if (type === 'over') {
+          titleInput.value = currentWay ? `Прокладка кабеля массой 1 м свыше ${tVal || 3} кг (${currentWay})` : `Прокладка кабеля массой 1 м свыше ${tVal || 3} кг`;
+        } else {
+          titleInput.value = currentWay ? `Прокладка кабеля массой 1 м, кг, до: ${tVal || 1} (${currentWay})` : `Прокладка кабеля массой 1 м, кг, до: ${tVal || 1}`;
+        }
+      }
+    });
+
+    thresholdInput.addEventListener('input', () => {
+      updateCardConditionAndKey(false);
+    });
+
+    keyInput.addEventListener('input', () => {
+      keyPreview.textContent = `ключ: "${keyInput.value.trim()}"`;
+    });
+
+    updateCardConditionAndKey(data.key !== undefined);
+    return card;
+  }
+
+  function refreshInstallationTiersBadges(container) {
+    if (!container) return;
+    const cards = Array.from(container.querySelectorAll('.tier-card'));
+    const total = cards.length;
+    const badge = document.getElementById('addRuleTiersCountBadge');
+    if (badge) {
+      badge.textContent = `${total} ${total === 1 ? 'категория' : (total >= 2 && total <= 4 ? 'категории' : 'категорий')}`;
+    }
+
+    cards.forEach((c, idx) => {
+      const idxBadge = c.querySelector('.tier-index-badge');
+      if (idxBadge) idxBadge.textContent = `Ступень ${idx + 1}`;
+      const btnUp = c.querySelector('.btn-move-tier-up');
+      const btnDown = c.querySelector('.btn-move-tier-down');
+      if (btnUp) btnUp.disabled = (idx === 0);
+      if (btnDown) btnDown.disabled = (idx === total - 1);
+    });
+  }
+
+  // Standard filling with exact 5 parameters: 1, 2, 3, свыше 3, ВОЛС
+  function applyDefaultStandardTiers(wayName = '') {
+    const container = document.getElementById('addRuleInstallationTiersContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    const template = document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
+    const effectiveWay = wayName || document.getElementById('addRuleWayName')?.value?.trim() || '';
+
+    const defaultCableMat = [
+      {
+        "Наименование": "{МАРКА_КАБЕЛЯ}",
+        "Тип": "материал",
+        "Единицы измерения": "км",
+        "Формула": "ДЛИНА/1000",
+        "ОтображатьФормулу": true,
+        "Раздел": "Монтажные работы"
+      }
+    ];
+
+    const createItem = (type, threshold, key, title) => {
+      const card = createInstallationTierCard({
+        type: type,
+        threshold: threshold,
+        key: key,
+        title: title,
+        unit: 'м',
+        formula: 'ДЛИНА',
+        showFormula: true,
+        materials: JSON.parse(JSON.stringify(defaultCableMat))
+      }, { ruleName: effectiveWay, template: template });
+      container.appendChild(card);
+    };
+
+    // 1. Ступень: до 1 кг
+    createItem('up_to', 1, '1', effectiveWay ? `Прокладка кабеля массой 1 м, кг, до: 1 (${effectiveWay})` : 'Прокладка кабеля массой 1 м, кг, до: 1');
+
+    // 2. Ступень: до 2 кг
+    createItem('up_to', 2, '2', effectiveWay ? `Прокладка кабеля массой 1 м, кг, до: 2 (${effectiveWay})` : 'Прокладка кабеля массой 1 м, кг, до: 2');
+
+    // 3. Ступень: до 3 кг
+    createItem('up_to', 3, '3', effectiveWay ? `Прокладка кабеля массой 1 м, кг, до: 3 (${effectiveWay})` : 'Прокладка кабеля массой 1 м, кг, до: 3');
+
+    // 4. Ступень: свыше 3 кг
+    createItem('over', 3, 'свыше 3', effectiveWay ? `Прокладка кабеля массой 1 м свыше 3 кг (${effectiveWay})` : 'Прокладка кабеля массой 1 м свыше 3 кг');
+
+    // 5. Ступень: ВОЛС
+    createItem('optical', null, 'оптический', effectiveWay ? `Прокладка оптического кабеля (${effectiveWay})` : 'Прокладка оптического кабеля');
+
+    refreshInstallationTiersBadges(container);
+  }
+
+  function applyInstallationPreset(presetType, wayName = '') {
+    applyDefaultStandardTiers(wayName);
+  }
+
+  function collectInstallationTiersData() {
+    const container = document.getElementById('addRuleInstallationTiersContainer');
+    if (!container) return null;
+    const cards = container.querySelectorAll('.tier-card');
+    if (cards.length === 0) {
+      showToast('Добавьте хотя бы одну весовую категорию прокладки кабеля', 'warning', 'Проверка данных');
+      return null;
+    }
+
+    const tiersDict = {};
+    const usedKeys = new Set();
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      const key = card.querySelector('.tier-key-input')?.value?.trim();
+      const title = card.querySelector('.tier-work-title')?.value?.trim();
+      const unit = card.querySelector('.tier-work-unit')?.value?.trim() || 'м';
+      const formula = card.querySelector('.tier-work-formula')?.value?.trim() || 'ДЛИНА';
+      const showFormula = Boolean(card.querySelector('.tier-work-show-formula')?.checked);
+      const type = card.querySelector('.tier-type-select')?.value || 'up_to';
+      const rawThreshold = card.querySelector('.tier-threshold-input')?.value?.trim();
+
+      if (!key) {
+        showToast(`Укажите JSON-ключ для ступени ${i + 1}`, 'warning', 'Проверка данных');
+        card.querySelector('.tier-key-input')?.focus();
+        return null;
+      }
+      if (usedKeys.has(key)) {
+        showToast(`Повторяющийся JSON-ключ «${key}». Ключи ступеней должны быть уникальными`, 'warning', 'Проверка данных');
+        card.querySelector('.tier-key-input')?.focus();
+        return null;
+      }
+      usedKeys.add(key);
+
+      if (!title) {
+        showToast(`Укажите наименование сметной работы для ступени «${key}»`, 'warning', 'Проверка данных');
+        card.querySelector('.tier-work-title')?.focus();
+        return null;
+      }
+
+      let parsedThreshold = null;
+      if (rawThreshold !== undefined && rawThreshold !== '') {
+        const num = parseFloat(rawThreshold.replace(',', '.'));
+        if (!isNaN(num)) parsedThreshold = num;
+      }
+
+      const workItem = {
+        "Наименование": title,
+        "Единицы измерения": unit,
+        "Формула": formula,
+        "Тип": "работа",
+        "ОтображатьФормулу": showFormula
+      };
+
+      if (type === 'optical') {
+        workItem["Категория"] = "Оптический кабель";
+      } else if (parsedThreshold !== null) {
+        workItem["МаксВес"] = parsedThreshold;
+      }
+
+      // Collect all materials directly from this tier's editable materials table
+      const materials = [];
+      const matRows = card.querySelectorAll('.tier-materials-tbody tr');
+      matRows.forEach(nr => {
+        const nName = nr.querySelector('.unified-nested-name')?.value?.trim();
+        if (!nName) return;
+        const nType = nr.querySelector('.unified-nested-type')?.value?.trim() || 'материал';
+        const nUnit = nr.querySelector('.unified-nested-unit')?.value?.trim() || 'км';
+        const nFormula = nr.querySelector('.unified-nested-formula')?.value?.trim() || 'ДЛИНА/1000';
+        const nSection = nr.querySelector('.unified-nested-section')?.value?.trim() || '';
+        const nShow = Boolean(nr.querySelector('.unified-nested-show')?.checked);
+
+        const matItem = {
+          "Наименование": nName,
+          "Тип": nType,
+          "Единицы измерения": nUnit,
+          "Формула": nFormula,
+          "ОтображатьФормулу": nShow
+        };
+        if (nSection) matItem["Раздел"] = nSection;
+        materials.push(matItem);
+      });
+
+      workItem["Материалы"] = materials;
+      tiersDict[key] = [workItem];
+    }
+
+    return tiersDict;
+  }
+
+  // -------------------------------------------------------------------------
+  // EDIT RULE MODAL (СПРАВОЧНИКИ И ПРАВИЛА ПРОКЛАДКИ)
+  // -------------------------------------------------------------------------
+
+  function openEditRuleModal(sectionName, ruleName) {
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const secDict = currentObj[sectionName];
+    if (!secDict || typeof secDict !== 'object') {
+      showToast(`Раздел «${sectionName}» не найден`, 'warning', 'Ошибка');
+      return;
+    }
+    const ruleObj = secDict[ruleName];
+    if (!ruleObj) {
+      showToast(`Правило «${ruleName}» не найдено в разделе «${sectionName}»`, 'warning', 'Ошибка');
+      return;
+    }
+
+    addRuleEditContext = {
+      mode: 'edit',
+      originalSection: sectionName,
+      originalRuleName: ruleName,
+      ruleObj: JSON.parse(JSON.stringify(ruleObj))
+    };
+
+    const titleEl = document.getElementById('addRuleModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class='bx bx-edit text-primary fs-5'></i> Редактирование способа: «${escapeHtml(ruleName)}»`;
+    }
+    const btnSave = document.getElementById('btnSaveNewRule');
+    if (btnSave) {
+      btnSave.innerHTML = `<i class='bx bx-check-double'></i> Сохранить изменения`;
+    }
+    const btnDel = document.getElementById('btnDeleteCurrentRuleInModal');
+    if (btnDel) {
+      btnDel.classList.remove('d-none');
+    }
+
+    const wayInput = document.getElementById('addRuleWayName');
+    if (wayInput) wayInput.value = ruleName;
+
+    const isInstallation = sectionName === 'Монтажные работы' || (ruleObj["Шаблон"] && ruleObj["Работы"] && typeof ruleObj["Работы"] === 'object' && !Array.isArray(ruleObj["Работы"]));
+    const radioInstallation = document.getElementById('addRuleSecInstallation');
+    const radioConstruction = document.getElementById('addRuleSecConstruction');
+
+    if (isInstallation && radioInstallation) {
+      radioInstallation.checked = true;
+    } else if (radioConstruction) {
+      radioConstruction.checked = true;
+    }
+    updateAddRuleSectionsVisibility();
+
+    if (isInstallation) {
+      const templateInput = document.getElementById('addRuleInstTemplate');
+      if (templateInput) templateInput.value = ruleObj["Шаблон"] || '';
+
+      const instContainer = document.getElementById('addRuleInstallationTiersContainer');
+      if (instContainer) {
+        instContainer.innerHTML = '';
+        const rawWorks = ruleObj["Работы"] || ruleObj["Работы и материалы"] || {};
+
+        if (rawWorks && typeof rawWorks === 'object' && !Array.isArray(rawWorks)) {
+          const keys = Object.keys(rawWorks);
+          if (keys.length > 0) {
+            keys.forEach(key => {
+              const val = rawWorks[key];
+              const items = Array.isArray(val) ? val : (val ? [val] : []);
+              const firstItem = items[0] || {};
+              const lowerKey = String(key).toLowerCase();
+
+              let type = 'up_to';
+              let threshold = null;
+
+              if (lowerKey.includes('оптич') || lowerKey.includes('волс') || (firstItem["Категория"] || '').toLowerCase().includes('оптич')) {
+                type = 'optical';
+              } else if (lowerKey.includes('свыше') || lowerKey.includes('более') || lowerKey.includes('от') || lowerKey.includes('>')) {
+                type = 'over';
+              } else if (!isNaN(parseFloat(String(key).replace(',', '.'))) || lowerKey.includes('до')) {
+                type = 'up_to';
+              } else {
+                type = 'custom';
+              }
+
+              const cleanKey = String(key).trim().replace(',', '.');
+              const numK = parseFloat(cleanKey);
+              if (!isNaN(numK) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
+                threshold = numK;
+              } else {
+                const m = cleanKey.match(/(?:до|макс(?:имум)?|свыше|более|от|>)[_\s]*[:;]?[_\s]*(\d+(?:[.,]\d+)?)/i);
+                if (m) threshold = parseFloat(m[1].replace(',', '.'));
+              }
+              if (threshold === null && firstItem["МаксВес"] !== undefined) {
+                threshold = parseFloat(String(firstItem["МаксВес"]).replace(',', '.'));
+              }
+
+              const allMats = Array.isArray(firstItem["Материалы"]) ? firstItem["Материалы"] : [];
+
+              const card = createInstallationTierCard({
+                key: key,
+                type: type,
+                threshold: threshold,
+                title: firstItem["Наименование"] || firstItem.name || '',
+                unit: firstItem["Единицы измерения"] || firstItem.unit || 'м',
+                formula: firstItem["Формула"] || firstItem.formula || 'ДЛИНА',
+                showFormula: firstItem["ОтображатьФормулу"] !== undefined ? Boolean(firstItem["ОтображатьФормулу"]) : true,
+                materials: allMats
+              }, { ruleName: ruleName, template: ruleObj["Шаблон"] || '' });
+
+              instContainer.appendChild(card);
+            });
+            refreshInstallationTiersBadges(instContainer);
+          } else {
+            applyInstallationPreset('standard', ruleName);
+          }
+        } else {
+          applyInstallationPreset('standard', ruleName);
+        }
+      }
+    } else {
+      const container = document.getElementById('addRuleWorksCardsContainer');
+      if (container) {
+        container.innerHTML = '';
+        const works = getRuleWorks(ruleObj);
+        if (Array.isArray(works) && works.length > 0) {
+          works.forEach(w => appendUnifiedWorkCard(container, w, { defaultSection: sectionName, defaultFormula: 'ДЛИНА', defaultUnit: 'м' }));
+        } else {
+          appendUnifiedWorkCard(container, null, { defaultSection: sectionName, defaultFormula: 'ДЛИНА', defaultUnit: 'м' });
+        }
+      }
+    }
+
+    const modalEl = document.getElementById('addRuleModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  // Legacy compatibility aliases
+  function appendAddRuleWorkMaterialRow(tbody, name = '', unit = 'м', formula = 'ДЛИНА', show = false, section = '') {
+    appendUnifiedNestedItemRow(tbody, name, 'материал', unit, formula, show, section);
+  }
+  function refreshAddRuleWorkCardBadges() {
+    refreshUnifiedWorkCardBadges(document.getElementById('addRuleWorksCardsContainer'));
+  }
+  function appendAddRuleWorkCard(title = '', unit = 'м', formula = 'ДЛИНА', showFormula = true, materials = [], condition = '', section = '') {
+    const workData = {
+      "Наименование": title,
+      "Единицы измерения": unit,
+      "Формула": formula,
+      "Тип": "работа",
+      "ОтображатьФормулу": showFormula,
+      "Условие": condition,
+      "Раздел": section,
+      "Материалы": materials
+    };
+    appendUnifiedWorkCard(document.getElementById('addRuleWorksCardsContainer'), workData, { defaultFormula: 'ДЛИНА', defaultUnit: 'м' });
   }
 
   const btnAddRuleWorkRow = document.getElementById('btnAddRuleWorkRow');
   if (btnAddRuleWorkRow) {
     btnAddRuleWorkRow.addEventListener('click', () => {
-      appendAddRuleWorkCard('', 'м', 'ДЛИНА', true, []);
+      appendUnifiedWorkCard(document.getElementById('addRuleWorksCardsContainer'), null, { defaultFormula: 'ДЛИНА', defaultUnit: 'м' });
     });
   }
 
   const addRuleWorksCardsContainer = document.getElementById('addRuleWorksCardsContainer');
   if (addRuleWorksCardsContainer) {
     addRuleWorksCardsContainer.addEventListener('click', (e) => {
-      const addMatBtn = e.target.closest('.btn-add-work-material');
-      if (addMatBtn) {
-        const card = addMatBtn.closest('.rule-work-card');
-        const matTbody = card ? card.querySelector('.rule-work-materials-tbody') : null;
-        if (matTbody) {
-          appendAddRuleWorkMaterialRow(matTbody, '', 'шт', 'ДЛИНА', false, '');
+      const addNestedBtn = e.target.closest('.btn-add-nested-row, .btn-add-work-material');
+      if (addNestedBtn) {
+        const card = addNestedBtn.closest('.unified-work-card, .rule-work-card');
+        const tbody = card ? (card.querySelector('.unified-nested-tbody') || card.querySelector('.rule-work-materials-tbody')) : null;
+        if (tbody) {
+          appendUnifiedNestedItemRow(tbody, '', 'материал', 'шт', 'ДЛИНА', false, '');
         }
         return;
       }
 
-      const removeMatBtn = e.target.closest('.btn-remove-mat-row');
-      if (removeMatBtn) {
-        const tr = removeMatBtn.closest('tr');
+      const removeRowBtn = e.target.closest('.btn-remove-nested-row, .btn-remove-mat-row');
+      if (removeRowBtn) {
+        const tr = removeRowBtn.closest('tr');
         if (tr) tr.remove();
         return;
       }
 
-      const removeWorkBtn = e.target.closest('.btn-remove-work-card');
-      if (removeWorkBtn) {
-        const card = removeWorkBtn.closest('.rule-work-card');
+      const removeCardBtn = e.target.closest('.btn-remove-unified-work-card, .btn-remove-work-card');
+      if (removeCardBtn) {
+        const card = removeCardBtn.closest('.unified-work-card, .rule-work-card');
         if (card) {
           card.remove();
-          refreshAddRuleWorkCardBadges();
+          refreshUnifiedWorkCardBadges(addRuleWorksCardsContainer);
           if (addRuleWorksCardsContainer.children.length === 0) {
-            appendAddRuleWorkCard('', 'м', 'ДЛИНА', true, []);
+            appendUnifiedWorkCard(addRuleWorksCardsContainer, null, { defaultFormula: 'ДЛИНА', defaultUnit: 'м' });
           }
         }
         return;
@@ -1671,6 +2627,10 @@ function setupWorksRulesListeners() {
     if (radioInstallation && radioInstallation.checked) {
       if (constrContainer) constrContainer.classList.add('d-none');
       if (instContainer) instContainer.classList.remove('d-none');
+      const instTiers = document.getElementById('addRuleInstallationTiersContainer');
+      if (instTiers && instTiers.children.length === 0) {
+        applyInstallationPreset('standard');
+      }
     } else {
       if (constrContainer) constrContainer.classList.remove('d-none');
       if (instContainer) instContainer.classList.add('d-none');
@@ -1680,19 +2640,195 @@ function setupWorksRulesListeners() {
   if (radioConstruction) radioConstruction.addEventListener('change', updateAddRuleSectionsVisibility);
   if (radioInstallation) radioInstallation.addEventListener('change', updateAddRuleSectionsVisibility);
 
+  // Dynamic installation tiers toolbar and container event listeners
+  const instTiersContainer = document.getElementById('addRuleInstallationTiersContainer');
+  if (instTiersContainer) {
+    instTiersContainer.addEventListener('click', (e) => {
+      // Reorder up
+      const moveUpBtn = e.target.closest('.btn-move-tier-up');
+      if (moveUpBtn) {
+        const card = moveUpBtn.closest('.tier-card');
+        if (card && card.previousElementSibling) {
+          card.parentNode.insertBefore(card, card.previousElementSibling);
+          refreshInstallationTiersBadges(instTiersContainer);
+        }
+        return;
+      }
+
+      // Reorder down
+      const moveDownBtn = e.target.closest('.btn-move-tier-down');
+      if (moveDownBtn) {
+        const card = moveDownBtn.closest('.tier-card');
+        if (card && card.nextElementSibling) {
+          card.parentNode.insertBefore(card.nextElementSibling, card);
+          refreshInstallationTiersBadges(instTiersContainer);
+        }
+        return;
+      }
+
+      // Remove tier
+      const removeBtn = e.target.closest('.btn-remove-tier');
+      if (removeBtn) {
+        const card = removeBtn.closest('.tier-card');
+        if (card) {
+          if (instTiersContainer.querySelectorAll('.tier-card').length <= 1) {
+            showToast('В способе прокладки должна оставаться хотя бы одна категория', 'warning', 'Предупреждение');
+            return;
+          }
+          card.remove();
+          refreshInstallationTiersBadges(instTiersContainer);
+        }
+        return;
+      }
+
+      // Remove material row in tier
+      const removeMatBtn = e.target.closest('.btn-remove-nested-row, .btn-remove-nested-item, .btn-remove-mat-row');
+      if (removeMatBtn) {
+        const tr = removeMatBtn.closest('tr');
+        const card = removeMatBtn.closest('.tier-card');
+        if (tr) tr.remove();
+        if (card) {
+          const tbody = card.querySelector('.tier-materials-tbody') || card.querySelector('.tier-extra-mats-tbody');
+          const countSpan = card.querySelector('.tier-materials-count') || card.querySelector('.tier-extra-mats-count');
+          if (tbody && countSpan) countSpan.textContent = tbody.children.length;
+        }
+        return;
+      }
+    });
+  }
+
+  // Add cable tier button
+  const btnAddCableTier = document.getElementById('btnAddRuleCableTierBtn');
+  if (btnAddCableTier && instTiersContainer) {
+    btnAddCableTier.addEventListener('click', () => {
+      const wayName = document.getElementById('addRuleWayName')?.value?.trim() || '';
+      const template = document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
+
+      const existingThresholds = Array.from(instTiersContainer.querySelectorAll('.tier-threshold-input'))
+        .map(inp => parseFloat(inp.value.replace(',', '.')))
+        .filter(n => !isNaN(n));
+
+      let nextThreshold = 1;
+      if (existingThresholds.length > 0) {
+        const maxVal = Math.max(...existingThresholds);
+        if (maxVal < 3) nextThreshold = maxVal + 1;
+        else if (maxVal === 3) nextThreshold = 6;
+        else nextThreshold = maxVal + 2;
+      }
+
+      const card = createInstallationTierCard({
+        type: 'up_to',
+        threshold: nextThreshold,
+        key: String(nextThreshold),
+        unit: 'м',
+        formula: 'ДЛИНА',
+        showFormula: true
+      }, { ruleName: wayName, template: template });
+
+      instTiersContainer.appendChild(card);
+      refreshInstallationTiersBadges(instTiersContainer);
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      card.querySelector('.tier-work-title')?.focus();
+    });
+  }
+
+  // Add optical tier button
+  const btnAddOpticalTier = document.getElementById('btnAddRuleOpticalTierBtn');
+  if (btnAddOpticalTier && instTiersContainer) {
+    btnAddOpticalTier.addEventListener('click', () => {
+      const wayName = document.getElementById('addRuleWayName')?.value?.trim() || '';
+      const hasOptical = Array.from(instTiersContainer.querySelectorAll('.tier-type-select'))
+        .some(sel => sel.value === 'optical');
+      if (hasOptical) {
+        showToast('Категория для оптического кабеля (ВОЛС) уже присутствует в списке', 'info', 'ВОЛС');
+        return;
+      }
+
+      const card = createInstallationTierCard({
+        type: 'optical',
+        key: 'оптический',
+        unit: 'м',
+        formula: 'ДЛИНА',
+        showFormula: true
+      }, { ruleName: wayName });
+
+      instTiersContainer.appendChild(card);
+      refreshInstallationTiersBadges(instTiersContainer);
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+
+  // Standard filling button with parameters: 1, 2, 3, свыше 3, ВОЛС
+  const btnApplyStdTiers = document.getElementById('btnApplyDefaultStandardTiers');
+  if (btnApplyStdTiers) {
+    btnApplyStdTiers.addEventListener('click', () => {
+      applyDefaultStandardTiers();
+      showToast('Заполнен стандартный набор категорий (1, 2, 3, свыше 3, ВОЛС)', 'success', 'Стандартное заполнение');
+    });
+  }
+
+  // Apply template button
+  const btnApplyTpl = document.getElementById('btnApplyRuleTemplateToTiers');
+  if (btnApplyTpl && instTiersContainer) {
+    btnApplyTpl.addEventListener('click', () => {
+      const tpl = document.getElementById('addRuleInstTemplate')?.value?.trim();
+      if (!tpl) {
+        showToast('Укажите шаблон с маркером {масса} в поле выше', 'warning', 'Шаблон');
+        document.getElementById('addRuleInstTemplate')?.focus();
+        return;
+      }
+
+      const cards = instTiersContainer.querySelectorAll('.tier-card');
+      let updatedCount = 0;
+      cards.forEach(card => {
+        const type = card.querySelector('.tier-type-select')?.value;
+        const thVal = card.querySelector('.tier-threshold-input')?.value?.trim() || '';
+        const titleInput = card.querySelector('.tier-work-title');
+        if (!titleInput) return;
+
+        if (type === 'up_to') {
+          titleInput.value = tpl.replace(/\{масса\}|\{вес\}/gi, thVal || '1').trim();
+          updatedCount++;
+        } else if (type === 'over') {
+          titleInput.value = tpl.replace(/\{масса\}|\{вес\}/gi, `свыше ${thVal || '3'}`).trim();
+          updatedCount++;
+        } else if (type === 'custom') {
+          titleInput.value = tpl.replace(/\{масса\}|\{вес\}/gi, thVal || '').trim();
+          updatedCount++;
+        }
+      });
+
+      showToast(`Шаблон применен к ${updatedCount} ступеням`, 'success', 'Шаблон применен');
+    });
+  }
+
   const quickAddRuleInTabBtn = document.getElementById('quickAddRuleInTabBtn');
   if (quickAddRuleInTabBtn) {
     quickAddRuleInTabBtn.addEventListener('click', () => {
+      resetRuleModalToAddMode();
       const form = document.getElementById('formAddRule');
       if (form) form.reset();
       if (radioConstruction) radioConstruction.checked = true;
       updateAddRuleSectionsVisibility();
       if (addRuleWorksCardsContainer) {
         addRuleWorksCardsContainer.innerHTML = '';
-        appendAddRuleWorkCard('Разработка грунта в траншее вручную', 'м3 грунта', '0.4 * ДЛИНА', true, [
-          { "Наименование": "Песок для постели", "Единицы измерения": "м3", "Формула": "0.1 * ДЛИНА", "ОтображатьФормулу": false }
-        ]);
-        appendAddRuleWorkCard('Засыпка траншей вручную', 'м3 грунта', '0.4 * ДЛИНА', true, []);
+        appendUnifiedWorkCard(addRuleWorksCardsContainer, {
+          "Наименование": "Разработка грунта в траншее вручную",
+          "Единицы измерения": "м3 грунта",
+          "Формула": "0.4 * ДЛИНА",
+          "Тип": "работа",
+          "ОтображатьФормулу": true,
+          "Материалы": [
+            { "Наименование": "Песок для постели", "Тип": "материал", "Единицы измерения": "м3", "Формула": "0.1 * ДЛИНА", "ОтображатьФормулу": false }
+          ]
+        });
+        appendUnifiedWorkCard(addRuleWorksCardsContainer, {
+          "Наименование": "Засыпка траншей вручную",
+          "Единицы измерения": "м3 грунта",
+          "Формула": "0.4 * ДЛИНА",
+          "Тип": "работа",
+          "ОтображатьФормулу": true
+        });
       }
       const modalEl = document.getElementById('addRuleModal');
       if (modalEl && window.bootstrap && bootstrap.Modal) {
@@ -1720,134 +2856,34 @@ function setupWorksRulesListeners() {
         currentObj[targetSectionKey] = {};
       }
 
+      // If in edit mode, remove old rule if renamed or section changed
+      if (addRuleEditContext && addRuleEditContext.mode === 'edit') {
+        const oldSec = addRuleEditContext.originalSection;
+        const oldName = addRuleEditContext.originalRuleName;
+        if (oldSec && oldName && (oldSec !== targetSectionKey || oldName !== wayName)) {
+          if (currentObj[oldSec] && currentObj[oldSec][oldName]) {
+            delete currentObj[oldSec][oldName];
+          }
+        }
+      }
+
       if (isInstallation) {
-        const createDefaultCableMaterial = () => ([
-          {
-            "Наименование": "{МАРКА_КАБЕЛЯ}",
-            "Единицы измерения": "км",
-            "Формула": "ДЛИНА/1000",
-            "Тип": "материал",
-            "ОтображатьФормулу": true
-          }
-        ]);
+        const templateInput = document.getElementById('addRuleInstTemplate');
+        const templateVal = templateInput ? templateInput.value.trim() : '';
 
-        const t1Title = document.getElementById('addRuleInst1Title')?.value?.trim() || `Прокладка кабеля массой 1 м до 1 кг (${wayName})`;
-        const t1Unit = document.getElementById('addRuleInst1Unit')?.value?.trim() || 'м';
-        const t1Formula = document.getElementById('addRuleInst1Formula')?.value?.trim() || 'ДЛИНА';
-        const t1Show = Boolean(document.getElementById('addRuleInst1Show')?.checked);
+        const tiersDict = collectInstallationTiersData();
+        if (!tiersDict) return; // Validation message already shown
 
-        const t2Title = document.getElementById('addRuleInst2Title')?.value?.trim() || `Прокладка кабеля массой 1 м до 2 кг (${wayName})`;
-        const t2Unit = document.getElementById('addRuleInst2Unit')?.value?.trim() || 'м';
-        const t2Formula = document.getElementById('addRuleInst2Formula')?.value?.trim() || 'ДЛИНА';
-        const t2Show = Boolean(document.getElementById('addRuleInst2Show')?.checked);
-
-        const t3Title = document.getElementById('addRuleInst3Title')?.value?.trim() || `Прокладка кабеля массой 1 м до 3 кг (${wayName})`;
-        const t3Unit = document.getElementById('addRuleInst3Unit')?.value?.trim() || 'м';
-        const t3Formula = document.getElementById('addRuleInst3Formula')?.value?.trim() || 'ДЛИНА';
-        const t3Show = Boolean(document.getElementById('addRuleInst3Show')?.checked);
-
-        const optTitle = document.getElementById('addRuleInstOptTitle')?.value?.trim() || `Прокладка оптического кабеля (${wayName})`;
-        const optUnit = document.getElementById('addRuleInstOptUnit')?.value?.trim() || 'м';
-        const optFormula = document.getElementById('addRuleInstOptFormula')?.value?.trim() || 'ДЛИНА';
-        const optShow = Boolean(document.getElementById('addRuleInstOptShow')?.checked);
-
-        currentObj[targetSectionKey][wayName] = {
-          "Шаблон": `Прокладка кабеля массой 1 м, кг, до: {масса} (${wayName})`,
-          "Работы": {
-            "1": [
-              {
-                "Наименование": t1Title,
-                "МаксВес": 1,
-                "Единицы измерения": t1Unit,
-                "Формула": t1Formula,
-                "Тип": "работа",
-                "ОтображатьФормулу": t1Show,
-                "Материалы": createDefaultCableMaterial()
-              }
-            ],
-            "2": [
-              {
-                "Наименование": t2Title,
-                "МаксВес": 2,
-                "Единицы измерения": t2Unit,
-                "Формула": t2Formula,
-                "Тип": "работа",
-                "ОтображатьФормулу": t2Show,
-                "Материалы": createDefaultCableMaterial()
-              }
-            ],
-            "3": [
-              {
-                "Наименование": t3Title,
-                "МаксВес": 3,
-                "Единицы измерения": t3Unit,
-                "Формула": t3Formula,
-                "Тип": "работа",
-                "ОтображатьФормулу": t3Show,
-                "Материалы": createDefaultCableMaterial()
-              }
-            ],
-            "оптический": [
-              {
-                "Наименование": optTitle,
-                "Категория": "Оптический кабель",
-                "Единицы измерения": optUnit,
-                "Формула": optFormula,
-                "Тип": "работа",
-                "ОтображатьФормулу": optShow,
-                "Материалы": createDefaultCableMaterial()
-              }
-            ]
-          }
+        const rulePayload = {
+          "Работы": tiersDict
         };
+        if (templateVal) {
+          rulePayload["Шаблон"] = templateVal;
+        }
+
+        currentObj[targetSectionKey][wayName] = rulePayload;
       } else {
-        const cards = document.querySelectorAll('#addRuleWorksCardsContainer .rule-work-card');
-        const works = [];
-        cards.forEach(card => {
-          const title = card.querySelector('.rule-work-title')?.value?.trim();
-          const unit = card.querySelector('.rule-work-unit')?.value?.trim() || 'м';
-          const formula = card.querySelector('.rule-work-formula')?.value?.trim() || 'ДЛИНА';
-          const show = Boolean(card.querySelector('.rule-work-show')?.checked);
-          const condition = card.querySelector('.rule-work-condition')?.value?.trim();
-          const sectionOverride = card.querySelector('.rule-work-section')?.value?.trim();
-          
-          if (title) {
-            const matRows = card.querySelectorAll('.rule-work-materials-tbody tr');
-            const materials = [];
-            matRows.forEach(mr => {
-              const mTitle = mr.querySelector('.rule-mat-title')?.value?.trim();
-              const mUnit = mr.querySelector('.rule-mat-unit')?.value?.trim() || 'шт';
-              const mFormula = mr.querySelector('.rule-mat-formula')?.value?.trim() || 'ДЛИНА';
-              const mSection = mr.querySelector('.rule-mat-section')?.value?.trim();
-              const mShow = Boolean(mr.querySelector('.rule-mat-show')?.checked);
-              if (mTitle) {
-                const matItem = {
-                  "Наименование": mTitle,
-                  "Единицы измерения": mUnit,
-                  "Формула": mFormula,
-                  "Тип": "материал",
-                  "ОтображатьФормулу": mShow
-                };
-                if (mSection) matItem["Раздел"] = mSection;
-                materials.push(matItem);
-              }
-            });
-
-            const workObj = {
-              "Наименование": title,
-              "Единицы измерения": unit,
-              "Формула": formula,
-              "Тип": "работа",
-              "ОтображатьФормулу": show
-            };
-            if (condition) workObj["Условие"] = condition;
-            if (sectionOverride) workObj["Раздел"] = sectionOverride;
-            workObj["Материалы"] = materials;
-
-            works.push(workObj);
-          }
-        });
-
+        const works = collectUnifiedWorksData(document.getElementById('addRuleWorksCardsContainer'));
         if (works.length === 0) {
           showToast('Добавьте хотя бы одну работу в состав способа', 'warning', 'Проверка данных');
           return;
@@ -1868,7 +2904,15 @@ function setupWorksRulesListeners() {
         bootstrap.Modal.getInstance(modalEl)?.hide();
       }
 
-      showToast(`Способ «${wayName}» успешно добавлен в раздел «${targetSectionKey}». Нажмите «Применить и пересчитать работы» для применения.`, 'success', 'Правило добавлено', 6000);
+      const isEdit = addRuleEditContext && addRuleEditContext.mode === 'edit';
+      resetRuleModalToAddMode();
+
+      showToast(
+        isEdit ? `Способ «${wayName}» успешно обновлен в разделе «${targetSectionKey}».` : `Способ «${wayName}» успешно добавлен в раздел «${targetSectionKey}».`,
+        'success',
+        isEdit ? 'Правило обновлено' : 'Правило добавлено',
+        5000
+      );
     });
   }
 
@@ -1889,43 +2933,142 @@ function setupWorksRulesListeners() {
   }
 
   // =========================================================================
-  // ADD CABLE MODAL
+  // ADD / EDIT CABLE MODAL
   // =========================================================================
+
+  function openEditCableModal(groupName, markKey) {
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const catalog = currentObj["Справочник кабелей"] || {};
+    let targetGroup = groupName;
+    let targetData = catalog[groupName]?.["Тип"]?.[markKey];
+
+    if (!targetData) {
+      for (const [gKey, gVal] of Object.entries(catalog)) {
+        if (gVal?.["Тип"]?.[markKey]) {
+          targetGroup = gKey;
+          targetData = gVal["Тип"][markKey];
+          break;
+        }
+      }
+    }
+
+    if (!targetData) {
+      showToast(`Марка кабеля «${markKey}» не найдена в справочнике`, 'warning', 'Ошибка');
+      return;
+    }
+
+    addCableEditContext = {
+      mode: 'edit',
+      originalGroup: targetGroup,
+      originalMark: markKey,
+      cableData: JSON.parse(JSON.stringify(targetData))
+    };
+
+    const titleEl = document.getElementById('addCableModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class='bx bx-edit text-primary fs-5'></i> Редактирование марки кабеля: «${escapeHtml(markKey)}»`;
+    }
+    const btnSave = document.getElementById('btnSaveNewCable');
+    if (btnSave) {
+      btnSave.innerHTML = `<i class='bx bx-check-double'></i> Сохранить изменения`;
+    }
+    const btnDel = document.getElementById('btnDeleteCurrentCableInModal');
+    if (btnDel) {
+      btnDel.classList.remove('d-none');
+    }
+
+    // Populate dynamic groups and datalists from active rules
+    populateDynamicCableGroups(currentObj);
+
+    const cpList = document.getElementById('datalistCouplingsList');
+    if (cpList) {
+      const cpCatalog = currentObj["Справочник муфт"] || (cachedDefaultRules && cachedDefaultRules["Справочник муфт"]) || {};
+      cpList.innerHTML = Object.keys(cpCatalog).map(k => `<option value="${escapeHtml(k)}">${escapeHtml(cpCatalog[k]["Полное наименование"] || '')}</option>`).join('');
+    }
+
+    const groupKeyInput = document.getElementById('addCableGroupKey');
+    const groupNameInput = document.getElementById('addCableGroupName');
+    const markInput = document.getElementById('addCableMark');
+    const weightInput = document.getElementById('addCableWeight');
+    const lenInput = document.getElementById('addCableBuildingLength');
+    const couplingInput = document.getElementById('addCableCoupling');
+    const descInput = document.getElementById('addCableDescription');
+
+    if (groupKeyInput) groupKeyInput.value = targetGroup;
+    if (groupNameInput) groupNameInput.value = catalog[targetGroup]?.["Название"] || targetGroup;
+    if (markInput) markInput.value = markKey;
+    if (weightInput) weightInput.value = targetData["Вес"] !== undefined ? targetData["Вес"] : '';
+    if (lenInput) lenInput.value = targetData["Строительная длина"] !== undefined ? targetData["Строительная длина"] : 1000;
+    if (couplingInput) couplingInput.value = targetData["Муфта"] || '';
+    if (descInput) descInput.value = targetData["Полное описание"] || '';
+
+    const modalEl = document.getElementById('addCableModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  // Delegated click handler for dynamic dropdown menu items
+  const cableDropdownList = document.getElementById('dropdownCableGroupList');
+  if (cableDropdownList && !cableDropdownList.dataset.bound) {
+    cableDropdownList.dataset.bound = 'true';
+    cableDropdownList.addEventListener('click', (e) => {
+      const link = e.target.closest('a[data-group]');
+      if (link) {
+        e.preventDefault();
+        const grp = link.getAttribute('data-group') ?? '';
+        const nm = link.getAttribute('data-name') ?? '';
+        const groupKeyInput = document.getElementById('addCableGroupKey');
+        const groupNameInput = document.getElementById('addCableGroupName');
+        if (groupKeyInput) {
+          groupKeyInput.value = grp;
+          groupKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (groupNameInput) groupNameInput.value = nm;
+      }
+    });
+  }
+
+  // Auto-sync group name when typing or selecting from datalist in group key input
+  const cableGroupKeyInputEl = document.getElementById('addCableGroupKey');
+  if (cableGroupKeyInputEl && !cableGroupKeyInputEl.dataset.syncBound) {
+    cableGroupKeyInputEl.dataset.syncBound = 'true';
+    const syncGroupNameFromKey = () => {
+      const currentVal = cableGroupKeyInputEl.value.trim();
+      const draft = getDraftRulesFromEditor();
+      const cableCatalog = getCableCatalog(draft) || {};
+      if (cableCatalog[currentVal] && (cableCatalog[currentVal]["Название"] || cableCatalog[currentVal]["Наименование"])) {
+        const groupNameInput = document.getElementById('addCableGroupName');
+        if (groupNameInput) {
+          groupNameInput.value = cableCatalog[currentVal]["Название"] || cableCatalog[currentVal]["Наименование"] || '';
+        }
+      }
+    };
+    cableGroupKeyInputEl.addEventListener('input', syncGroupNameFromKey);
+    cableGroupKeyInputEl.addEventListener('change', syncGroupNameFromKey);
+  }
+
+  // Ensure dynamic groups refresh whenever addCableModal opens
+  const addCableModalEl = document.getElementById('addCableModal');
+  if (addCableModalEl && !addCableModalEl.dataset.dynamicBound) {
+    addCableModalEl.dataset.dynamicBound = 'true';
+    addCableModalEl.addEventListener('show.bs.modal', () => {
+      populateDynamicCableGroups();
+    });
+  }
 
   const quickAddCableInTabBtn = document.getElementById('quickAddCableInTabBtn');
   if (quickAddCableInTabBtn) {
-    const dropdownList = document.getElementById('dropdownCableGroupList');
-    if (dropdownList && !dropdownList.dataset.bound) {
-      dropdownList.dataset.bound = 'true';
-      dropdownList.addEventListener('click', (e) => {
-        const link = e.target.closest('a[data-group]');
-        if (link) {
-          e.preventDefault();
-          const grp = link.getAttribute('data-group') ?? '';
-          const nm = link.getAttribute('data-name') ?? '';
-          const groupKeyInput = document.getElementById('addCableGroupKey');
-          const groupNameInput = document.getElementById('addCableGroupName');
-          if (groupKeyInput) groupKeyInput.value = grp;
-          if (groupNameInput) groupNameInput.value = nm;
-        }
-      });
-    }
-
     quickAddCableInTabBtn.addEventListener('click', () => {
+      resetCableModalToAddMode();
       const form = document.getElementById('formAddCable');
       if (form) form.reset();
 
       const draft = getDraftRulesFromEditor();
-      const cableCatalog = (draft && draft["Справочник кабелей"]) || (cachedDefaultRules && cachedDefaultRules["Справочник кабелей"]) || {};
+      const cableCatalog = getCableCatalog(draft) || {};
 
-      const groupDatalist = document.getElementById('datalistCableGroups');
-      if (groupDatalist) {
-        groupDatalist.innerHTML = Object.entries(cableCatalog).map(([k, v]) => {
-          const gName = (v && v["Название"]) || (k === '' ? 'Основная группа' : k);
-          const label = k === '' ? '"" (Основная группа СБВБПу)' : `${k} (${gName})`;
-          return `<option value="${escapeHtml(k)}">${escapeHtml(label)}</option>`;
-        }).join('');
-      }
+      // Populate dynamic groups and datalists from active rules
+      populateDynamicCableGroups(draft);
 
       const cpList = document.getElementById('datalistCouplingsList');
       if (cpList) {
@@ -1941,19 +3084,48 @@ function setupWorksRulesListeners() {
       const lenInput = document.getElementById('addCableBuildingLength');
       const coupInput = document.getElementById('addCableCoupling');
 
+      const catEntries = Object.entries(cableCatalog);
+      let targetGrpKey = '';
+      let targetGrpName = '';
+      let defaultWeight = '0.35';
+      let defaultLen = '1000';
+      let defaultCoup = '';
+
       if (catVal === 'optical') {
-        if (groupKeyInput) groupKeyInput.value = 'Оптический кабель';
-        if (groupNameInput) groupNameInput.value = 'Оптический кабель';
-        if (weightInput) weightInput.value = '0.28';
-        if (lenInput) lenInput.value = '2000';
-        if (coupInput) coupInput.value = 'МТОК-А1/216-1Т3-44';
-      } else {
-        if (groupKeyInput) groupKeyInput.value = '*';
-        if (groupNameInput) groupNameInput.value = 'СБВБэпПуц';
-        if (weightInput) weightInput.value = '0.35';
-        if (lenInput) lenInput.value = '1000';
-        if (coupInput) coupInput.value = 'МСХз40-9-24х0,9';
+        const optEntry = catEntries.find(([k, v]) => v?.["Категория"] === 'Оптический кабель' || k.toLowerCase().includes('оптич') || (v?.["Название"] || '').toLowerCase().includes('оптич'));
+        if (optEntry) {
+          targetGrpKey = optEntry[0];
+          targetGrpName = optEntry[1]?.["Название"] || optEntry[0];
+          const firstMarkData = optEntry[1]?.["Тип"] ? Object.values(optEntry[1]["Тип"])[0] : null;
+          if (firstMarkData) {
+            if (firstMarkData["Вес"]) defaultWeight = String(firstMarkData["Вес"]);
+            if (firstMarkData["Строительная длина"]) defaultLen = String(firstMarkData["Строительная длина"]);
+            if (firstMarkData["Муфта"]) defaultCoup = firstMarkData["Муфта"];
+          }
+        } else {
+          targetGrpKey = 'Оптический кабель';
+          targetGrpName = 'Оптический кабель';
+          defaultWeight = '0.28';
+          defaultLen = '2000';
+        }
+      } else if (catEntries.length > 0) {
+        // Pick first non-optical group if available, else first group
+        const normalEntry = catEntries.find(([k, v]) => v?.["Категория"] !== 'Оптический кабель' && !k.toLowerCase().includes('оптич')) || catEntries[0];
+        targetGrpKey = normalEntry[0];
+        targetGrpName = normalEntry[1]?.["Название"] || normalEntry[0];
+        const firstMarkData = normalEntry[1]?.["Тип"] ? Object.values(normalEntry[1]["Тип"])[0] : null;
+        if (firstMarkData) {
+          if (firstMarkData["Вес"]) defaultWeight = String(firstMarkData["Вес"]);
+          if (firstMarkData["Строительная длина"]) defaultLen = String(firstMarkData["Строительная длина"]);
+          if (firstMarkData["Муфта"]) defaultCoup = firstMarkData["Муфта"];
+        }
       }
+
+      if (groupKeyInput) groupKeyInput.value = targetGrpKey;
+      if (groupNameInput) groupNameInput.value = targetGrpName;
+      if (weightInput) weightInput.value = defaultWeight;
+      if (lenInput) lenInput.value = defaultLen;
+      if (coupInput) coupInput.value = defaultCoup;
 
       const modalEl = document.getElementById('addCableModal');
       if (modalEl && window.bootstrap && bootstrap.Modal) {
@@ -1991,12 +3163,27 @@ function setupWorksRulesListeners() {
         currentObj["Справочник кабелей"] = JSON.parse(JSON.stringify(existingCat));
       }
 
+      // If in edit mode, remove old cable mark if group or mark changed
+      if (addCableEditContext && addCableEditContext.mode === 'edit') {
+        const oldGrp = addCableEditContext.originalGroup;
+        const oldMrk = addCableEditContext.originalMark;
+        if (oldGrp !== undefined && oldMrk && (oldGrp !== groupKey || oldMrk !== mark)) {
+          if (currentObj["Справочник кабелей"][oldGrp]?.["Тип"]?.[oldMrk]) {
+            delete currentObj["Справочник кабелей"][oldGrp]["Тип"][oldMrk];
+          }
+        }
+      }
+
       if (!currentObj["Справочник кабелей"][groupKey] || typeof currentObj["Справочник кабелей"][groupKey] !== 'object') {
         currentObj["Справочник кабелей"][groupKey] = {
           "Название": groupName,
           ...(isOptical ? { "Категория": "Оптический кабель" } : {}),
           "Тип": {}
         };
+      } else {
+        if (groupName) {
+          currentObj["Справочник кабелей"][groupKey]["Название"] = groupName;
+        }
       }
 
       if (!currentObj["Справочник кабелей"][groupKey]["Тип"] || typeof currentObj["Справочник кабелей"][groupKey]["Тип"] !== 'object') {
@@ -2014,15 +3201,26 @@ function setupWorksRulesListeners() {
       modalDraftRules = currentObj;
       setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
       validateWorksJsonInput();
+      saveWorksRulesToLocalStorage(modalDraftRules);
+      populateDynamicCableGroups(modalDraftRules);
       renderCableCatalogModalContent(modalDraftRules);
+      renderCableGroupsOverviewModalContent(modalDraftRules);
 
       const modalEl = document.getElementById('addCableModal');
       if (modalEl && window.bootstrap && bootstrap.Modal) {
         bootstrap.Modal.getInstance(modalEl)?.hide();
       }
 
+      const isEdit = addCableEditContext && addCableEditContext.mode === 'edit';
+      resetCableModalToAddMode();
+
       const displayGroup = groupKey === '' ? 'Основная группа ("")' : `группа "${groupKey}"`;
-      showToast(`Марка кабеля «${mark}» успешно добавлена в ${displayGroup}. Нажмите «Применить и пересчитать работы» для применения.`, 'success', 'Марка добавлена', 6000);
+      showToast(
+        isEdit ? `Марка кабеля «${mark}» успешно изменена.` : `Марка кабеля «${mark}» успешно добавлена в ${displayGroup}.`,
+        'success',
+        isEdit ? 'Марка изменена' : 'Марка добавлена',
+        5000
+      );
     });
   }
 
@@ -2048,12 +3246,60 @@ function setupWorksRulesListeners() {
   }
 
   // =========================================================================
-  // ADD COUPLING MODAL
+  // ADD / EDIT COUPLING MODAL
   // =========================================================================
+
+  function openEditCouplingModal(couplingKey) {
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const catalog = currentObj["Справочник муфт"] || {};
+    const data = catalog[couplingKey];
+
+    if (!data) {
+      showToast(`Муфта «${couplingKey}» не найдена в справочнике`, 'warning', 'Ошибка');
+      return;
+    }
+
+    addCouplingEditContext = {
+      mode: 'edit',
+      originalMark: couplingKey,
+      couplingData: JSON.parse(JSON.stringify(data))
+    };
+
+    const titleEl = document.getElementById('addCouplingModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class='bx bx-edit text-primary fs-5'></i> Редактирование соединительной муфты: «${escapeHtml(couplingKey)}»`;
+    }
+    const btnSave = document.getElementById('btnSaveNewCoupling');
+    if (btnSave) {
+      btnSave.innerHTML = `<i class='bx bx-check-double'></i> Сохранить изменения`;
+    }
+    const btnDel = document.getElementById('btnDeleteCurrentCouplingInModal');
+    if (btnDel) {
+      btnDel.classList.remove('d-none');
+    }
+
+    const markInput = document.getElementById('addCouplingMark');
+    const fullNameInput = document.getElementById('addCouplingFullName');
+    const maxCoresInput = document.getElementById('addCouplingMaxCores');
+    const unitInput = document.getElementById('addCouplingUnit');
+    const optCheck = document.getElementById('addCouplingIsOptical');
+
+    if (markInput) markInput.value = couplingKey;
+    if (fullNameInput) fullNameInput.value = data["Полное наименование"] || couplingKey;
+    if (maxCoresInput) maxCoresInput.value = data["МаксЖил"] !== undefined ? data["МаксЖил"] : 24;
+    if (unitInput) unitInput.value = data["Единицы измерения"] || 'шт';
+    if (optCheck) optCheck.checked = String(data["Категория"] || '').trim().toLowerCase() === 'оптическая муфта';
+
+    const modalEl = document.getElementById('addCouplingModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
 
   const quickAddCouplingInTabBtn = document.getElementById('quickAddCouplingInTabBtn');
   if (quickAddCouplingInTabBtn) {
     quickAddCouplingInTabBtn.addEventListener('click', () => {
+      resetCouplingModalToAddMode();
       const form = document.getElementById('formAddCoupling');
       if (form) form.reset();
       const unitInput = document.getElementById('addCouplingUnit');
@@ -2089,6 +3335,14 @@ function setupWorksRulesListeners() {
         currentObj["Справочник муфт"] = {};
       }
 
+      // If in edit mode, remove old mark if renamed
+      if (addCouplingEditContext && addCouplingEditContext.mode === 'edit') {
+        const oldMark = addCouplingEditContext.originalMark;
+        if (oldMark && oldMark !== mark && currentObj["Справочник муфт"][oldMark]) {
+          delete currentObj["Справочник муфт"][oldMark];
+        }
+      }
+
       const couplingEntry = {
         "Полное наименование": fullName,
         "МаксЖил": maxCores,
@@ -2110,148 +3364,115 @@ function setupWorksRulesListeners() {
         bootstrap.Modal.getInstance(modalEl)?.hide();
       }
 
-      showToast(`Муфта «${mark}» успешно добавлена в справочник муфт. Нажмите «Применить и пересчитать работы» для применения.`, 'success', 'Муфта добавлена', 6000);
+      const isEdit = addCouplingEditContext && addCouplingEditContext.mode === 'edit';
+      resetCouplingModalToAddMode();
+
+      showToast(
+        isEdit ? `Муфта «${mark}» успешно изменена.` : `Муфта «${mark}» успешно добавлена в справочник муфт.`,
+        'success',
+        isEdit ? 'Муфта изменена' : 'Муфта добавлена',
+        5000
+      );
     });
   }
 
   // =========================================================================
-  // ADD EQUIPMENT MODAL (МНОЖЕСТВЕННЫЕ РАБОТЫ, МАТЕРИАЛЫ И ПРОВЕРКА ДУБЛИКАТОВ)
+  // ADD / EDIT EQUIPMENT MODAL
   // =========================================================================
 
-  function appendAddEquipNestedItemRow(tbody, name = '', type = 'материал', unit = 'шт', formula = 'КОЛИЧЕСТВО', show = true) {
-    if (!tbody) return;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>
-        <input type="text" class="form-control form-control-sm equip-item-name" placeholder="Наименование позиции" value="${escapeHtml(name)}" required>
-      </td>
-      <td style="width: 20%;">
-        <select class="form-select form-select-sm equip-item-type">
-          <option value="оборудование" ${type === 'оборудование' ? 'selected' : ''}>оборудование</option>
-          <option value="материал" ${type === 'материал' ? 'selected' : ''}>материал</option>
-        </select>
-      </td>
-      <td style="width: 14%;">
-        <input type="text" class="form-control form-control-sm equip-item-unit" value="${escapeHtml(unit)}" placeholder="шт" required>
-      </td>
-      <td style="width: 20%;">
-        <input type="text" class="form-control form-control-sm font-monospace equip-item-formula" value="${escapeHtml(formula)}" placeholder="КОЛИЧЕСТВО" required>
-      </td>
-      <td style="width: 8%;" class="text-center">
-        <input class="form-check-input equip-item-show" type="checkbox" ${show ? 'checked' : ''} title="Показывать формулу в ВОР">
-      </td>
-      <td style="width: 6%;" class="text-center">
-        <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-remove-equip-item-row" title="Удалить позицию">
-          <i class='bx bx-trash'></i>
-        </button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  }
+  function openEditEquipmentModal(markKey, targetMethod = null) {
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const eqCatalog = currentObj["Оборудование"] || {};
+    const eqObj = eqCatalog[markKey];
 
-  function refreshAddEquipWorkCardBadges() {
-    const container = document.getElementById('addEquipWorksContainer');
-    if (!container) return;
-    const cards = container.querySelectorAll('.equip-work-card');
-    cards.forEach((card, idx) => {
-      const badge = card.querySelector('.equip-work-badge');
-      if (badge) badge.textContent = `Работа #${idx + 1}`;
-    });
-  }
-
-  function appendAddEquipWorkCard(title = '', unit = 'шт', formula = 'КОЛИЧЕСТВО', showFormula = false, section = 'Монтажные работы', nestedItems = []) {
-    const container = document.getElementById('addEquipWorksContainer');
-    if (!container) return;
-    const workIndex = container.children.length + 1;
-    const cardId = `equipWorkCard_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
-    const card = document.createElement('div');
-    card.className = 'card border shadow-xs equip-work-card mb-2';
-    card.innerHTML = `
-      <div class="card-header bg-light py-2 px-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-primary-subtle text-primary border font-monospace equip-work-badge">Работа #${workIndex}</span>
-          <span class="fw-semibold small text-dark">Параметры сметной нормы</span>
-        </div>
-        <button type="button" class="btn btn-xs btn-outline-danger py-0 px-2 btn-remove-equip-work-card" title="Удалить работу и её позиции">
-          <i class='bx bx-trash me-1'></i>Удалить работу
-        </button>
-      </div>
-      <div class="card-body p-2_5">
-        <div class="row g-2 mb-2">
-          <div class="col-md-5">
-            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Наименование работы <span class="text-danger">*</span></label>
-            <input type="text" class="form-control form-control-sm equip-work-title" placeholder="Наименование сметной работы" value="${escapeHtml(title)}" required>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Ед. изм.</label>
-            <input type="text" class="form-control form-control-sm equip-work-unit" value="${escapeHtml(unit)}" required>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Формула</label>
-            <input type="text" class="form-control form-control-sm font-monospace equip-work-formula" value="${escapeHtml(formula)}" placeholder="КОЛИЧЕСТВО" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Раздел сметы</label>
-            <select class="form-select form-select-sm equip-work-section">
-              <option value="Монтажные работы" ${section === 'Монтажные работы' ? 'selected' : ''}>Монтажные работы</option>
-              <option value="Строительные работы" ${section === 'Строительные работы' ? 'selected' : ''}>Строительные работы</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-check small mb-2">
-          <input class="form-check-input equip-work-show" type="checkbox" id="chkEquipWorkShow_${cardId}" ${showFormula ? 'checked' : ''}>
-          <label class="form-check-label fs-xs" for="chkEquipWorkShow_${cardId}">Отображать формулу работы в ведомости (ВОР)</label>
-        </div>
-
-        <div class="p-2 rounded border bg-body-tertiary">
-          <div class="d-flex align-items-center justify-content-between mb-1_5">
-            <span class="fs-xs fw-semibold text-secondary d-flex align-items-center gap-1">
-              <i class='bx bx-package text-success'></i> Вложенные позиции работы (ключ «Материалы»):
-            </span>
-            <button type="button" class="btn btn-xs btn-outline-success py-0 px-1_5 btn-add-equip-nested-item">
-              <i class='bx bx-plus me-0_5'></i>Добавить позицию
-            </button>
-          </div>
-          <div class="table-responsive bg-body rounded border">
-            <table class="table table-sm table-hover align-middle mb-0">
-              <thead class="table-light" style="font-size: 0.72rem;">
-                <tr>
-                  <th style="width: 32%;">Наименование позиции</th>
-                  <th style="width: 20%;">Тип позиции</th>
-                  <th style="width: 14%;">Ед. изм.</th>
-                  <th style="width: 20%;">Формула</th>
-                  <th style="width: 8%;" class="text-center" title="Показывать формулу">ВОР</th>
-                  <th style="width: 6%;" class="text-center"></th>
-                </tr>
-              </thead>
-              <tbody class="equip-work-nested-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    `;
-
-    const tbody = card.querySelector('.equip-work-nested-tbody');
-    if (Array.isArray(nestedItems) && nestedItems.length > 0) {
-      nestedItems.forEach(item => {
-        appendAddEquipNestedItemRow(
-          tbody,
-          item["Наименование"] || item.name || '',
-          item["Тип"] || item.type || 'материал',
-          item["Единицы измерения"] || item.unit || 'шт',
-          item["Формула"] || item.formula || 'КОЛИЧЕСТВО',
-          item["ОтображатьФормулу"] !== undefined ? Boolean(item["ОтображатьФормулу"]) : true
-        );
-      });
+    if (!eqObj) {
+      showToast(`Оборудование «${markKey}» не найдено в нормах`, 'warning', 'Ошибка');
+      return;
     }
 
-    container.appendChild(card);
-    refreshAddEquipWorkCardBadges();
+    const wm = getEquipmentItemWorksObject(eqObj);
+    const methodNames = Object.keys(wm);
+    const activeMethod = targetMethod || (methodNames.length > 0 ? methodNames[0] : 'Не указано');
+    const worksForMethod = wm[activeMethod] || [];
+
+    addEquipEditContext = {
+      mode: 'edit',
+      originalMark: markKey,
+      originalMethod: activeMethod,
+      eqData: JSON.parse(JSON.stringify(eqObj))
+    };
+
+    const titleEl = document.getElementById('addEquipmentModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class='bx bx-edit text-primary fs-5'></i> Редактирование оборудования: «${escapeHtml(markKey)}»`;
+    }
+    const btnSave = document.getElementById('btnSaveNewEquipment');
+    if (btnSave) {
+      btnSave.innerHTML = `<i class='bx bx-check-double'></i> Сохранить изменения`;
+    }
+    const btnDelMethod = document.getElementById('btnDeleteCurrentEquipMethodInModal');
+    if (btnDelMethod) {
+      btnDelMethod.classList.remove('d-none');
+      btnDelMethod.setAttribute('title', `Удалить способ «${escapeHtml(activeMethod)}»`);
+    }
+    const btnDelAll = document.getElementById('btnDeleteCurrentEquipAllInModal');
+    if (btnDelAll) {
+      btnDelAll.classList.remove('d-none');
+      btnDelAll.setAttribute('title', `Удалить оборудование «${escapeHtml(markKey)}» целиком`);
+    }
+
+    const markInput = document.getElementById('addEquipMark');
+    const methodInput = document.getElementById('addEquipMethod');
+    if (markInput) markInput.value = markKey;
+    if (methodInput) methodInput.value = activeMethod;
+
+    const warningAlert = document.getElementById('addEquipExistWarning');
+    if (warningAlert) warningAlert.classList.add('d-none');
+    const strategyContainer = document.getElementById('addEquipMergeStrategyContainer');
+    if (strategyContainer) strategyContainer.classList.add('d-none');
+
+    const container = document.getElementById('addEquipWorksContainer');
+    if (container) {
+      container.innerHTML = '';
+      const worksList = Array.isArray(worksForMethod) ? worksForMethod : (worksForMethod ? [worksForMethod] : []);
+      if (worksList.length > 0) {
+        worksList.forEach(w => {
+          appendUnifiedWorkCard(container, w, { defaultSection: 'Монтажные работы', defaultFormula: 'КОЛИЧЕСТВО', defaultUnit: 'шт' });
+        });
+      } else {
+        appendUnifiedWorkCard(container, null, { defaultSection: 'Монтажные работы', defaultFormula: 'КОЛИЧЕСТВО', defaultUnit: 'шт' });
+      }
+    }
+
+    const modalEl = document.getElementById('addEquipmentModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  // Legacy compatibility aliases for equipment
+  function appendAddEquipNestedItemRow(tbody, name = '', type = 'материал', unit = 'шт', formula = 'КОЛИЧЕСТВО', show = true) {
+    appendUnifiedNestedItemRow(tbody, name, type, unit, formula, show, 'Монтажные работы');
+  }
+  function refreshAddEquipWorkCardBadges() {
+    refreshUnifiedWorkCardBadges(document.getElementById('addEquipWorksContainer'));
+  }
+  function appendAddEquipWorkCard(title = '', unit = 'шт', formula = 'КОЛИЧЕСТВО', showFormula = false, section = 'Монтажные работы', nestedItems = []) {
+    const workData = {
+      "Наименование": title,
+      "Единицы измерения": unit,
+      "Формула": formula,
+      "Тип": "работа",
+      "ОтображатьФормулу": showFormula,
+      "Раздел": section,
+      "Материалы": nestedItems
+    };
+    appendUnifiedWorkCard(document.getElementById('addEquipWorksContainer'), workData, { defaultSection: section, defaultFormula: 'КОЛИЧЕСТВО', defaultUnit: 'шт', defaultShowFormula: false });
   }
 
   // Проверка дубликата способа установки для активной марки
   function checkEquipMethodExists() {
+    if (addEquipEditContext && addEquipEditContext.mode === 'edit') return;
     const markInput = document.getElementById('addEquipMark');
     const methodInput = document.getElementById('addEquipMethod');
     const warningAlert = document.getElementById('addEquipExistWarning');
@@ -2282,31 +3503,31 @@ function setupWorksRulesListeners() {
   const addEquipWorksContainer = document.getElementById('addEquipWorksContainer');
   if (addEquipWorksContainer) {
     addEquipWorksContainer.addEventListener('click', (e) => {
-      const addNestedBtn = e.target.closest('.btn-add-equip-nested-item');
+      const addNestedBtn = e.target.closest('.btn-add-nested-row, .btn-add-equip-nested-item');
       if (addNestedBtn) {
-        const card = addNestedBtn.closest('.equip-work-card');
-        const tbody = card ? card.querySelector('.equip-work-nested-tbody') : null;
+        const card = addNestedBtn.closest('.unified-work-card, .equip-work-card');
+        const tbody = card ? (card.querySelector('.unified-nested-tbody') || card.querySelector('.equip-work-nested-tbody')) : null;
         if (tbody) {
-          appendAddEquipNestedItemRow(tbody, '', 'материал', 'шт', 'КОЛИЧЕСТВО', true);
+          appendUnifiedNestedItemRow(tbody, '', 'материал', 'шт', 'КОЛИЧЕСТВО', true, 'Монтажные работы');
         }
         return;
       }
 
-      const removeRowBtn = e.target.closest('.btn-remove-equip-item-row');
+      const removeRowBtn = e.target.closest('.btn-remove-nested-row, .btn-remove-equip-item-row');
       if (removeRowBtn) {
         const tr = removeRowBtn.closest('tr');
         if (tr) tr.remove();
         return;
       }
 
-      const removeWorkBtn = e.target.closest('.btn-remove-equip-work-card');
+      const removeWorkBtn = e.target.closest('.btn-remove-unified-work-card, .btn-remove-equip-work-card');
       if (removeWorkBtn) {
-        const card = removeWorkBtn.closest('.equip-work-card');
+        const card = removeWorkBtn.closest('.unified-work-card, .equip-work-card');
         if (card) {
           card.remove();
-          refreshAddEquipWorkCardBadges();
+          refreshUnifiedWorkCardBadges(addEquipWorksContainer);
           if (addEquipWorksContainer.children.length === 0) {
-            appendAddEquipWorkCard('Монтаж оборудования', 'шт', 'КОЛИЧЕСТВО', false, 'Монтажные работы', []);
+            appendUnifiedWorkCard(addEquipWorksContainer, null, { defaultSection: 'Монтажные работы', defaultFormula: 'КОЛИЧЕСТВО', defaultUnit: 'шт' });
           }
         }
         return;
@@ -2314,7 +3535,7 @@ function setupWorksRulesListeners() {
     });
 
     addEquipWorksContainer.addEventListener('input', (e) => {
-      if (e.target.classList.contains('equip-work-title') || e.target.classList.contains('equip-item-name')) {
+      if (e.target.classList.contains('unified-work-title') || e.target.classList.contains('equip-work-title') || e.target.classList.contains('unified-nested-name')) {
         e.target.dataset.autoFilled = 'false';
       }
     });
@@ -2323,7 +3544,7 @@ function setupWorksRulesListeners() {
   const btnAddEquipWorkCard = document.getElementById('btnAddEquipWorkCard');
   if (btnAddEquipWorkCard) {
     btnAddEquipWorkCard.addEventListener('click', () => {
-      appendAddEquipWorkCard('', 'шт', 'КОЛИЧЕСТВО', false, 'Монтажные работы', []);
+      appendUnifiedWorkCard(addEquipWorksContainer, null, { defaultSection: 'Монтажные работы', defaultFormula: 'КОЛИЧЕСТВО', defaultUnit: 'шт' });
     });
   }
 
@@ -2331,13 +3552,13 @@ function setupWorksRulesListeners() {
   if (addEquipMarkInput) {
     addEquipMarkInput.addEventListener('input', () => {
       const mark = addEquipMarkInput.value.trim();
-      const firstWorkTitle = document.querySelector('#addEquipWorksContainer .equip-work-card:first-child .equip-work-title');
+      const firstWorkTitle = document.querySelector('#addEquipWorksContainer .unified-work-card:first-child .unified-work-title, #addEquipWorksContainer .equip-work-card:first-child .equip-work-title');
       if (firstWorkTitle && (!firstWorkTitle.value.trim() || firstWorkTitle.dataset.autoFilled === 'true')) {
         firstWorkTitle.value = mark ? `Монтаж оборудования типа ${mark}` : '';
         firstWorkTitle.dataset.autoFilled = 'true';
       }
-      const firstItemName = document.querySelector('#addEquipWorksContainer .equip-work-card:first-child .equip-item-name');
-      const firstItemType = document.querySelector('#addEquipWorksContainer .equip-work-card:first-child .equip-item-type');
+      const firstItemName = document.querySelector('#addEquipWorksContainer .unified-work-card:first-child .unified-nested-name, #addEquipWorksContainer .equip-work-card:first-child .equip-item-name');
+      const firstItemType = document.querySelector('#addEquipWorksContainer .unified-work-card:first-child .unified-nested-type, #addEquipWorksContainer .equip-work-card:first-child .equip-item-type');
       if (firstItemName && firstItemType && firstItemType.value === 'оборудование' && (!firstItemName.value.trim() || firstItemName.dataset.autoFilled === 'true')) {
         firstItemName.value = mark;
         firstItemName.dataset.autoFilled = 'true';
@@ -2355,6 +3576,7 @@ function setupWorksRulesListeners() {
   const quickAddEquipmentInTabBtn = document.getElementById('quickAddEquipmentInTabBtn');
   if (quickAddEquipmentInTabBtn) {
     quickAddEquipmentInTabBtn.addEventListener('click', () => {
+      resetEquipmentModalToAddMode();
       const form = document.getElementById('formAddEquipment');
       if (form) form.reset();
 
@@ -2376,10 +3598,18 @@ function setupWorksRulesListeners() {
 
       if (addEquipWorksContainer) {
         addEquipWorksContainer.innerHTML = '';
-        appendAddEquipWorkCard('', 'шт', 'КОЛИЧЕСТВО', false, 'Монтажные работы', [
-          { "Наименование": "", "Тип": "оборудование", "Единицы измерения": "шт", "Формула": "КОЛИЧЕСТВО", "ОтображатьФормулу": true },
-          { "Наименование": "", "Тип": "материал", "Единицы измерения": "шт", "Формула": "КОЛИЧЕСТВО", "ОтображатьФормулу": true }
-        ]);
+        appendUnifiedWorkCard(addEquipWorksContainer, {
+          "Наименование": "",
+          "Тип": "работа",
+          "Единицы измерения": "шт",
+          "Формула": "КОЛИЧЕСТВО",
+          "ОтображатьФормулу": false,
+          "Раздел": "Монтажные работы",
+          "Материалы": [
+            { "Наименование": "", "Тип": "оборудование", "Единицы измерения": "шт", "Формула": "КОЛИЧЕСТВО", "ОтображатьФормулу": true },
+            { "Наименование": "", "Тип": "материал", "Единицы измерения": "шт", "Формула": "КОЛИЧЕСТВО", "ОтображатьФормулу": true }
+          ]
+        }, { defaultSection: 'Монтажные работы', defaultFormula: 'КОЛИЧЕСТВО', defaultUnit: 'шт' });
       }
 
       checkEquipMethodExists();
@@ -2406,48 +3636,7 @@ function setupWorksRulesListeners() {
       const method = (methodInput ? methodInput.value.trim() : '') || 'Не указано';
       const mergeStrategy = document.getElementById('addEquipMergeStrategy')?.value || 'append';
 
-      const workCards = document.querySelectorAll('#addEquipWorksContainer .equip-work-card');
-      const parsedWorks = [];
-
-      workCards.forEach(card => {
-        const title = card.querySelector('.equip-work-title')?.value?.trim();
-        const unit = card.querySelector('.equip-work-unit')?.value?.trim() || 'шт';
-        const formula = card.querySelector('.equip-work-formula')?.value?.trim() || 'КОЛИЧЕСТВО';
-        const show = Boolean(card.querySelector('.equip-work-show')?.checked);
-        const section = card.querySelector('.equip-work-section')?.value || 'Монтажные работы';
-
-        if (!title) return;
-
-        const nestedItems = [];
-        const itemRows = card.querySelectorAll('.equip-work-nested-tbody tr');
-        itemRows.forEach(r => {
-          const mName = r.querySelector('.equip-item-name')?.value?.trim();
-          const mType = r.querySelector('.equip-item-type')?.value?.trim() || 'материал';
-          const mUnit = r.querySelector('.equip-item-unit')?.value?.trim() || 'шт';
-          const mFormula = r.querySelector('.equip-item-formula')?.value?.trim() || 'КОЛИЧЕСТВО';
-          const mShow = Boolean(r.querySelector('.equip-item-show')?.checked);
-          if (mName) {
-            nestedItems.push({
-              "Наименование": mName,
-              "Единицы измерения": mUnit,
-              "Формула": mFormula,
-              "Тип": mType,
-              "ОтображатьФормулу": mShow,
-              "Раздел": section
-            });
-          }
-        });
-
-        parsedWorks.push({
-          "Наименование": title,
-          "Единицы измерения": unit,
-          "Формула": formula,
-          "Тип": "работа",
-          "ОтображатьФормулу": show,
-          "Раздел": section,
-          "Материалы": nestedItems
-        });
-      });
+      const parsedWorks = collectUnifiedWorksData(document.getElementById('addEquipWorksContainer'));
 
       if (parsedWorks.length === 0) {
         showToast('Добавьте хотя бы одну работу с наименованием', 'warning', 'Проверка данных');
@@ -2458,6 +3647,30 @@ function setupWorksRulesListeners() {
       if (!currentObj["Оборудование"] || typeof currentObj["Оборудование"] !== 'object' || Array.isArray(currentObj["Оборудование"])) {
         currentObj["Оборудование"] = {};
       }
+
+      // If in edit mode, handle rename or method change
+      if (addEquipEditContext && addEquipEditContext.mode === 'edit') {
+        const oldMark = addEquipEditContext.originalMark;
+        const oldMethod = addEquipEditContext.originalMethod;
+
+        if (oldMark && oldMark !== mark && currentObj["Оборудование"][oldMark]) {
+          // Move existing methods to new mark
+          currentObj["Оборудование"][mark] = currentObj["Оборудование"][oldMark];
+          delete currentObj["Оборудование"][oldMark];
+        }
+
+        if (!currentObj["Оборудование"][mark] || typeof currentObj["Оборудование"][mark] !== 'object') {
+          currentObj["Оборудование"][mark] = { "Работы": {} };
+        }
+        if (!currentObj["Оборудование"][mark]["Работы"] || typeof currentObj["Оборудование"][mark]["Работы"] !== 'object') {
+          currentObj["Оборудование"][mark]["Работы"] = {};
+        }
+
+        if (oldMethod && oldMethod !== method && currentObj["Оборудование"][mark]["Работы"][oldMethod]) {
+          delete currentObj["Оборудование"][mark]["Работы"][oldMethod];
+        }
+      }
+
       if (!currentObj["Оборудование"][mark] || typeof currentObj["Оборудование"][mark] !== 'object') {
         currentObj["Оборудование"][mark] = { "Работы": {} };
       }
@@ -2465,7 +3678,7 @@ function setupWorksRulesListeners() {
         currentObj["Оборудование"][mark]["Работы"] = {};
       }
 
-      if (mergeStrategy === 'append' && Array.isArray(currentObj["Оборудование"][mark]["Работы"][method])) {
+      if (!addEquipEditContext && mergeStrategy === 'append' && Array.isArray(currentObj["Оборудование"][mark]["Работы"][method])) {
         currentObj["Оборудование"][mark]["Работы"][method].push(...parsedWorks);
       } else {
         currentObj["Оборудование"][mark]["Работы"][method] = parsedWorks;
@@ -2481,7 +3694,15 @@ function setupWorksRulesListeners() {
         bootstrap.Modal.getInstance(modalEl)?.hide();
       }
 
-      showToast(`Оборудование «${mark}» [${method}]: успешно добавлено ${parsedWorks.length} работ. Нажмите «Применить и пересчитать работы» для применения.`, 'success', 'Оборудование добавлено', 6000);
+      const isEdit = addEquipEditContext && addEquipEditContext.mode === 'edit';
+      resetEquipmentModalToAddMode();
+
+      showToast(
+        isEdit ? `Оборудование «${mark}» [${method}]: сметные нормы успешно обновлены.` : `Оборудование «${mark}» [${method}]: успешно добавлено ${parsedWorks.length} работ.`,
+        'success',
+        isEdit ? 'Нормы обновлены' : 'Оборудование добавлено',
+        5000
+      );
     });
   }
 
@@ -2596,6 +3817,9 @@ function setupWorksRulesListeners() {
         window.currentWorksRules = currentWorksRules;
         modalDraftRules = JSON.parse(JSON.stringify(parsed));
 
+        // Save committed rules to LocalStorage
+        saveWorksRulesToLocalStorage(currentWorksRules);
+
         renderRulesModalContent(currentWorksRules);
 
         if (currentData) {
@@ -2610,29 +3834,833 @@ function setupWorksRulesListeners() {
         const sections = getRulesSections(currentWorksRules);
         let totalWays = 0;
         sections.forEach(s => totalWays += s.rules.length);
-        showToast(`Сметные нормы обновлены (${totalWays} способов в ${sections.length} разд.). Выполнен автоматический перерасчет работ.`, 'success', 'Перерасчет выполнен');
+        showToast(`Сметные нормы обновлены и сохранены в LocalStorage (${totalWays} способов в ${sections.length} разд.). Выполнен авто-перерасчет работ.`, 'success', 'Сохранено в LocalStorage');
       } catch (err) {
         showToast('Ошибка синтаксиса JSON: ' + err.message, 'error', 'Ошибка');
       }
     });
   }
 
-  // Переход к узлу JSON
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.btn-jump-to-json');
-    if (btn) {
-      const target = btn.getAttribute('data-json-target');
-      if (target) {
-        highlightAndScrollToJsonNode(target, true);
+  // LocalStorage explicit actions in Settings tab
+  const saveStorageBtn = document.getElementById('saveLocalStorageRulesBtn');
+  if (saveStorageBtn) {
+    saveStorageBtn.addEventListener('click', () => {
+      const draft = getDraftRulesFromEditor();
+      if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
+        showToast('Не удалось сохранить: ошибка формата JSON в редакторе', 'error', 'Ошибка');
+        return;
       }
+      currentWorksRules = JSON.parse(JSON.stringify(draft));
+      window.currentWorksRules = currentWorksRules;
+      saveWorksRulesToLocalStorage(currentWorksRules);
+      if (currentData) calculateVolumes();
+      showToast('Текущие правила из редактора успешно сохранены в LocalStorage браузера', 'success', 'LocalStorage обновлен');
+    });
+  }
+
+  const clearStorageBtn = document.getElementById('clearLocalStorageRulesBtn');
+  if (clearStorageBtn) {
+    clearStorageBtn.addEventListener('click', () => {
+      clearWorksRulesFromLocalStorage();
+      showToast('Сохраненные правила удалены из LocalStorage. Нажмите кнопку «По умолчанию», если хотите загрузить стандартный шаблон works_rules.json.', 'info', 'LocalStorage очищен');
+    });
+  }
+
+  // Delegated event listener for block Edit buttons
+  document.addEventListener('click', (e) => {
+    // Edit Rule / Installation Way
+    const editRuleBtn = e.target.closest('.btn-edit-rule');
+    if (editRuleBtn) {
+      const sec = editRuleBtn.getAttribute('data-rule-section');
+      const name = editRuleBtn.getAttribute('data-rule-name');
+      if (sec && name) {
+        openEditRuleModal(sec, name);
+      }
+      return;
+    }
+
+    // Edit Cable Group / Designation Mapping
+    const editCableGroupBtn = e.target.closest('.btn-edit-cable-group');
+    if (editCableGroupBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const grpKey = editCableGroupBtn.getAttribute('data-group-key') ?? '';
+      openEditCableGroupModal(grpKey);
+      return;
+    }
+
+    // Add Cable Mark to specific group
+    const addMarkToGroupBtn = e.target.closest('.btn-add-mark-to-group');
+    if (addMarkToGroupBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const grpKey = addMarkToGroupBtn.getAttribute('data-group-key') ?? '';
+      const grpName = addMarkToGroupBtn.getAttribute('data-group-name') ?? '';
+      openAddCableModalForGroup(grpKey, grpName);
+      return;
+    }
+
+    // Delete Cable Group
+    const delCableGroupBtn = e.target.closest('.btn-delete-cable-group');
+    if (delCableGroupBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const grpKey = delCableGroupBtn.getAttribute('data-group-key') ?? '';
+      deleteCableGroupItem(grpKey);
+      return;
+    }
+
+    // Edit Cable Mark
+    const editCableBtn = e.target.closest('.btn-edit-cable');
+    if (editCableBtn) {
+      const grp = editCableBtn.getAttribute('data-cable-group') ?? '';
+      const mark = editCableBtn.getAttribute('data-cable-mark');
+      if (mark) {
+        openEditCableModal(grp, mark);
+      }
+      return;
+    }
+
+    // Edit Coupling
+    const editCouplingBtn = e.target.closest('.btn-edit-coupling');
+    if (editCouplingBtn) {
+      const mark = editCouplingBtn.getAttribute('data-coupling-mark');
+      if (mark) {
+        openEditCouplingModal(mark);
+      }
+      return;
+    }
+
+    // Edit Equipment (Full item)
+    const editEquipBtn = e.target.closest('.btn-edit-equipment');
+    if (editEquipBtn) {
+      const mark = editEquipBtn.getAttribute('data-equipment-mark');
+      if (mark) {
+        openEditEquipmentModal(mark);
+      }
+      return;
+    }
+
+    // Edit Equipment Method
+    const editEquipMethodBtn = e.target.closest('.btn-edit-equipment-method');
+    if (editEquipMethodBtn) {
+      const mark = editEquipMethodBtn.getAttribute('data-equipment-mark');
+      const method = editEquipMethodBtn.getAttribute('data-method-name');
+      if (mark) {
+        openEditEquipmentModal(mark, method);
+      }
+      return;
+    }
+
+    // Delete Rule / Installation Way
+    const delRuleBtn = e.target.closest('.btn-delete-rule');
+    if (delRuleBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const sec = delRuleBtn.getAttribute('data-rule-section');
+      const name = delRuleBtn.getAttribute('data-rule-name');
+      if (sec && name) {
+        deleteRuleItem(sec, name);
+      }
+      return;
+    }
+
+    // Delete Cable Mark
+    const delCableBtn = e.target.closest('.btn-delete-cable');
+    if (delCableBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const grp = delCableBtn.getAttribute('data-cable-group') ?? '';
+      const mark = delCableBtn.getAttribute('data-cable-mark');
+      if (mark) {
+        deleteCableItem(grp, mark);
+      }
+      return;
+    }
+
+    // Delete Coupling
+    const delCouplingBtn = e.target.closest('.btn-delete-coupling');
+    if (delCouplingBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const mark = delCouplingBtn.getAttribute('data-coupling-mark');
+      if (mark) {
+        deleteCouplingItem(mark);
+      }
+      return;
+    }
+
+    // Delete Equipment Method
+    const delEquipMethodBtn = e.target.closest('.btn-delete-equipment-method');
+    if (delEquipMethodBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const mark = delEquipMethodBtn.getAttribute('data-equipment-mark');
+      const method = delEquipMethodBtn.getAttribute('data-method-name');
+      if (mark && method) {
+        deleteEquipmentMethodItem(mark, method);
+      }
+      return;
+    }
+
+    // Delete Equipment (Full item)
+    const delEquipBtn = e.target.closest('.btn-delete-equipment');
+    if (delEquipBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const mark = delEquipBtn.getAttribute('data-equipment-mark');
+      if (mark) {
+        deleteEquipmentAllItem(mark);
+      }
+      return;
     }
   });
 
-  // Сохранение скролла в основном окне при закрытии дочерних модалок
-  ['addRuleModal', 'addCableModal', 'addCouplingModal', 'addEquipmentModal'].forEach(id => {
+  // =========================================================================
+  // DELETION LOGIC (RULES, CABLES, COUPLINGS, EQUIPMENT)
+  // =========================================================================
+
+  function deleteRuleItem(sectionName, ruleName) {
+    if (!sectionName || !ruleName) return;
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    let deleted = false;
+
+    if (currentObj[sectionName] && typeof currentObj[sectionName] === 'object') {
+      if (currentObj[sectionName][ruleName] !== undefined) {
+        delete currentObj[sectionName][ruleName];
+        deleted = true;
+      } else {
+        const foundKey = Object.keys(currentObj[sectionName]).find(k => k.trim() === ruleName.trim());
+        if (foundKey) {
+          delete currentObj[sectionName][foundKey];
+          deleted = true;
+        }
+      }
+    }
+
+    if (!deleted) {
+      for (const [secKey, secVal] of Object.entries(currentObj)) {
+        if (secVal && typeof secVal === 'object' && secVal[ruleName] !== undefined) {
+          delete secVal[ruleName];
+          deleted = true;
+          break;
+        }
+      }
+    }
+
+    modalDraftRules = currentObj;
+    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
+    validateWorksJsonInput();
+    renderRulesModalContent(modalDraftRules, true);
+
+    const modalEl = document.getElementById('addRuleModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
+    resetRuleModalToAddMode();
+
+    showToast(`Способ «${ruleName}» успешно удален из раздела «${sectionName}».`, 'success', 'Удалено');
+  }
+
+  function deleteCableItem(groupName, markKey) {
+    if (!markKey) return;
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const catalog = currentObj["Справочник кабелей"];
+    let deleted = false;
+
+    if (catalog && typeof catalog === 'object') {
+      if (groupName !== undefined && catalog[groupName]?.["Тип"]?.[markKey]) {
+        delete catalog[groupName]["Тип"][markKey];
+        deleted = true;
+      }
+      if (!deleted) {
+        for (const g of Object.values(catalog)) {
+          if (g?.["Тип"]?.[markKey]) {
+            delete g["Тип"][markKey];
+            deleted = true;
+            break;
+          }
+        }
+      }
+    }
+
+    modalDraftRules = currentObj;
+    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
+    validateWorksJsonInput();
+    renderCableCatalogModalContent(modalDraftRules);
+
+    const modalEl = document.getElementById('addCableModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
+    resetCableModalToAddMode();
+
+    showToast(`Марка кабеля «${markKey}» успешно удалена из справочника.`, 'success', 'Удалено');
+  }
+
+  function deleteCouplingItem(markKey) {
+    if (!markKey) return;
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    if (currentObj["Справочник муфт"] && currentObj["Справочник муфт"][markKey]) {
+      delete currentObj["Справочник муфт"][markKey];
+    }
+
+    modalDraftRules = currentObj;
+    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
+    validateWorksJsonInput();
+    renderCouplingCatalogModalContent(modalDraftRules);
+
+    const modalEl = document.getElementById('addCouplingModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
+    resetCouplingModalToAddMode();
+
+    showToast(`Муфта «${markKey}» успешно удалена из справочника.`, 'success', 'Удалено');
+  }
+
+  function deleteEquipmentMethodItem(markKey, methodName) {
+    if (!markKey || !methodName) return;
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const eqObj = currentObj["Оборудование"]?.[markKey];
+    if (eqObj) {
+      if (eqObj["Работы"] && eqObj["Работы"][methodName]) {
+        delete eqObj["Работы"][methodName];
+      }
+      if (eqObj["Работы и материалы"] && eqObj["Работы и материалы"][methodName]) {
+        delete eqObj["Работы и материалы"][methodName];
+      }
+    }
+
+    modalDraftRules = currentObj;
+    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
+    validateWorksJsonInput();
+    renderEquipmentCatalogModalContent(modalDraftRules);
+
+    const modalEl = document.getElementById('addEquipmentModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
+    resetEquipmentModalToAddMode();
+
+    showToast(`Способ установки «${methodName}» для оборудования «${markKey}» удален.`, 'success', 'Удалено');
+  }
+
+  function deleteEquipmentAllItem(markKey) {
+    if (!markKey) return;
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    if (currentObj["Оборудование"] && currentObj["Оборудование"][markKey]) {
+      delete currentObj["Оборудование"][markKey];
+    }
+
+    modalDraftRules = currentObj;
+    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
+    validateWorksJsonInput();
+    renderEquipmentCatalogModalContent(modalDraftRules);
+
+    const modalEl = document.getElementById('addEquipmentModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
+    resetEquipmentModalToAddMode();
+
+    showToast(`Оборудование «${markKey}» полностью удалено из справочника.`, 'success', 'Удалено');
+  }
+
+  // =========================================================================
+  // CABLE GROUPS & CONDITIONAL DESIGNATIONS MANAGER
+  // =========================================================================
+
+  let addCableGroupEditContext = null;
+
+  function resetCableGroupModalToAddMode() {
+    addCableGroupEditContext = null;
+    const titleEl = document.getElementById('editCableGroupModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class='bx bx-folder-plus text-success fs-5'></i> Добавление группы кабелей и обозначения`;
+    }
+    const btnSave = document.getElementById('btnSaveCableGroup');
+    if (btnSave) {
+      btnSave.innerHTML = `<i class='bx bx-check'></i> Создать группу`;
+    }
+    const btnDel = document.getElementById('btnDeleteCurrentCableGroupInModal');
+    if (btnDel) btnDel.classList.add('d-none');
+
+    const keyInput = document.getElementById('editCableGroupKey');
+    const nameInput = document.getElementById('editCableGroupName');
+    const catSelect = document.getElementById('editCableGroupCategory');
+    if (keyInput) keyInput.value = '';
+    if (nameInput) nameInput.value = '';
+    if (catSelect) catSelect.value = '';
+  }
+
+  function openEditCableGroupModal(groupKey = null) {
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const catalog = currentObj["Справочник кабелей"] || {};
+
+    const keyInput = document.getElementById('editCableGroupKey');
+    const nameInput = document.getElementById('editCableGroupName');
+    const catSelect = document.getElementById('editCableGroupCategory');
+    const titleEl = document.getElementById('editCableGroupModalTitle');
+    const btnSave = document.getElementById('btnSaveCableGroup');
+    const btnDel = document.getElementById('btnDeleteCurrentCableGroupInModal');
+
+    if (groupKey !== null && groupKey !== undefined) {
+      const targetGroup = catalog[groupKey] || {};
+      const brandName = targetGroup["Название"] || (groupKey === '' ? 'СБВБПу' : groupKey);
+      const displayKey = groupKey === '' ? '"" (без знака)' : (groupKey === '\\U+0394' ? '\\U+0394 (Δ)' : `"${groupKey}"`);
+
+      addCableGroupEditContext = {
+        mode: 'edit',
+        originalKey: groupKey,
+        originalName: brandName,
+        groupData: JSON.parse(JSON.stringify(targetGroup))
+      };
+
+      if (titleEl) {
+        titleEl.innerHTML = `<i class='bx bx-edit text-primary fs-5'></i> Изменение соответствия: ${escapeHtml(displayKey)} ↔ «${escapeHtml(brandName)}»`;
+      }
+      if (btnSave) {
+        btnSave.innerHTML = `<i class='bx bx-check-double'></i> Сохранить соответствие`;
+      }
+      if (btnDel) {
+        btnDel.classList.remove('d-none');
+      }
+
+      if (keyInput) keyInput.value = groupKey;
+      if (nameInput) nameInput.value = targetGroup["Название"] || '';
+      if (catSelect) catSelect.value = targetGroup["Категория"] || '';
+    } else {
+      resetCableGroupModalToAddMode();
+    }
+
+    const modalEl = document.getElementById('editCableGroupModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  function saveCableGroupModal() {
+    const keyInput = document.getElementById('editCableGroupKey');
+    const nameInput = document.getElementById('editCableGroupName');
+    const catSelect = document.getElementById('editCableGroupCategory');
+    const updateDescCheck = document.getElementById('editCableGroupUpdateFullDesc');
+
+    let newKey = keyInput ? keyInput.value.trim() : '';
+    // If user entered Greek delta Δ or U+0394 directly, normalize to \U+0394 for AutoCAD export compatibility
+    if (newKey === 'Δ' || newKey === 'U+0394') {
+      newKey = '\\U+0394';
+    }
+
+    const newName = nameInput ? nameInput.value.trim() : '';
+    if (!newName) {
+      showToast('Укажите наименование марки кабеля для этой группы', 'warning', 'Проверка данных');
+      if (nameInput) nameInput.focus();
+      return;
+    }
+
+    const newCat = catSelect ? catSelect.value.trim() : '';
+    const shouldUpdateDesc = updateDescCheck ? updateDescCheck.checked : true;
+
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    if (!currentObj["Справочник кабелей"] || typeof currentObj["Справочник кабелей"] !== 'object') {
+      const existingCat = (cachedDefaultRules && cachedDefaultRules["Справочник кабелей"]) ? cachedDefaultRules["Справочник кабелей"] : {};
+      currentObj["Справочник кабелей"] = JSON.parse(JSON.stringify(existingCat));
+    }
+
+    const isEdit = addCableGroupEditContext && addCableGroupEditContext.mode === 'edit';
+    const oldKey = isEdit ? addCableGroupEditContext.originalKey : null;
+    const oldName = isEdit ? addCableGroupEditContext.originalName : '';
+
+    if (isEdit && oldKey !== null) {
+      // If key (conditional designation) changed
+      if (oldKey !== newKey) {
+        if (currentObj["Справочник кабелей"][newKey] && newKey !== oldKey) {
+          // If destination group already exists, merge types
+          const targetExistingTypes = currentObj["Справочник кабелей"][newKey]["Тип"] || {};
+          const oldTypes = currentObj["Справочник кабелей"][oldKey]?.["Тип"] || {};
+          currentObj["Справочник кабелей"][newKey]["Тип"] = { ...targetExistingTypes, ...oldTypes };
+          delete currentObj["Справочник кабелей"][oldKey];
+        } else {
+          // Rename group key
+          const groupData = currentObj["Справочник кабелей"][oldKey] || { "Тип": {} };
+          delete currentObj["Справочник кабелей"][oldKey];
+          currentObj["Справочник кабелей"][newKey] = groupData;
+        }
+      }
+    } else {
+      // Add mode: check if key already exists
+      if (currentObj["Справочник кабелей"][newKey]) {
+        showToast(`Группа с условным обозначением «${newKey || '""'}» уже существует. Выберите другое обозначение или отредактируйте существующую группу.`, 'warning', 'Группа существует');
+        return;
+      }
+      currentObj["Справочник кабелей"][newKey] = {
+        "Название": newName,
+        "Тип": {}
+      };
+    }
+
+    if (!currentObj["Справочник кабелей"][newKey]) {
+      currentObj["Справочник кабелей"][newKey] = { "Название": newName, "Тип": {} };
+    }
+
+    currentObj["Справочник кабелей"][newKey]["Название"] = newName;
+    if (newCat) {
+      currentObj["Справочник кабелей"][newKey]["Категория"] = newCat;
+    } else {
+      delete currentObj["Справочник кабелей"][newKey]["Категория"];
+    }
+
+    // Optionally update mark name in full descriptions of all types in this group
+    if (shouldUpdateDesc && oldName && oldName !== newName && currentObj["Справочник кабелей"][newKey]["Тип"]) {
+      Object.values(currentObj["Справочник кабелей"][newKey]["Тип"]).forEach(tObj => {
+        if (tObj && typeof tObj === 'object' && tObj["Полное описание"]) {
+          tObj["Полное описание"] = tObj["Полное описание"].split(oldName).join(newName);
+        }
+      });
+    }
+
+    modalDraftRules = currentObj;
+    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
+    validateWorksJsonInput();
+    saveWorksRulesToLocalStorage(modalDraftRules);
+
+    // Re-populate and re-render
+    populateDynamicCableGroups(modalDraftRules);
+    renderCableCatalogModalContent(modalDraftRules);
+    renderCableGroupsOverviewModalContent(modalDraftRules);
+
+    const modalEl = document.getElementById('editCableGroupModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
+    resetCableGroupModalToAddMode();
+
+    const displayKey = newKey === '' ? '"" (без знака)' : `"${newKey}"`;
+    showToast(
+      isEdit 
+        ? `Соответствие марки «${newName}» и условного обозначения ${displayKey} успешно сохранено.`
+        : `Группа кабелей «${newName}» с условным обозначением ${displayKey} создана.`,
+      'success',
+      'Сохранено',
+      5000
+    );
+  }
+
+  function deleteCableGroupItem(groupKey) {
+    if (groupKey === undefined || groupKey === null) return;
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const catalog = currentObj["Справочник кабелей"];
+    if (!catalog || !catalog[groupKey]) return;
+
+    const brandName = catalog[groupKey]["Название"] || groupKey;
+    const displayKey = groupKey === '' ? '"" (без знака)' : `"${groupKey}"`;
+
+    delete currentObj["Справочник кабелей"][groupKey];
+
+    modalDraftRules = currentObj;
+    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
+    validateWorksJsonInput();
+    saveWorksRulesToLocalStorage(modalDraftRules);
+
+    populateDynamicCableGroups(modalDraftRules);
+    renderCableCatalogModalContent(modalDraftRules);
+    renderCableGroupsOverviewModalContent(modalDraftRules);
+
+    const modalEl = document.getElementById('editCableGroupModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
+    resetCableGroupModalToAddMode();
+
+    showToast(`Группа кабелей «${brandName}» (${displayKey}) успешно удалена из справочника.`, 'success', 'Группа удалена');
+  }
+
+  function openAddCableModalForGroup(groupKey, groupName) {
+    resetCableModalToAddMode();
+    const form = document.getElementById('formAddCable');
+    if (form) form.reset();
+
+    const draft = getDraftRulesFromEditor();
+    populateDynamicCableGroups(draft);
+
+    const groupKeyInput = document.getElementById('addCableGroupKey');
+    const groupNameInput = document.getElementById('addCableGroupName');
+    if (groupKeyInput) groupKeyInput.value = groupKey;
+    if (groupNameInput) groupNameInput.value = groupName;
+
+    const modalEl = document.getElementById('addCableModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  function renderCableGroupsOverviewModalContent(rulesObj = null) {
+    const tableBody = document.getElementById('cableGroupsOverviewTableBody');
+    const totalBadge = document.getElementById('cableGroupsTotalBadge');
+    if (!tableBody) return;
+
+    const rules = resolveValidRules(rulesObj);
+    const catalog = getCableCatalog(rules) || {};
+    const entries = Object.entries(catalog);
+
+    if (totalBadge) {
+      totalBadge.textContent = `${entries.length} групп`;
+    }
+
+    const searchInput = document.getElementById('cableGroupOverviewSearchInput');
+    const query = (searchInput ? searchInput.value.trim().toLowerCase() : '');
+
+    let filtered = entries;
+    if (query) {
+      filtered = entries.filter(([k, v]) => {
+        const name = (v && v["Название"]) || '';
+        const cat = (v && v["Категория"]) || '';
+        return `${k} ${name} ${cat}`.toLowerCase().includes(query);
+      });
+    }
+
+    if (filtered.length === 0) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center py-4 text-muted">
+            <i class='bx bx-search fs-4 d-block mb-1'></i>
+            ${query ? 'По запросу группы не найдены' : 'Справочник групп кабелей пуст'}
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tableBody.innerHTML = filtered.map(([grpKey, grpVal]) => {
+      const brandName = (grpVal && grpVal["Название"]) || (grpKey === '' ? 'СБВБПу' : grpKey);
+      const cat = (grpVal && grpVal["Категория"]) || 'Сигнально-блокировочный кабель';
+      const count = (grpVal && grpVal["Тип"] && typeof grpVal["Тип"] === 'object') ? Object.keys(grpVal["Тип"]).length : 0;
+
+      let codeDisplay = '';
+      if (grpKey === '') {
+        codeDisplay = `<span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace px-2 py-1">"" (пусто / без знака)</span>`;
+      } else if (grpKey === '\\U+0394') {
+        codeDisplay = `<span class="badge bg-primary-subtle text-primary border font-monospace px-2 py-1">\\U+0394 (Дельта Δ)</span>`;
+      } else {
+        codeDisplay = `<span class="badge bg-primary-subtle text-primary border font-monospace px-2 py-1">"${escapeHtml(grpKey)}"</span>`;
+      }
+
+      const sampleMarks = (grpVal && grpVal["Тип"]) 
+        ? Object.keys(grpVal["Тип"]).slice(0, 4).map(k => `<span class="badge bg-light text-dark border font-monospace me-1 fs-xs">${escapeHtml(k)}</span>`).join('')
+        : '';
+      const moreBadge = count > 4 ? `<span class="text-muted fs-xs">+${count - 4}</span>` : '';
+
+      return `
+        <tr>
+          <td class="ps-3">
+            <div class="fw-bold">${codeDisplay}</div>
+            <div class="fs-xs text-muted mt-0_5">Чертеж: <code class="text-dark">${grpKey === '' ? '10х2' : `10х2${escapeHtml(grpKey)}`}</code></div>
+          </td>
+          <td>
+            <div class="fw-bold text-dark fs-6">${escapeHtml(brandName)}</div>
+            <div class="mt-1">${sampleMarks} ${moreBadge}</div>
+          </td>
+          <td>
+            <span class="badge bg-light text-muted border">${escapeHtml(cat)}</span>
+          </td>
+          <td class="text-center font-monospace fw-semibold">${count}</td>
+          <td class="text-end pe-3 text-nowrap">
+            <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-edit-cable-group" data-group-key="${escapeHtml(grpKey)}" title="Изменить соответствие марки и условного обозначения">
+              <i class='bx bx-edit-alt me-0_5'></i>Изменить
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-1_5 btn-delete-cable-group" data-group-key="${escapeHtml(grpKey)}" data-group-name="${escapeHtml(brandName)}" title="Удалить эту группу кабелей">
+              <i class='bx bx-trash'></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  window.deleteRuleItem = deleteRuleItem;
+  window.deleteCableItem = deleteCableItem;
+  window.deleteCouplingItem = deleteCouplingItem;
+  window.deleteEquipmentMethodItem = deleteEquipmentMethodItem;
+  window.deleteEquipmentAllItem = deleteEquipmentAllItem;
+  window.deleteCableGroupItem = deleteCableGroupItem;
+  window.openEditCableGroupModal = openEditCableGroupModal;
+  window.renderCableGroupsOverviewModalContent = renderCableGroupsOverviewModalContent;
+
+  // In-modal delete buttons click listeners
+  const btnDeleteCurrentRuleInModal = document.getElementById('btnDeleteCurrentRuleInModal');
+  if (btnDeleteCurrentRuleInModal) {
+    btnDeleteCurrentRuleInModal.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (addRuleEditContext && addRuleEditContext.originalSection && addRuleEditContext.originalRuleName) {
+        deleteRuleItem(addRuleEditContext.originalSection, addRuleEditContext.originalRuleName);
+      }
+    });
+  }
+
+  const btnDeleteCurrentCableInModal = document.getElementById('btnDeleteCurrentCableInModal');
+  if (btnDeleteCurrentCableInModal) {
+    btnDeleteCurrentCableInModal.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (addCableEditContext && addCableEditContext.originalMark) {
+        deleteCableItem(addCableEditContext.originalGroup, addCableEditContext.originalMark);
+      }
+    });
+  }
+
+  const btnDeleteCurrentCableGroupInModal = document.getElementById('btnDeleteCurrentCableGroupInModal');
+  if (btnDeleteCurrentCableGroupInModal) {
+    btnDeleteCurrentCableGroupInModal.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (addCableGroupEditContext && addCableGroupEditContext.originalKey !== undefined) {
+        deleteCableGroupItem(addCableGroupEditContext.originalKey);
+      }
+    });
+  }
+
+  const btnDeleteCurrentCouplingInModal = document.getElementById('btnDeleteCurrentCouplingInModal');
+  if (btnDeleteCurrentCouplingInModal) {
+    btnDeleteCurrentCouplingInModal.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (addCouplingEditContext && addCouplingEditContext.originalMark) {
+        deleteCouplingItem(addCouplingEditContext.originalMark);
+      }
+    });
+  }
+
+  const btnDeleteCurrentEquipMethodInModal = document.getElementById('btnDeleteCurrentEquipMethodInModal');
+  if (btnDeleteCurrentEquipMethodInModal) {
+    btnDeleteCurrentEquipMethodInModal.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (addEquipEditContext && addEquipEditContext.originalMark && addEquipEditContext.originalMethod) {
+        deleteEquipmentMethodItem(addEquipEditContext.originalMark, addEquipEditContext.originalMethod);
+      }
+    });
+  }
+
+  const btnDeleteCurrentEquipAllInModal = document.getElementById('btnDeleteCurrentEquipAllInModal');
+  if (btnDeleteCurrentEquipAllInModal) {
+    btnDeleteCurrentEquipAllInModal.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (addEquipEditContext && addEquipEditContext.originalMark) {
+        deleteEquipmentAllItem(addEquipEditContext.originalMark);
+      }
+    });
+  }
+
+  // Cable group toolbar & overview buttons
+  const btnOpenCableGroupsManager = document.getElementById('btnOpenCableGroupsManager');
+  if (btnOpenCableGroupsManager) {
+    btnOpenCableGroupsManager.addEventListener('click', () => {
+      renderCableGroupsOverviewModalContent(getDraftRulesFromEditor());
+      const modalEl = document.getElementById('manageCableGroupsOverviewModal');
+      if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+    });
+  }
+
+  const quickAddCableGroupBtn = document.getElementById('quickAddCableGroupBtn');
+  if (quickAddCableGroupBtn) {
+    quickAddCableGroupBtn.addEventListener('click', () => {
+      openEditCableGroupModal(null);
+    });
+  }
+
+  const btnAddNewCableGroupFromOverview = document.getElementById('btnAddNewCableGroupFromOverview');
+  if (btnAddNewCableGroupFromOverview) {
+    btnAddNewCableGroupFromOverview.addEventListener('click', () => {
+      openEditCableGroupModal(null);
+    });
+  }
+
+  const btnSaveCableGroup = document.getElementById('btnSaveCableGroup');
+  if (btnSaveCableGroup) {
+    btnSaveCableGroup.addEventListener('click', () => {
+      saveCableGroupModal();
+    });
+  }
+
+  const cableGroupOverviewSearchInput = document.getElementById('cableGroupOverviewSearchInput');
+  if (cableGroupOverviewSearchInput) {
+    cableGroupOverviewSearchInput.addEventListener('input', () => {
+      renderCableGroupsOverviewModalContent();
+    });
+  }
+
+  // Quick symbol buttons in editCableGroupModal
+  const editCableGroupModalEl = document.getElementById('editCableGroupModal');
+  if (editCableGroupModalEl) {
+    editCableGroupModalEl.addEventListener('click', (e) => {
+      const symBtn = e.target.closest('.btn-group-symbol-choice');
+      if (symBtn) {
+        e.preventDefault();
+        const sym = symBtn.getAttribute('data-symbol') ?? '';
+        const keyInput = document.getElementById('editCableGroupKey');
+        if (keyInput) {
+          keyInput.value = sym;
+          keyInput.dispatchEvent(new Event('input', { bubbles: true }));
+          keyInput.focus();
+        }
+      }
+    });
+  }
+
+  // Quick symbol buttons in addCableModal
+  if (addCableModalEl) {
+    addCableModalEl.addEventListener('click', (e) => {
+      const symBtn = e.target.closest('.btn-cable-modal-symbol');
+      if (symBtn) {
+        e.preventDefault();
+        const sym = symBtn.getAttribute('data-symbol') ?? '';
+        const groupKeyInput = document.getElementById('addCableGroupKey');
+        if (groupKeyInput) {
+          groupKeyInput.value = sym;
+          groupKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+          groupKeyInput.dispatchEvent(new Event('change', { bubbles: true }));
+          groupKeyInput.focus();
+        }
+      }
+    });
+  }
+
+  // Delegated clicks inside manageCableGroupsOverviewModal
+  const manageCableGroupsOverviewModalEl = document.getElementById('manageCableGroupsOverviewModal');
+  if (manageCableGroupsOverviewModalEl) {
+    manageCableGroupsOverviewModalEl.addEventListener('click', (e) => {
+      const editBtn = e.target.closest('.btn-edit-cable-group');
+      if (editBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const grpKey = editBtn.getAttribute('data-group-key') ?? '';
+        openEditCableGroupModal(grpKey);
+        return;
+      }
+      const delBtn = e.target.closest('.btn-delete-cable-group');
+      if (delBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const grpKey = delBtn.getAttribute('data-group-key') ?? '';
+        deleteCableGroupItem(grpKey);
+        return;
+      }
+    });
+  }
+
+  // Reset modal modes and preserve scroll on child modal close
+  const modalResetMap = {
+    'addRuleModal': resetRuleModalToAddMode,
+    'addCableModal': resetCableModalToAddMode,
+    'addCouplingModal': resetCouplingModalToAddMode,
+    'addEquipmentModal': resetEquipmentModalToAddMode,
+    'editCableGroupModal': resetCableGroupModalToAddMode
+  };
+
+  Object.entries(modalResetMap).forEach(([id, resetFn]) => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener('hidden.bs.modal', () => {
+        resetFn();
         const parentModal = document.getElementById('worksRulesModal');
         if (parentModal && parentModal.classList.contains('show')) {
           document.body.classList.add('modal-open');

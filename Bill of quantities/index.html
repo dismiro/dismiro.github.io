@@ -156,23 +156,6 @@
   [data-bs-theme="dark"] .cm-s-default .cm-atom { color: #ff7b72 !important; font-weight: 600; }
   [data-bs-theme="dark"] .cm-s-default .cm-variable { color: #e6edf3 !important; }
   [data-bs-theme="dark"] .cm-s-default .cm-operator, [data-bs-theme="dark"] .cm-s-default .cm-punctuation { color: #e6edf3 !important; }
-/* Animated glow for newly added JSON nodes in CodeMirror */
-  @keyframes cmNodePulse {
-    0% { background-color: rgba(13, 110, 253, 0.38); }
-    50% { background-color: rgba(13, 110, 253, 0.18); }
-    100% { background-color: transparent; }
-  }
-  @keyframes cmNodePulseDark {
-    0% { background-color: rgba(56, 189, 248, 0.45); }
-    50% { background-color: rgba(56, 189, 248, 0.2); }
-    100% { background-color: transparent; }
-  }
-  .cm-new-node-glow {
-    animation: cmNodePulse 3.5s ease-out forwards !important;
-  }
-  [data-bs-theme="dark"] .cm-new-node-glow {
-    animation: cmNodePulseDark 3.5s ease-out forwards !important;
-  }
  /* Text wrap utility - NEVER TRUNCATE */
   .cell-wrap {
     white-space: normal !important;
@@ -550,11 +533,17 @@
     }
   }
 
-  #addRuleModal, #addCableModal, #addCouplingModal, #addEquipmentModal {
+  #addRuleModal, #addCableModal, #addCouplingModal, #addEquipmentModal, #manageCableGroupsOverviewModal {
     z-index: 1065 !important;
+  }
+  #editCableGroupModal {
+    z-index: 1075 !important;
   }
   .modal-backdrop.show + .modal-backdrop.show {
     z-index: 1060 !important;
+  }
+  .modal-backdrop.show + .modal-backdrop.show + .modal-backdrop.show {
+    z-index: 1070 !important;
   }
   </style> 
 </head>
@@ -659,10 +648,6 @@
                 <div class="btn-group btn-group-sm" role="group" aria-label="Панель действий">
                   <button id='openWorksRulesBtn' class="btn btn-outline-secondary btn-icon" type="button" onclick="openWorksRulesModal('editor')" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Сметные нормы и работы: загрузить или корректировать JSON">
                     <i class="bx bx-slider-alt fs-5"></i>
-                  </button>
-
-                  <button id='openSettingsBtn' class="btn btn-outline-secondary btn-icon" type="button" onclick="openWorksRulesModal('settings')" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Настройки расчетов и экспорта (JSON)">
-                    <i class="bx bx-cog fs-5"></i>
                   </button>
 
                   <button id='calculate' class="btn btn-primary btn-icon" type="button" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Выполнить расчет объемов">
@@ -1034,6 +1019,9 @@
           <span id="worksJsonValidationBadge" class="badge bg-success-subtle text-success border border-success-subtle ms-2">
             <i class='bx bx-check me-1'></i>Корректный JSON
           </span>
+          <span id="worksRulesStorageBadge" class="badge bg-secondary-subtle text-secondary-emphasis border ms-1" style="font-size: 0.72rem;" title="Статус сохранения в LocalStorage">
+            <i class='bx bx-data me-1'></i>LocalStorage: проверка...
+          </span>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
       </div>
@@ -1160,6 +1148,12 @@
                   <option value="signaling">Кабели СЦБ и блокировки</option>
                 </select>
 
+                <button type="button" id="btnOpenCableGroupsManager" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Открыть таблицу соответствий марок кабелей и условных обозначений на плане">
+                  <i class='bx bx-git-repo-forked'></i> Соответствие марок и групп
+                </button>
+                <button type="button" id="quickAddCableGroupBtn" class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1" title="Добавить новую группу с условным обозначением">
+                  <i class='bx bx-folder-plus'></i> Добавить группу
+                </button>
                 <button type="button" id="quickAddCableInTabBtn" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1">
                   <i class='bx bx-plus-circle'></i> Добавить марку
                 </button>
@@ -1322,15 +1316,50 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Storage & Persistence Card -->
+              <div class="col-12">
+                <div class="card border shadow-xs">
+                  <div class="card-header bg-light py-2 px-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                      <i class='bx bx-data text-primary fs-5'></i>
+                      <h6 class="fw-bold small mb-0 text-dark">Хранение правил в браузере (LocalStorage)</h6>
+                    </div>
+                    <span id="settingsStorageStatusBadge" class="badge bg-secondary-subtle text-secondary-emphasis border">Проверка...</span>
+                  </div>
+                  <div class="card-body p-3">
+                    <p class="small text-muted mb-2">
+                      Все ваши изменения (новые способы, скорректированные нормы, марки кабелей, муфты и оборудование) автоматически сохраняются в браузере при нажатии «Применить и пересчитать». При перезагрузке страницы или следующем входе они загружаются автоматически.
+                    </p>
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-2 border-top">
+                      <div class="small text-muted" id="settingsStorageInfo">
+                        Занято памяти: <span class="fw-semibold font-monospace text-dark" id="storageSizeSpan">0 КБ</span> &bull; Обновлено: <span class="fw-semibold text-dark" id="storageDateSpan">—</span>
+                      </div>
+                      <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1" id="clearLocalStorageRulesBtn" title="Удалить сохраненные правила из браузера и вернуться к works_rules.json">
+                          <i class='bx bx-trash'></i> Очистить LocalStorage
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" id="saveLocalStorageRulesBtn" title="Принудительно сохранить текущие правила редактора в браузер">
+                          <i class='bx bx-save'></i> Сохранить в LocalStorage
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div class="modal-footer py-2 px-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div class="text-muted small d-flex align-items-center gap-3" id="worksRulesStats" style="font-size: 0.8rem;">
+        <div class="text-muted small d-flex align-items-center gap-3 flex-wrap" id="worksRulesStats" style="font-size: 0.8rem;">
           <span>Строк: <strong id="worksStatLines">0</strong></span>
           <span>Символов: <strong id="worksStatChars">0</strong></span>
+          <span class="border-start ps-3 d-flex align-items-center gap-1" id="footerStorageStatusWrap">
+            <i class='bx bx-check-circle text-success' id="footerStorageSavedIcon"></i>
+            <span id="footerStorageText">LocalStorage: автосохранение</span>
+          </span>
         </div>
         <div class="d-flex align-items-center gap-2">
           <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
@@ -1355,160 +1384,86 @@
       </div>
       <div class="modal-body p-3">
         <form id="formAddRule" onsubmit="return false;">
-          <div class="mb-3">
-            <label class="form-label fw-semibold small mb-1">Раздел сметных норм <span class="text-danger">*</span></label>
-            <div class="d-flex gap-3">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="addRuleSectionRadio" id="addRuleSecConstruction" value="construction" checked>
-                <label class="form-check-label small fw-medium" for="addRuleSecConstruction">
-                  Строительные работы (траншеи, лотки, проколы)
-                </label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="addRuleSectionRadio" id="addRuleSecInstallation" value="installation">
-                <label class="form-check-label small fw-medium" for="addRuleSecInstallation">
-                  Монтажные работы (прокладка кабеля по способу)
-                </label>
-              </div>
+          <div class="mb-2_5">
+            <div class="btn-group w-100 p-1 bg-body-tertiary rounded border" role="group">
+              <input type="radio" class="btn-check" name="addRuleSectionRadio" id="addRuleSecConstruction" value="construction" checked autocomplete="off">
+              <label class="btn btn-sm btn-outline-primary border-0 rounded py-1 fw-medium d-flex align-items-center justify-content-center gap-1_5" for="addRuleSecConstruction">
+                <i class="bx bx-buildings fs-6"></i> Строительные работы (траншеи, лотки, проколы)
+              </label>
+              <input type="radio" class="btn-check" name="addRuleSectionRadio" id="addRuleSecInstallation" value="installation" autocomplete="off">
+              <label class="btn btn-sm btn-outline-primary border-0 rounded py-1 fw-medium d-flex align-items-center justify-content-center gap-1_5" for="addRuleSecInstallation">
+                <i class="bx bx-cable fs-6"></i> Монтажные работы (прокладка кабеля)
+              </label>
             </div>
           </div>
 
-          <div class="mb-3">
-            <label for="addRuleWayName" class="form-label fw-semibold small mb-1">Способ прокладки (название) <span class="text-danger">*</span></label>
-            <input type="text" class="form-control form-control-sm" id="addRuleWayName" placeholder="Например: В грунтовой траншее тип 1 или Футляр ПНД" required>
-            <div class="form-text fs-xs">Должно точно совпадать с наименованием способа прокладки в двухниточном плане или исходных данных.</div>
+          <div class="mb-2">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-light fw-medium text-secondary">Способ прокладки</span>
+              <input type="text" class="form-control" id="addRuleWayName" placeholder="Наименование способа прокладки" required>
+            </div>
           </div>
 
           <!-- Construction works dynamic container -->
           <div id="addRuleConstructionContainer">
             <div class="d-flex align-items-center justify-content-between mb-2">
               <label class="form-label fw-semibold small mb-0">Состав сметных работ и материалов способа</label>
-              <button type="button" class="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1" id="btnAddRuleWorkRow">
+              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2 fs-xs d-inline-flex align-items-center gap-1" id="btnAddRuleWorkRow">
                 <i class='bx bx-plus'></i> Добавить работу
               </button>
             </div>
-            <div class="alert alert-info py-1 px-2 fs-xs mb-2">
-              Переменная <code>ДЛИНА</code> в формулах означает протяженность траншеи / способа прокладки в метрах (например: <code>ДЛИНА</code>, <code>0.4*ДЛИНА</code>, <code>1.05*ДЛИНА</code>). К каждой работе можно добавить расходные материалы, условие применения и переопределить сметный раздел.
-            </div>
-            <div id="addRuleWorksCardsContainer" class="d-flex flex-column gap-2" style="max-height: 420px; overflow-y: auto; overflow-x: hidden; padding-right: 4px;">
+            <div id="addRuleWorksCardsContainer" class="d-flex flex-column gap-2" style="max-height: 440px; overflow-y: auto; overflow-x: hidden; padding-right: 4px;">
             </div>
           </div>
 
           <!-- Installation works container -->
           <div id="addRuleInstallationContainer" class="d-none">
-            <div class="alert alert-info py-1 px-2 fs-xs mb-3">
-              Для монтажных работ нормы дифференцируются по весовым категориям (масса 1 м кабеля в кг) и для оптического кабеля. Переменная <code>ДЛИНА</code> обозначает длину кабеля. Кабель <code>{МАРКА_КАБЕЛЯ}</code> будет добавлен в материалы автоматически.
+            <!-- Compact template & actions bar -->
+            <div class="p-2 mb-2 rounded border bg-body-tertiary">
+              <div class="input-group input-group-sm mb-1_5">
+                <span class="input-group-text bg-body text-secondary fs-xs fw-semibold">
+                  <i class="bx bx-magic-wand me-1 text-primary"></i>Шаблон названия
+                </span>
+                <input type="text" class="form-control font-monospace" id="addRuleInstTemplate" placeholder="Прокладка кабеля массой 1 м, кг, до: {масса} в траншее">
+                <button type="button" class="btn btn-outline-primary" id="btnApplyRuleTemplateToTiers" title="Применить этот шаблон ко всем весовым ступеням">
+                  Применить к ступеням
+                </button>
+              </div>
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-1_5 pt-1 border-top">
+                <div class="d-flex align-items-center gap-1_5">
+                  <span class="fw-semibold small text-dark">Весовые ступени</span>
+                  <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs" id="addRuleTiersCountBadge">0 категорий</span>
+                </div>
+                <div class="d-flex align-items-center gap-1 flex-wrap">
+                  <button type="button" class="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1" id="btnApplyDefaultStandardTiers" title="Заполнить стандартный набор: 1, 2, 3, свыше 3, ВОЛС">
+                    <i class="bx bx-check-double"></i> Стандартные (1, 2, 3, >3, ВОЛС)
+                  </button>
+                  <button type="button" class="btn btn-xs btn-outline-info d-inline-flex align-items-center gap-1" id="btnAddRuleOpticalTierBtn">
+                    <i class="bx bx-cable"></i> + ВОЛС
+                  </button>
+                  <button type="button" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1" id="btnAddRuleCableTierBtn">
+                    <i class="bx bx-plus"></i> + Ступень веса
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div class="d-flex flex-column gap-3">
-              <!-- Tier 1 -->
-              <div class="card p-2 border bg-body-tertiary">
-                <div class="fw-semibold small text-primary mb-1 d-flex align-items-center justify-content-between">
-                  <span>1. Масса 1 м кабеля до 1 кг (включительно)</span>
-                  <span class="badge bg-primary-subtle text-primary border">вес &le; 1 кг/м</span>
-                </div>
-                <div class="row g-2 align-items-center mb-1">
-                  <div class="col-md-6">
-                    <input type="text" class="form-control form-control-sm" id="addRuleInst1Title" placeholder="Наименование сметной работы" value="Прокладка кабеля массой 1 м до 1 кг">
-                  </div>
-                  <div class="col-md-2">
-                    <input type="text" class="form-control form-control-sm" id="addRuleInst1Unit" placeholder="Ед. изм." value="м">
-                  </div>
-                  <div class="col-md-2">
-                    <input type="text" class="form-control form-control-sm font-monospace" id="addRuleInst1Formula" placeholder="Формула" value="ДЛИНА">
-                  </div>
-                  <div class="col-md-2">
-                    <div class="form-check small">
-                      <input class="form-check-input" type="checkbox" id="addRuleInst1Show" checked>
-                      <label class="form-check-label fs-xs" for="addRuleInst1Show">Показ формулы</label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Tier 2 -->
-              <div class="card p-2 border bg-body-tertiary">
-                <div class="fw-semibold small text-success mb-1 d-flex align-items-center justify-content-between">
-                  <span>2. Масса 1 м кабеля от 1 до 2 кг</span>
-                  <span class="badge bg-success-subtle text-success border">1 &lt; вес &le; 2 кг/м</span>
-                </div>
-                <div class="row g-2 align-items-center mb-1">
-                  <div class="col-md-6">
-                    <input type="text" class="form-control form-control-sm" id="addRuleInst2Title" placeholder="Наименование сметной работы" value="Прокладка кабеля массой 1 м до 2 кг">
-                  </div>
-                  <div class="col-md-2">
-                    <input type="text" class="form-control form-control-sm" id="addRuleInst2Unit" placeholder="Ед. изм." value="м">
-                  </div>
-                  <div class="col-md-2">
-                    <input type="text" class="form-control form-control-sm font-monospace" id="addRuleInst2Formula" placeholder="Формула" value="ДЛИНА">
-                  </div>
-                  <div class="col-md-2">
-                    <div class="form-check small">
-                      <input class="form-check-input" type="checkbox" id="addRuleInst2Show" checked>
-                      <label class="form-check-label fs-xs" for="addRuleInst2Show">Показ формулы</label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Tier 3 -->
-              <div class="card p-2 border bg-body-tertiary">
-                <div class="fw-semibold small text-warning mb-1 d-flex align-items-center justify-content-between">
-                  <span>3. Масса 1 м кабеля от 2 до 3 кг</span>
-                  <span class="badge bg-warning-subtle text-warning-emphasis border">2 &lt; вес &le; 3 кг/м</span>
-                </div>
-                <div class="row g-2 align-items-center mb-1">
-                  <div class="col-md-6">
-                    <input type="text" class="form-control form-control-sm" id="addRuleInst3Title" placeholder="Наименование сметной работы" value="Прокладка кабеля массой 1 м до 3 кг">
-                  </div>
-                  <div class="col-md-2">
-                    <input type="text" class="form-control form-control-sm" id="addRuleInst3Unit" placeholder="Ед. изм." value="м">
-                  </div>
-                  <div class="col-md-2">
-                    <input type="text" class="form-control form-control-sm font-monospace" id="addRuleInst3Formula" placeholder="Формула" value="ДЛИНА">
-                  </div>
-                  <div class="col-md-2">
-                    <div class="form-check small">
-                      <input class="form-check-input" type="checkbox" id="addRuleInst3Show" checked>
-                      <label class="form-check-label fs-xs" for="addRuleInst3Show">Показ формулы</label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Optical -->
-              <div class="card p-2 border bg-body-tertiary">
-                <div class="fw-semibold small text-info mb-1 d-flex align-items-center justify-content-between">
-                  <span>4. Оптический кабель связи (ВОЛС)</span>
-                  <span class="badge bg-info-subtle text-info border">ВОЛС</span>
-                </div>
-                <div class="row g-2 align-items-center mb-1">
-                  <div class="col-md-6">
-                    <input type="text" class="form-control form-control-sm" id="addRuleInstOptTitle" placeholder="Наименование сметной работы" value="Прокладка оптического кабеля">
-                  </div>
-                  <div class="col-md-2">
-                    <input type="text" class="form-control form-control-sm" id="addRuleInstOptUnit" placeholder="Ед. изм." value="м">
-                  </div>
-                  <div class="col-md-2">
-                    <input type="text" class="form-control form-control-sm font-monospace" id="addRuleInstOptFormula" placeholder="Формула" value="ДЛИНА">
-                  </div>
-                  <div class="col-md-2">
-                    <div class="form-check small">
-                      <input class="form-check-input" type="checkbox" id="addRuleInstOptShow" checked>
-                      <label class="form-check-label fs-xs" for="addRuleInstOptShow">Показ формулы</label>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <!-- Dynamic installation tiers container -->
+            <div id="addRuleInstallationTiersContainer" class="d-flex flex-column gap-2" style="max-height: 480px; overflow-y: auto; overflow-x: hidden; padding-right: 4px;">
             </div>
           </div>
         </form>
       </div>
-      <div class="modal-footer py-2 px-3 border-top d-flex justify-content-end gap-2">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
-        <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnSaveNewRule">
-          <i class='bx bx-check'></i> Добавить способ в правила
+      <div class="modal-footer py-2 px-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-danger btn-sm d-none align-items-center gap-1" id="btnDeleteCurrentRuleInModal" title="Удалить этот способ прокладки из правил">
+          <i class='bx bx-trash'></i> Удалить способ
         </button>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnSaveNewRule">
+            <i class='bx bx-check'></i> Добавить способ в правила
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1516,7 +1471,7 @@
 
 <!-- Dialog Modal 2: Add Cable (Марка кабеля) -->
 <div class="modal fade" id="addCableModal" tabindex="-1" aria-labelledby="addCableModalTitle" aria-hidden="true">
-  <div class="modal-dialog modal-md modal-dialog-centered">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content shadow-lg border">
       <div class="modal-header py-2 px-3 bg-body-tertiary border-bottom">
         <h6 class="modal-title fw-bold d-flex align-items-center gap-2" id="addCableModalTitle">
@@ -1526,65 +1481,213 @@
       </div>
       <div class="modal-body p-3">
         <form id="formAddCable" onsubmit="return false;">
-          <div class="mb-3">
-            <label for="addCableGroupKey" class="form-label fw-semibold small mb-1">Группа / индекс кабеля на плане <span class="text-danger">*</span></label>
-            <div class="input-group input-group-sm">
-              <input type="text" class="form-control font-monospace" id="addCableGroupKey" list="datalistCableGroups" placeholder="Например: * или ** или пусто">
-              <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Выбрать</button>
-              <ul class="dropdown-menu dropdown-menu-end shadow-sm" id="dropdownCableGroupList">
-                <li><a class="dropdown-item small" href="#" data-group="" data-name="СБВБПу"><code>""</code> — Основная группа (СБВБПу)</a></li>
-                <li><a class="dropdown-item small" href="#" data-group="*" data-name="СБВБэпПуц"><code>"*"</code> — СБВБэпПуц (алюмополимерный экран)</a></li>
-                <li><a class="dropdown-item small" href="#" data-group="**" data-name="СБВБПсЭауПсБбШпц"><code>"**"</code> — СБВБПсЭауПсБбШпц (усиленный экран и броня)</a></li>
-                <li><a class="dropdown-item small" href="#" data-group="&" data-name="СБВБПнг(А)-HF"><code>"&"</code> — СБВБПнг(А)-HF (безгалогенный)</a></li>
-                <li><a class="dropdown-item small" href="#" data-group="#" data-name="СБМВБэпПу"><code>"#"</code> — СБМВБэпПу</a></li>
-                <li><a class="dropdown-item small" href="#" data-group="\U+0394" data-name="СБМВБэпПу"><code>"\U+0394"</code> — Δ СБМВБэпПу</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item small" href="#" data-group="Особый кабель" data-name="Особый кабель"><code>"Особый кабель"</code></a></li>
-                <li><a class="dropdown-item small" href="#" data-group="Оптический кабель" data-name="Оптический кабель"><code>"Оптический кабель"</code> (ВОЛС)</a></li>
-              </ul>
+          <!-- Row 1: Group Index and Group Name -->
+          <div class="row g-2 mb-2_5">
+            <div class="col-md-5">
+              <label for="addCableGroupKey" class="form-label fw-semibold small mb-1">Группа / условное обозначение <span class="text-danger">*</span></label>
+              <div class="input-group input-group-sm">
+                <input type="text" class="form-control font-monospace" id="addCableGroupKey" list="datalistCableGroups" placeholder="* или ** или пусто">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Выбрать группу из справочника">Выбрать</button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm" id="dropdownCableGroupList" style="max-height: 280px; overflow-y: auto;">
+                  <!-- Динамически заполняется из «Справочник кабелей» сметных правил -->
+                </ul>
+              </div>
+              <div class="d-flex align-items-center gap-1 flex-wrap mt-1">
+                <span class="fs-xs text-muted me-1">Символ:</span>
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 font-monospace btn-cable-modal-symbol" data-symbol="">"" (пусто)</button>
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 font-monospace btn-cable-modal-symbol" data-symbol="*">*</button>
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 font-monospace btn-cable-modal-symbol" data-symbol="**">**</button>
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 font-monospace btn-cable-modal-symbol" data-symbol="&">&amp;</button>
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 font-monospace btn-cable-modal-symbol" data-symbol="#">#</button>
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 font-monospace btn-cable-modal-symbol" data-symbol="\U+0394">\U+0394</button>
+              </div>
             </div>
-            <div class="form-text fs-xs">Символьный маркер в двухниточном плане (например, <code>*</code>, <code>**</code>, <code>&</code> или пустая строка для основной марки СБВБПу).</div>
+            <div class="col-md-7">
+              <label for="addCableGroupName" class="form-label fw-semibold small mb-1">Наименование марки кабеля группы <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" id="addCableGroupName" placeholder="Например: СБВБэпПуц">
+              <div class="fs-xs text-muted mt-1">
+                Задает соответствие: при обнаружении указанного условного обозначения кабелю присваивается эта марка.
+              </div>
+            </div>
           </div>
 
-          <div class="mb-3">
-            <label for="addCableGroupName" class="form-label fw-semibold small mb-1">Наименование марки / группы</label>
-            <input type="text" class="form-control form-control-sm" id="addCableGroupName" placeholder="Например: СБВБэпПуц">
-          </div>
-
-          <div class="mb-3">
-            <label for="addCableMark" class="form-label fw-semibold small mb-1">Обозначение / типоразмер кабеля <span class="text-danger">*</span></label>
-            <input type="text" class="form-control form-control-sm font-monospace" id="addCableMark" placeholder="Например: 7х2 или СБВБПу 7х0.9 или ОКК-01-4х8" required>
-            <div class="form-text fs-xs">Точное обозначение жильности или марки кабеля.</div>
-          </div>
-
-          <div class="row g-2 mb-3">
+          <!-- Row 2: Mark, Weight, Length -->
+          <div class="row g-2 mb-2_5">
             <div class="col-md-6">
-              <label for="addCableWeight" class="form-label fw-semibold small mb-1">Масса 1 метра, кг <span class="text-danger">*</span></label>
-              <input type="number" step="0.001" min="0" class="form-control form-control-sm font-monospace" id="addCableWeight" placeholder="Например: 0.35" required>
+              <label for="addCableMark" class="form-label fw-semibold small mb-1">Обозначение / типоразмер кабеля <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm font-monospace" id="addCableMark" placeholder="Например: 7х2 или СБВБПу 7х0.9 или ОКК-01-4х8" required>
             </div>
-            <div class="col-md-6">
-              <label for="addCableBuildingLength" class="form-label fw-semibold small mb-1">Строительная длина, м <span class="text-danger">*</span></label>
-              <input type="number" step="1" min="1" class="form-control form-control-sm font-monospace" id="addCableBuildingLength" placeholder="Например: 1000" value="1000" required>
+            <div class="col-md-3">
+              <label for="addCableWeight" class="form-label fw-semibold small mb-1">Масса 1 м, кг <span class="text-danger">*</span></label>
+              <input type="number" step="0.001" min="0" class="form-control form-control-sm font-monospace" id="addCableWeight" placeholder="0.35" required>
+            </div>
+            <div class="col-md-3">
+              <label for="addCableBuildingLength" class="form-label fw-semibold small mb-1">Строит. длина, м <span class="text-danger">*</span></label>
+              <input type="number" step="1" min="1" class="form-control form-control-sm font-monospace" id="addCableBuildingLength" placeholder="1000" value="1000" required>
             </div>
           </div>
 
-          <div class="mb-3">
-            <label for="addCableCoupling" class="form-label fw-semibold small mb-1">Тип соединительной муфты</label>
-            <input type="text" class="form-control form-control-sm" id="addCableCoupling" list="datalistCouplingsList" placeholder="Выберите или введите тип муфты">
-            <div class="form-text fs-xs">Муфта, автоматически применяемая при превышении строительной длины.</div>
-          </div>
-
-          <div class="mb-2">
-            <label for="addCableDescription" class="form-label fw-semibold small mb-1">Описание / спецификация</label>
-            <textarea class="form-control form-control-sm" id="addCableDescription" rows="2" placeholder="Например: Кабель для сигнализации и блокировки парной скрутки"></textarea>
+          <!-- Row 3: Coupling & Description -->
+          <div class="row g-2 mb-1">
+            <div class="col-md-5">
+              <label for="addCableCoupling" class="form-label fw-semibold small mb-1">Тип соединительной муфты</label>
+              <input type="text" class="form-control form-control-sm" id="addCableCoupling" list="datalistCouplingsList" placeholder="Муфта при превышении длины">
+            </div>
+            <div class="col-md-7">
+              <label for="addCableDescription" class="form-label fw-semibold small mb-1">Описание / спецификация</label>
+              <input type="text" class="form-control form-control-sm" id="addCableDescription" placeholder="Например: Кабель для сигнализации и блокировки">
+            </div>
           </div>
         </form>
       </div>
-      <div class="modal-footer py-2 px-3 border-top d-flex justify-content-end gap-2">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
-        <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnSaveNewCable">
-          <i class='bx bx-check'></i> Добавить марку
+      <div class="modal-footer py-2 px-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-danger btn-sm d-none align-items-center gap-1" id="btnDeleteCurrentCableInModal" title="Удалить эту марку кабеля из справочника">
+          <i class='bx bx-trash'></i> Удалить марку
         </button>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnSaveNewCable">
+            <i class='bx bx-check'></i> Добавить марку
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dialog Modal: Edit Cable Group & Designation Mapping -->
+<div class="modal fade" id="editCableGroupModal" tabindex="-1" aria-labelledby="editCableGroupModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-md modal-dialog-centered">
+    <div class="modal-content shadow-lg border">
+      <div class="modal-header py-2 px-3 bg-body-tertiary border-bottom">
+        <h6 class="modal-title fw-bold d-flex align-items-center gap-2" id="editCableGroupModalTitle">
+          <i class='bx bx-edit text-primary fs-5'></i> Соответствие марки кабеля и условного обозначения
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body p-3">
+        <form id="formEditCableGroup" onsubmit="return false;">
+          <!-- Field 1: Group Designation / Symbol -->
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label for="editCableGroupKey" class="form-label fw-semibold small mb-0">Условное обозначение (символ на плане / индекс) <span class="text-danger">*</span></label>
+              <span class="fs-xs text-muted">Ключ группы в правилах</span>
+            </div>
+            <input type="text" class="form-control font-monospace" id="editCableGroupKey" placeholder="* или ** или & или пусто (для базовой марки)">
+            <div class="fs-xs text-muted mt-1">
+              Символ после типоразмера на схеме (например: <code>10х2*</code> &rarr; <code>*</code>, <code>14х2**</code> &rarr; <code>**</code>). Для основной марки без индекса оставьте поле пустым.
+            </div>
+            <!-- Quick Symbol Buttons -->
+            <div class="d-flex align-items-center gap-1 flex-wrap mt-1_5">
+              <span class="fs-xs text-muted me-1">Быстрый ввод:</span>
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 font-monospace btn-group-symbol-choice" data-symbol="">"" (пусто)</button>
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 font-monospace btn-group-symbol-choice" data-symbol="*">*</button>
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 font-monospace btn-group-symbol-choice" data-symbol="**">**</button>
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 font-monospace btn-group-symbol-choice" data-symbol="&">&amp;</button>
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 font-monospace btn-group-symbol-choice" data-symbol="#">#</button>
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 font-monospace btn-group-symbol-choice" data-symbol="\U+0394">\U+0394 (Δ)</button>
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 font-monospace btn-group-symbol-choice" data-symbol="+">+</button>
+              <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 font-monospace btn-group-symbol-choice" data-symbol="~">~</button>
+            </div>
+          </div>
+
+          <!-- Field 2: Cable Mark Name -->
+          <div class="mb-3">
+            <label for="editCableGroupName" class="form-label fw-semibold small mb-1">Наименование марки кабеля этой группы <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="editCableGroupName" placeholder="Например: СБВБэпПуц, СБВБПу, СБВБПнг(А)-HF, ВВГнг-LS">
+            <div class="fs-xs text-muted mt-1">
+              Базовая марка кабеля по ГОСТ/ТУ, которая назначается при обнаружении данного условного обозначения.
+            </div>
+          </div>
+
+          <!-- Field 3: Category -->
+          <div class="mb-3">
+            <label for="editCableGroupCategory" class="form-label fw-semibold small mb-1">Категория кабеля</label>
+            <select class="form-select form-select-sm" id="editCableGroupCategory">
+              <option value="">Сигнально-блокировочный кабель (по умолчанию)</option>
+              <option value="Оптический кабель">Оптический кабель (ВОЛС)</option>
+              <option value="Особый кабель">Особый кабель</option>
+              <option value="Силовой кабель">Силовой кабель</option>
+              <option value="Кабель связи">Кабель связи</option>
+            </select>
+          </div>
+
+          <!-- Option: sync full description -->
+          <div class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" id="editCableGroupUpdateFullDesc" checked>
+            <label class="form-check-label small" for="editCableGroupUpdateFullDesc">
+              Обновить марку в полных описаниях марок этой группы при переименовании
+            </label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer py-2 px-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-danger btn-sm d-none align-items-center gap-1" id="btnDeleteCurrentCableGroupInModal" title="Удалить эту группу кабелей и условное обозначение">
+          <i class='bx bx-trash'></i> Удалить группу
+        </button>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnSaveCableGroup">
+            <i class='bx bx-check'></i> Сохранить соответствие
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dialog Modal: Overview Table of Cable Groups & Conditional Designations -->
+<div class="modal fade" id="manageCableGroupsOverviewModal" tabindex="-1" aria-labelledby="manageCableGroupsOverviewModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content shadow-lg border">
+      <div class="modal-header py-2 px-3 bg-body-tertiary border-bottom d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <i class='bx bx-git-repo-forked text-primary fs-5'></i>
+          <h6 class="modal-title fw-bold mb-0" id="manageCableGroupsOverviewModalTitle">
+            Таблица соответствий: марки кабелей и условные обозначения
+          </h6>
+          <span class="badge bg-primary-subtle text-primary border" id="cableGroupsTotalBadge">0 групп</span>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body p-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 bg-body-tertiary p-2 rounded border">
+          <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 240px; max-width: 440px;">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-body-secondary text-body-secondary"><i class='bx bx-search fs-6'></i></span>
+              <input type="text" id="cableGroupOverviewSearchInput" class="form-control" placeholder="Поиск обозначения, марки, категории...">
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2 ms-auto">
+            <button type="button" id="btnAddNewCableGroupFromOverview" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1">
+              <i class='bx bx-plus-circle'></i> Добавить соответствие / группу
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive border rounded">
+          <table class="table table-sm table-hover align-middle mb-0 text-start">
+            <thead class="table-light text-muted small border-bottom">
+              <tr>
+                <th style="width: 22%;" class="ps-3">Условное обозначение (на плане)</th>
+                <th style="width: 28%;">Наименование марки кабеля</th>
+                <th style="width: 18%;">Категория</th>
+                <th style="width: 14%;" class="text-center">Кол-во типоразмеров</th>
+                <th style="width: 18%;" class="text-end pe-3">Действия</th>
+              </tr>
+            </thead>
+            <tbody id="cableGroupsOverviewTableBody" class="small">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+        <div class="text-muted small mt-2 d-flex align-items-start gap-1">
+          <i class='bx bx-info-circle text-primary mt-0_5'></i>
+          <span>Условные обозначения (символы на плане) соответствуют обозначениям в чертежах САПР (например, <code>14х2*</code> связывается с группой <code>*</code>). Пустое обозначение <code>""</code> задает базовую марку по умолчанию без специального символа.</span>
+        </div>
+      </div>
+      <div class="modal-footer py-2 px-3 border-top">
+        <button type="button" class="btn btn-secondary btn-sm ms-auto" data-bs-dismiss="modal">Закрыть</button>
       </div>
     </div>
   </div>
@@ -1602,44 +1705,46 @@
       </div>
       <div class="modal-body p-3">
         <form id="formAddCoupling" onsubmit="return false;">
-          <div class="mb-3">
-            <label for="addCouplingMark" class="form-label fw-semibold small mb-1">Марка / тип муфты <span class="text-danger">*</span></label>
-            <input type="text" class="form-control form-control-sm font-monospace" id="addCouplingMark" placeholder="Например: МКС 14-23 или МТОК-А1" required>
-            <div class="form-text fs-xs">Обозначение муфты, используемое в привязке к кабелям.</div>
+          <div class="row g-2 mb-2_5">
+            <div class="col-md-6">
+              <label for="addCouplingMark" class="form-label fw-semibold small mb-1">Марка / тип муфты <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm font-monospace" id="addCouplingMark" placeholder="Например: МКС 14-23 или МТОК-А1" required>
+            </div>
+            <div class="col-md-3">
+              <label for="addCouplingMaxCores" class="form-label fw-semibold small mb-1">Емкость (жил) <span class="text-danger">*</span></label>
+              <input type="number" step="1" min="1" class="form-control form-control-sm font-monospace" id="addCouplingMaxCores" placeholder="24" required>
+            </div>
+            <div class="col-md-3">
+              <label for="addCouplingUnit" class="form-label fw-semibold small mb-1">Ед. изм.</label>
+              <input type="text" class="form-control form-control-sm text-center font-monospace" id="addCouplingUnit" value="шт" required>
+            </div>
           </div>
 
-          <div class="mb-3">
+          <div class="mb-2_5">
             <label for="addCouplingFullName" class="form-label fw-semibold small mb-1">Полное наименование <span class="text-danger">*</span></label>
             <textarea class="form-control form-control-sm" id="addCouplingFullName" rows="2" placeholder="Например: Муфта кабельная соединительная герметизированная чугунная" required></textarea>
           </div>
 
-          <div class="row g-2 mb-3">
-            <div class="col-md-7">
-              <label for="addCouplingMaxCores" class="form-label fw-semibold small mb-1">Емкость (жил / волокон) <span class="text-danger">*</span></label>
-              <input type="number" step="1" min="1" class="form-control form-control-sm font-monospace" id="addCouplingMaxCores" placeholder="Например: 24 или 48" required>
-            </div>
-            <div class="col-md-5">
-              <label for="addCouplingUnit" class="form-label fw-semibold small mb-1">Единица измерения</label>
-              <input type="text" class="form-control form-control-sm" id="addCouplingUnit" value="шт" required>
-            </div>
-          </div>
-
-          <div class="card p-2 border bg-body-tertiary">
+          <div class="p-2 rounded border bg-body-tertiary">
             <div class="form-check small mb-0">
               <input class="form-check-input" type="checkbox" id="addCouplingIsOptical">
               <label class="form-check-label fw-semibold text-body" for="addCouplingIsOptical">
                 Оптическая муфта (Категория: «Оптическая муфта», ВОЛС)
               </label>
             </div>
-            <div class="form-text fs-xs mt-1">Определяет привязку к нормам монтажа оптических тупиковых муфт вместо медножильных.</div>
           </div>
         </form>
       </div>
-      <div class="modal-footer py-2 px-3 border-top d-flex justify-content-end gap-2">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
-        <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnSaveNewCoupling">
-          <i class='bx bx-check'></i> Добавить муфту
+      <div class="modal-footer py-2 px-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-danger btn-sm d-none align-items-center gap-1" id="btnDeleteCurrentCouplingInModal" title="Удалить эту соединительную муфту из справочника">
+          <i class='bx bx-trash'></i> Удалить муфту
         </button>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnSaveNewCoupling">
+            <i class='bx bx-check'></i> Добавить муфту
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1657,16 +1762,14 @@
       </div>
       <div class="modal-body p-3">
         <form id="formAddEquipment" onsubmit="return false;">
-          <div class="row g-2 mb-3">
+          <div class="row g-2 mb-2_5 align-items-end">
             <div class="col-md-5">
               <label for="addEquipMark" class="form-label fw-semibold small mb-1">Марка / тип оборудования <span class="text-danger">*</span></label>
               <input type="text" class="form-control form-control-sm font-monospace" id="addEquipMark" placeholder="Например: Стрелочный электропривод СП-6К" required>
-              <div class="form-text fs-xs">Обозначение оборудования в исходных данных / двухниточном плане.</div>
             </div>
             <div class="col-md-4">
               <label for="addEquipMethod" class="form-label fw-semibold small mb-1">Способ установки <span class="text-danger">*</span></label>
               <input type="text" class="form-control form-control-sm" id="addEquipMethod" list="datalistEquipMethods" placeholder="Не указано" value="Не указано" required>
-              <div class="form-text fs-xs">Способ монтажа (например: «Не указано», «На стрелочном башмаке»).</div>
             </div>
             <div class="col-md-3 d-none" id="addEquipMergeStrategyContainer">
               <label for="addEquipMergeStrategy" class="form-label fw-semibold small mb-1">Действие:</label>
@@ -1678,11 +1781,11 @@
           </div>
 
           <!-- Баннер предупреждения о дубликате способа -->
-          <div id="addEquipExistWarning" class="alert alert-warning py-2 px-3 mb-3 border-warning shadow-sm small d-none d-flex align-items-start gap-2">
+          <div id="addEquipExistWarning" class="alert alert-warning py-1_5 px-2_5 mb-2_5 border-warning shadow-sm small d-none d-flex align-items-start gap-2">
             <i class="bx bx-error-circle fs-5 mt-0_5"></i>
             <div>
-              <strong>Внимание: такой способ установки уже существует!</strong><br>
-              <span class="fs-xs text-body-secondary">Выбранная марка и способ уже имеют сметные нормы. Выберите действие справа: дописать новые работы к существующим или полностью их перезаписать.</span>
+              <strong>Внимание: такой способ установки уже существует!</strong>
+              <div class="fs-xs text-body-secondary">Выбранная марка и способ уже имеют сметные нормы. Выберите действие: дописать работы или заменить.</div>
             </div>
           </div>
 
@@ -1692,24 +1795,30 @@
               <i class='bx bx-wrench'></i> Сметные работы по монтажу оборудования
             </div>
             <button type="button" class="btn btn-xs btn-outline-primary d-inline-flex align-items-center gap-1" id="btnAddEquipWorkCard">
-              <i class='bx bx-plus'></i> Добавить работу к оборудованию
+              <i class='bx bx-plus'></i> Добавить работу
             </button>
           </div>
 
-          <div class="alert alert-info py-1 px-2 fs-xs mb-2">
-            Каждая сметная работа может содержать вложенные позиции (ключ <code>Материалы</code>): саму товарную единицу оборудования (тип: <code>оборудование</code>) и монтажные материалы (тип: <code>материал</code>).
-          </div>
-
-          <div id="addEquipWorksContainer" class="d-flex flex-column gap-3" style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
+          <div id="addEquipWorksContainer" class="d-flex flex-column gap-2" style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
             <!-- Динамические карточки работ генерируются JS -->
           </div>
         </form>
       </div>
-      <div class="modal-footer py-2 px-3 border-top d-flex justify-content-end gap-2">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
-        <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnSaveNewEquipment">
-          <i class='bx bx-check'></i> Добавить оборудование
-        </button>
+      <div class="modal-footer py-2 px-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-outline-danger btn-sm d-none align-items-center gap-1" id="btnDeleteCurrentEquipMethodInModal" title="Удалить этот способ установки оборудования">
+            <i class='bx bx-trash'></i> Удалить способ
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm d-none align-items-center gap-1" id="btnDeleteCurrentEquipAllInModal" title="Удалить оборудование целиком со всеми нормами">
+            <i class='bx bx-trash-alt'></i> Удалить всё оборудование
+          </button>
+        </div>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnSaveNewEquipment">
+            <i class='bx bx-check'></i> Добавить оборудование
+          </button>
+        </div>
       </div>
     </div>
   </div>

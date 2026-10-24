@@ -559,20 +559,49 @@ function parseRuleWorksAndMaterials(rule) {
       let threshold = null;
       let isOver = false;
 
-      // Определение порога веса исключительно по ключу секции ("1", "2", "3", "до 1", "свыше 3" и т.д.)
+      // Определение порога веса по ключу секции ("1", "2", "3", "0.5", "до 2.5", "свыше 3", ">6" и т.д.)
       const cleanKey = String(key).trim().replace(',', '.');
       const numKey = parseFloat(cleanKey);
       if (!isNaN(numKey) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
         threshold = numKey;
       } else {
-        const matchDo = cleanKey.match(/(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
+        const matchDo = cleanKey.match(/(?:до|макс(?:имум)?)[_\s]*[:;]?[_\s]*(\d+(?:[.,]\d+)?)/i);
         if (matchDo) {
           threshold = parseFloat(matchDo[1].replace(',', '.'));
         }
-        if (/(?:свыше|более|от|>)\s*[:;]?\s*\d+/i.test(cleanKey)) {
+        if (/(?:свыше|более|от|>)[_\s]*[:;]?[_\s]*\d+/i.test(cleanKey)) {
           isOver = true;
-          const matchOver = cleanKey.match(/(?:свыше|более|от|>)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
+          const matchOver = cleanKey.match(/(?:свыше|более|от|>)[_\s]*[:;]?[_\s]*(\d+(?:[.,]\d+)?)/i);
           if (matchOver) threshold = parseFloat(matchOver[1].replace(',', '.'));
+        }
+      }
+
+      // Дополнительная проверка МаксВес / ПорогВеса внутри объектов работ
+      if (threshold === null && items.length > 0) {
+        for (const it of items) {
+          if (it && typeof it === 'object') {
+            const rawW = it["МаксВес"] !== undefined ? it["МаксВес"] : (it["ПорогВеса"] !== undefined ? it["ПорогВеса"] : it.threshold);
+            if (rawW !== undefined && rawW !== null && String(rawW).trim() !== '') {
+              const parsedW = parseFloat(String(rawW).replace(',', '.'));
+              if (!isNaN(parsedW)) {
+                threshold = parsedW;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Проверка признака "свыше" внутри объектов работ
+      if (!isOver && items.length > 0) {
+        for (const it of items) {
+          if (it && typeof it === 'object') {
+            const textCheck = `${it["Наименование"] || ''} ${it["Категория"] || ''} ${it["Условие"] || ''}`.toLowerCase();
+            if (/(?:свыше|более|от\s+\d+|>)/i.test(textCheck)) {
+              isOver = true;
+              break;
+            }
+          }
         }
       }
 
@@ -596,7 +625,8 @@ function parseRuleWorksAndMaterials(rule) {
     }
     if (a.isOver && !b.isOver) return 1;
     if (!a.isOver && b.isOver) return -1;
-    return (a.threshold || 0) - (b.threshold || 0);
+    // Оба "свыше": более высокий порог проверяется первым (например, >6 проверяется перед >3)
+    return (b.threshold || 0) - (a.threshold || 0);
   });
 
   return { optical, tiers, allItems, isObjectStructure: true, rawObj: wmObj };
@@ -1489,11 +1519,6 @@ function setupEventListeners() {
   const openWorksRulesBtn = document.getElementById('openWorksRulesBtn');
   if (openWorksRulesBtn) {
     openWorksRulesBtn.addEventListener('click', () => openWorksRulesModal('editor'));
-  }
-
-  const openSettingsBtn = document.getElementById('openSettingsBtn');
-  if (openSettingsBtn) {
-    openSettingsBtn.addEventListener('click', () => openWorksRulesModal('settings'));
   }
 
   const menuUploadWorksJson = document.getElementById('menuUploadWorksJson');
