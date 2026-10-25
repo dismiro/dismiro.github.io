@@ -1382,11 +1382,86 @@ function getCableWeightTier(weight, rule) {
   return 6;
 }
 
-// Active rules state and cached standard rules loaded dynamically from works_rules.json
+// Active rules state and cached standard rules loaded dynamically from rulesStore or works_rules.json
 var cachedDefaultRules = null;
 var currentWorksRules = { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} };
 window.cachedDefaultRules = cachedDefaultRules;
 window.currentWorksRules = currentWorksRules;
+
+// Open rules manager page (standard navigation in current tab, wheel-click/middle-click opens in new tab)
+function openWorksRulesModal(tab = 'editor', event = null) {
+  let hash = 'json';
+  if (tab === 'construction') hash = 'construction';
+  else if (tab === 'installation') hash = 'installation';
+  else if (tab === 'cables') hash = 'cables';
+  else if (tab === 'couplings') hash = 'couplings';
+  else if (tab === 'equipment') hash = 'equipment';
+  else if (tab === 'settings') hash = 'settings';
+  else if (tab === 'editor' || tab === 'json') hash = 'json';
+
+  const targetUrl = `rules.html#${hash}`;
+  if (event && (event.button === 1 || event.ctrlKey || event.metaKey)) {
+    window.open(targetUrl, '_blank');
+  } else {
+    window.location.href = targetUrl;
+  }
+}
+window.openWorksRulesModal = openWorksRulesModal;
+
+// Banner controls for cross-tab rules update
+function showRulesUpdatedBanner() {
+  const banner = document.getElementById('rulesUpdatedBanner');
+  if (banner) {
+    banner.classList.remove('d-none');
+    banner.classList.add('d-flex');
+  }
+}
+window.showRulesUpdatedBanner = showRulesUpdatedBanner;
+
+function hideRulesUpdatedBanner() {
+  const banner = document.getElementById('rulesUpdatedBanner');
+  if (banner) {
+    banner.classList.add('d-none');
+    banner.classList.remove('d-flex');
+  }
+}
+window.hideRulesUpdatedBanner = hideRulesUpdatedBanner;
+
+// Load rules from store or file
+async function initWorksRules() {
+  if (window.rulesStore) {
+    try {
+      const rules = await window.rulesStore.loadRules();
+      if (rules && typeof rules === 'object') {
+        currentWorksRules = rules;
+        window.currentWorksRules = currentWorksRules;
+        if (currentData) {
+          calculateVolumes({ refreshRawData: false });
+        }
+        return currentWorksRules;
+      }
+    } catch (err) {
+      console.warn('[initWorksRules] Ошибка rulesStore:', err);
+    }
+  }
+
+  try {
+    const res = await fetch('./works_rules.json?t=' + Date.now());
+    if (res.ok) {
+      const data = await res.json();
+      currentWorksRules = data;
+      window.currentWorksRules = data;
+      if (currentData) {
+        calculateVolumes({ refreshRawData: false });
+      }
+      return data;
+    }
+  } catch (err) {
+    console.warn('[initWorksRules] Ошибка загрузки works_rules.json:', err);
+  }
+  return currentWorksRules;
+}
+window.initWorksRules = initWorksRules;
 
 function escapeHtml(str) {
   if (typeof str !== 'string') return str === null || str === undefined ? '' : String(str);
@@ -1515,51 +1590,49 @@ function setupEventListeners() {
     });
   }
 
-  // Works rules (JSON) editor & modal open buttons
-  const openWorksRulesBtn = document.getElementById('openWorksRulesBtn');
-  if (openWorksRulesBtn) {
-    openWorksRulesBtn.addEventListener('click', () => openWorksRulesModal('editor'));
-  }
-
-  const menuUploadWorksJson = document.getElementById('menuUploadWorksJson');
-  if (menuUploadWorksJson) {
-    menuUploadWorksJson.addEventListener('click', (e) => {
-      e.preventDefault();
-      const rulesFileInput = document.getElementById('rulesFileInput');
-      if (rulesFileInput) rulesFileInput.click();
+  // Banner recalculate and dismiss listeners
+  const btnRecalculateFromBanner = document.getElementById('btnRecalculateFromBanner');
+  if (btnRecalculateFromBanner) {
+    btnRecalculateFromBanner.addEventListener('click', () => {
+      if (window.rulesStore) {
+        currentWorksRules = window.rulesStore.getRulesSync();
+        window.currentWorksRules = currentWorksRules;
+      }
+      hideRulesUpdatedBanner();
+      if (currentData) {
+        calculateVolumes({ refreshRawData: true });
+        showToast('Проект успешно пересчитан по обновленным сметным правилам', 'success', 'Перерасчет выполнен');
+      } else {
+        showToast('Правила обновлены. Загрузите файл проекта для расчета объемов', 'info', 'Правила обновлены');
+      }
     });
   }
 
-  const menuEditWorksJson = document.getElementById('menuEditWorksJson');
-  if (menuEditWorksJson) {
-    menuEditWorksJson.addEventListener('click', (e) => {
-      e.preventDefault();
-      openWorksRulesModal('editor');
+  const btnDismissRulesBanner = document.getElementById('btnDismissRulesBanner');
+  if (btnDismissRulesBanner) {
+    btnDismissRulesBanner.addEventListener('click', () => {
+      hideRulesUpdatedBanner();
     });
   }
 
-  const menuSettings = document.getElementById('menuSettings');
-  if (menuSettings) {
-    menuSettings.addEventListener('click', (e) => {
-      e.preventDefault();
-      openWorksRulesModal('settings');
+  // Cross-tab storage synchronization listener
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'si_works_rules_v1' || e.key === 'si_works_rules_v1_meta') {
+      showRulesUpdatedBanner();
+    }
+  });
+
+  if (window.rulesStore) {
+    window.rulesStore.subscribe((event) => {
+      if (event.type === 'external-storage-change') {
+        showRulesUpdatedBanner();
+      }
     });
   }
 
-  const menuViewCablesCatalog = document.getElementById('menuViewCablesCatalog');
-  if (menuViewCablesCatalog) {
-    menuViewCablesCatalog.addEventListener('click', (e) => {
-      e.preventDefault();
-      openWorksRulesModal('cables');
-    });
-  }
-
-  // Setup Works Rules modal controls & JSON editor listeners (in rules_modal.js)
-  setupWorksRulesListeners();
-
-  const rulesModalEl = document.getElementById('worksRulesModal');
-  if (rulesModalEl) {
-    rulesModalEl.addEventListener('show.bs.modal', renderRulesModalContent);
+  // Optional modal listeners if rules_modal.js is present
+  if (typeof setupWorksRulesListeners === 'function') {
+    setupWorksRulesListeners();
   }
 
   // Header data search & expand/collapse listeners
@@ -1802,9 +1875,16 @@ async function processFile(file) {
 
       if (isRulesFile) {
         currentWorksRules = json;
-        setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
-        validateWorksJsonInput();
-        renderRulesModalContent();
+        if (typeof setWorksJsonEditorValue === 'function') setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
+        if (typeof validateWorksJsonInput === 'function') validateWorksJsonInput();
+        if (typeof renderRulesModalContent === 'function') renderRulesModalContent();
+        if (window.rulesStore && typeof window.rulesStore.saveRules === 'function') {
+          try {
+            window.rulesStore.saveRules(currentWorksRules);
+          } catch (e) {
+            console.warn('[code.js] Ошибка сохранения правил в rulesStore:', e);
+          }
+        }
         const sections = getRulesSections(currentWorksRules);
         let totalWays = 0;
         sections.forEach(s => totalWays += s.rules.length);
@@ -3392,9 +3472,9 @@ function renderInstallationWorks(cableWorksCalc) {
       <div class="text-center py-4 px-2 text-muted small bg-light rounded border">
         <i class="bx bx-info-circle fs-4 d-block mb-1 text-secondary"></i>
         <div>Работы не определены для текущих способов прокладки кабелей и оборудования.</div>
-        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('cards')">
-          <i class="bx bx-edit"></i> Настроить правила в модальном окне
-        </button>
+        <a href="rules.html#construction" class="btn btn-sm btn-outline-primary mt-2">
+          <i class="bx bx-edit"></i> Настроить правила строительных работ
+        </a>
       </div>
     `;
   }
@@ -3579,9 +3659,9 @@ function renderConstructionWorks(worksCalc) {
       <div class="text-center py-4 px-2 text-muted small bg-light rounded border">
         <i class="bx bx-info-circle fs-4 d-block mb-1 text-secondary"></i>
         <div>Работы не определены для текущих способов прокладки.</div>
-        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openWorksRulesModal('cards')">
-          <i class="bx bx-edit"></i> Настроить правила в модальном окне
-        </button>
+        <a href="rules.html#installation" class="btn btn-sm btn-outline-primary mt-2">
+          <i class="bx bx-edit"></i> Настроить правила монтажных работ
+        </a>
       </div>
     `;
   }
@@ -4940,6 +5020,39 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 // --------------------------------------------------------------------------
 // EQUIPMENT RULES & CALCULATION FUNCTIONS
 // --------------------------------------------------------------------------
+
+function getEquipmentRulesDict(rulesData) {
+  if (!rulesData || typeof rulesData !== 'object') return {};
+  const raw = rulesData["Оборудование"];
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw;
+  }
+  return {};
+}
+window.getEquipmentRulesDict = getEquipmentRulesDict;
+
+function getEquipmentRulesList(rulesData) {
+  const dict = getEquipmentRulesDict(rulesData);
+  return Object.entries(dict).map(([markKey, itemVal]) => {
+    return {
+      "Марка": markKey,
+      ...(itemVal && typeof itemVal === 'object' ? itemVal : {})
+    };
+  });
+}
+window.getEquipmentRulesList = getEquipmentRulesList;
+
+function getEquipmentItemWorksObject(item) {
+  if (!item || typeof item !== 'object') return {};
+  if (item["Работы"] && typeof item["Работы"] === 'object') {
+    return item["Работы"];
+  }
+  if (item["Работы и материалы"] && typeof item["Работы и материалы"] === 'object') {
+    return item["Работы и материалы"];
+  }
+  return {};
+}
+window.getEquipmentItemWorksObject = getEquipmentItemWorksObject;
 
 function getEquipmentRules(rulesData) {
   const rules = getEquipmentRulesList(rulesData);

@@ -777,19 +777,19 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
 
   const btnTr = bodyEl.querySelector('#btnGoToTrenchRules');
   if (btnTr) {
-    btnTr.addEventListener('click', () => {
+    btnTr.addEventListener('click', (e) => {
       const modalInstance = bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
-      openWorksRulesModal('cards');
+      openWorksRulesModal('construction', e);
     });
   }
 
   const btnCb = bodyEl.querySelector('#btnGoToCableRules');
   if (btnCb) {
-    btnCb.addEventListener('click', () => {
+    btnCb.addEventListener('click', (e) => {
       const modalInstance = bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
-      openWorksRulesModal('cards');
+      openWorksRulesModal('installation', e);
     });
   }
 

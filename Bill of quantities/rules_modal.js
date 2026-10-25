@@ -91,6 +91,15 @@ const LOCAL_STORAGE_RULES_META_KEY = 'si_works_rules_v1_meta';
 
 function saveWorksRulesToLocalStorage(rules) {
   if (!rules || typeof rules !== 'object') return false;
+  if (window.rulesStore && typeof window.rulesStore.saveRules === 'function') {
+    try {
+      window.rulesStore.saveRules(rules);
+      updateStorageStatusUi();
+      return true;
+    } catch (err) {
+      console.error('Ошибка сохранения правил через rulesStore:', err);
+    }
+  }
   try {
     const jsonStr = JSON.stringify(rules);
     localStorage.setItem(LOCAL_STORAGE_RULES_KEY, jsonStr);
@@ -144,7 +153,6 @@ function updateStorageStatusUi() {
   } catch (e) {}
 
   const hasSaved = Boolean(raw);
-  const headerBadge = document.getElementById('worksRulesStorageBadge');
   const settingsBadge = document.getElementById('settingsStorageStatusBadge');
   const sizeSpan = document.getElementById('storageSizeSpan');
   const dateSpan = document.getElementById('storageDateSpan');
@@ -153,18 +161,6 @@ function updateStorageStatusUi() {
 
   const sizeKb = raw ? (raw.length / 1024).toFixed(1) + ' КБ' : '0 КБ';
   const dateStr = (meta && meta.savedAt) ? new Date(meta.savedAt).toLocaleString('ru-RU') : (hasSaved ? 'Сохранено' : '—');
-
-  if (headerBadge) {
-    if (hasSaved) {
-      headerBadge.className = 'badge bg-primary-subtle text-primary border border-primary-subtle ms-1';
-      headerBadge.innerHTML = `<i class='bx bx-check-circle me-1'></i>LocalStorage (${sizeKb})`;
-      headerBadge.title = `Сохранено в браузере: ${dateStr}`;
-    } else {
-      headerBadge.className = 'badge bg-light text-muted border ms-1';
-      headerBadge.innerHTML = `<i class='bx bx-file me-1'></i>works_rules.json`;
-      headerBadge.title = 'Правила загружаются из стандартного файла works_rules.json';
-    }
-  }
 
   if (settingsBadge) {
     if (hasSaved) {
@@ -218,7 +214,7 @@ async function initWorksRules() {
     modalDraftRules = JSON.parse(JSON.stringify(localRules));
     renderRulesModalContent(currentWorksRules);
     updateStorageStatusUi();
-    if (currentData) {
+    if (typeof currentData !== 'undefined' && currentData && typeof calculateVolumes === 'function') {
       calculateVolumes();
     }
     return currentWorksRules;
@@ -230,7 +226,7 @@ async function initWorksRules() {
     modalDraftRules = JSON.parse(JSON.stringify(defaultData));
     renderRulesModalContent(currentWorksRules);
     updateStorageStatusUi();
-    if (currentData) {
+    if (typeof currentData !== 'undefined' && currentData && typeof calculateVolumes === 'function') {
       calculateVolumes();
     }
     return currentWorksRules;
@@ -423,10 +419,257 @@ function renderModalWorkItemHtml(w, wIdx, options = {}) {
   `;
 }
 
+/// Helper to render rules cards for a specific section
+function renderSingleRulesSectionHtml(sec, query) {
+  if (!sec || !Array.isArray(sec.rules)) return { html: '', matchedCount: 0, totalCount: 0, worksCount: 0 };
+
+  const isCableSec = sec.name.toLowerCase().includes('монтаж') || sec.name.toLowerCase().includes('кабел');
+  const totalCount = sec.rules.length;
+  let worksCount = 0;
+
+  sec.rules.forEach(r => {
+    const works = getRuleWorks(r);
+    if (Array.isArray(works)) worksCount += works.length;
+  });
+
+  const matchingRules = sec.rules.filter(rule => {
+    if (!query) return true;
+    const rName = rule["Марка"] || rule["Название"] || rule.mark || rule.name || '';
+    const works = getRuleWorks(rule);
+    const worksNames = works.map(w => {
+      if (!w) return '';
+      if (typeof w === 'string') return w;
+      return `${w["Наименование"] || w.name || ''} ${w["Единицы измерения"] || w.unit || ''} ${w["Тип"] || w.type || ''}`;
+    }).join(' ');
+    const rawWm = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] : (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
+    const tierKeys = (rawWm && typeof rawWm === 'object' && !Array.isArray(rawWm)) ? Object.keys(rawWm).join(' ') : '';
+    const haystack = `${sec.name} ${rName} ${worksNames} ${tierKeys}`.toLowerCase();
+    return haystack.includes(query);
+  });
+
+  if (matchingRules.length === 0) {
+    return {
+      html: renderCatalogEmptyState('Позиции не найдены', query ? 'Попробуйте изменить поисковый запрос' : 'В этом разделе пока нет правил', 'bx-search'),
+      matchedCount: 0,
+      totalCount,
+      worksCount
+    };
+  }
+
+  let html = '<div class="d-flex flex-column gap-3">';
+
+  matchingRules.forEach((rule, rIdx) => {
+    const rName = rule["Марка"] || rule["Название"] || 'Без названия';
+    const rawWm = rule["Работы и материалы"] !== undefined 
+      ? rule["Работы и материалы"] 
+      : (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
+    const works = getRuleWorks(rule);
+    const isObjectStructure = rawWm && typeof rawWm === 'object' && !Array.isArray(rawWm);
+
+    let worksHtml = '';
+    let ruleWorksCount = 0;
+    let ruleSubCount = 0;
+
+    const renderWorkWithSubItems = (w, wIdx, tierContext = null) => {
+      if (typeof w === 'string') {
+        ruleWorksCount++;
+        return `
+          <div class="p-2 rounded bg-body border mb-1 small">
+            <div class="fw-semibold text-body">${wIdx + 1}. ${escapeHtml(w)}</div>
+          </div>
+        `;
+      }
+
+      ruleWorksCount++;
+      const threshold = (tierContext && tierContext.threshold !== null) ? tierContext.threshold : null;
+      const isOver = tierContext ? tierContext.isOver : false;
+      const tierBadge = threshold !== null 
+        ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">до ${threshold} кг/м</span>`
+        : (isOver ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">свыше</span>` : '');
+
+      const cond = parseCableCountCondition(w);
+      const condBadge = cond.hasCondition
+        ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1 font-monospace" style="font-size: 0.7rem;" title="Условие применения: ${escapeHtml(cond.description)}"><i class="bx bx-git-branch me-0_5"></i>${escapeHtml(cond.description)}</span>`
+        : '';
+
+      const showFormula = shouldShowFormula(w);
+      const section = w["Раздел"] || w.section || sec.name;
+
+      const nested = getWorkItemNestedResources(w);
+      ruleSubCount += nested.length;
+
+      const subItemsHtml = nested.map((sub, sIdx) => {
+        if (typeof sub === 'string') {
+          return `
+            <div class="p-2 rounded bg-body border mb-1 ms-3 small">
+              <div class="text-body"><span class="text-muted me-1 fw-bold">↳</span>${wIdx + 1}.${sIdx + 1}. ${escapeHtml(sub)}</div>
+            </div>
+          `;
+        }
+
+        const isDirectSubEquip = Array.isArray(w["Оборудование"]) && w["Оборудование"].includes(sub);
+        const subType = sub["Тип"] || sub.type || (isDirectSubEquip ? 'оборудование' : 'материал');
+
+        return renderModalWorkItemHtml(sub, sIdx, {
+          isSub: true,
+          parentIdx: wIdx,
+          defaultType: subType,
+          defaultFormula: 'ДЛИНА',
+          defaultUnit: sub["Единицы измерения"] || sub.unit || 'м',
+          defaultSection: sub["Раздел"] || section,
+          parentShowFormula: showFormula
+        });
+      }).join('');
+
+      return renderModalWorkItemHtml(w, wIdx, {
+        defaultFormula: 'ДЛИНА',
+        defaultSection: section,
+        extraBadges: `${tierBadge}${condBadge}`
+      }) + subItemsHtml;
+    };
+
+    if (isObjectStructure) {
+      const isEquipSec = sec.name.toLowerCase().includes('оборудован');
+      Object.entries(rawWm).forEach(([key, itemsVal]) => {
+        const items = Array.isArray(itemsVal) ? itemsVal : (itemsVal ? [itemsVal] : []);
+        const isOptKey = key.toLowerCase().includes('оптич') || key.toLowerCase().includes('волс');
+        let groupTitle = `Ключ: "${escapeHtml(key)}"`;
+        let tierThreshold = null;
+        let tierIsOver = false;
+
+        if (isEquipSec) {
+          groupTitle = `Способ установки: «${escapeHtml(key)}»`;
+        } else if (rName.toLowerCase().includes('муфт')) {
+          const isRuleOpt = rName.toLowerCase().includes('оптич') || rName.toLowerCase().includes('волс');
+          const unitLabel = isRuleOpt ? 'волокон' : 'жил';
+          const cleanKey = String(key).trim().replace(',', '.');
+          const numK = parseFloat(cleanKey);
+          if (!isNaN(numK)) {
+            tierThreshold = numK;
+            groupTitle = `Емкость до ${tierThreshold} ${unitLabel} (ключ "${escapeHtml(key)}")`;
+          } else {
+            groupTitle = `Емкость "${escapeHtml(key)}"`;
+          }
+        } else if (isOptKey) {
+          groupTitle = `Оптический кабель (ключ "${escapeHtml(key)}")`;
+        } else {
+          const cleanKey = String(key).trim().replace(',', '.');
+          const numK = parseFloat(cleanKey);
+          if (!isNaN(numK) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
+            tierThreshold = numK;
+            groupTitle = `Категория до ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`;
+          } else {
+            const matchDo = cleanKey.match(/(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
+            if (matchDo) {
+              tierThreshold = parseFloat(matchDo[1].replace(',', '.'));
+            }
+            if (/(?:свыше|более|от|>)\s*[:;]?\s*\d+/i.test(cleanKey)) {
+              tierIsOver = true;
+              const matchOver = cleanKey.match(/(?:свыше|более|от|>)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
+              if (matchOver) tierThreshold = parseFloat(matchOver[1].replace(',', '.'));
+            }
+            if (tierThreshold === null && items && items.length > 0) {
+              for (const it of items) {
+                if (it && typeof it === 'object' && it["МаксВес"] !== undefined) {
+                  const mw = parseFloat(String(it["МаксВес"]).replace(',', '.'));
+                  if (!isNaN(mw)) {
+                    tierThreshold = mw;
+                    break;
+                  }
+                }
+              }
+            }
+            if (tierThreshold !== null) {
+              groupTitle = tierIsOver 
+                ? `Категория свыше ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`
+                : `Категория до ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`;
+            } else {
+              groupTitle = `Категория "${escapeHtml(key)}"`;
+            }
+          }
+        }
+
+        const tierContext = isCableSec ? { threshold: tierThreshold, isOver: tierIsOver } : null;
+
+        let tierWorksCount = 0;
+        let tierSubCount = 0;
+        const groupItemsHtml = items.map((w, wIdx) => {
+          const beforeWorks = ruleWorksCount;
+          const beforeSubs = ruleSubCount;
+          const res = renderWorkWithSubItems(w, wIdx, tierContext);
+          tierWorksCount += (ruleWorksCount - beforeWorks);
+          tierSubCount += (ruleSubCount - beforeSubs);
+          return res;
+        }).join('');
+
+        const tierBadgeText = tierSubCount > 0 
+          ? `${tierWorksCount} норм, ${tierSubCount} мат.`
+          : `${items.length} поз.`;
+
+        worksHtml += `
+          <div class="mb-2 p-2 rounded bg-body-tertiary border">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span class="fw-bold text-primary small d-flex align-items-center gap-1">
+                <i class="bx bx-category-alt"></i> ${groupTitle}
+              </span>
+              <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs fw-semibold">${tierBadgeText}</span>
+            </div>
+            ${groupItemsHtml || '<div class="text-muted small ps-2">Нет позиций</div>'}
+          </div>
+        `;
+      });
+    } else {
+      const topWorks = Array.isArray(rawWm) ? rawWm : works;
+      worksHtml = topWorks.map((w, wIdx) => renderWorkWithSubItems(w, wIdx)).join('');
+    }
+
+    const cardBadges = [];
+    if (ruleWorksCount > 0) {
+      cardBadges.push(`<span class="badge bg-primary-subtle text-primary border">${ruleWorksCount} норм</span>`);
+    }
+    if (ruleSubCount > 0) {
+      cardBadges.push(`<span class="badge bg-warning-subtle text-warning-emphasis border">${ruleSubCount} мат./обор.</span>`);
+    }
+    if (cardBadges.length === 0) {
+      cardBadges.push(`<span class="badge bg-primary-subtle text-primary border">${works.length} поз.</span>`);
+    }
+
+    html += `
+      <div class="card border shadow-sm">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div class="fw-bold d-flex align-items-center gap-2">
+            <i class="bx bx-git-commit text-primary"></i>
+            <span>${rIdx + 1}. ${escapeHtml(rName)}</span>
+          </div>
+          <div class="d-flex align-items-center gap-1_5">
+            ${cardBadges.join('')}
+            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Редактировать этот способ прокладки">
+              <i class='bx bx-edit-alt'></i>
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Удалить этот способ прокладки из правил">
+              <i class='bx bx-trash'></i>
+            </button>
+          </div>
+        </div>
+        <div class="card-body p-3">
+          ${worksHtml || '<div class="text-muted small">Работы и материалы не определены</div>'}
+        </div>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+
+  return {
+    html,
+    matchedCount: matchingRules.length,
+    totalCount,
+    worksCount
+  };
+}
+
 // Render rules modal cards, cable catalog, couplings, equipment and settings tabs
 function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
-  const container = document.getElementById('rulesListContainer');
-  const countBadge = document.getElementById('worksRulesCountBadge');
   const rules = resolveValidRules(rulesObj);
   
   if (updateAllTabs) {
@@ -436,309 +679,76 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
     renderSettingsModalContent(rules);
   }
 
-  if (!container) return;
-
   const sections = getRulesSections(rules);
-  let totalRulesCount = 0;
-  let totalWorksCount = 0;
+  const constContainer = document.getElementById('rulesConstructionListContainer');
+  const instContainer = document.getElementById('rulesInstallationListContainer');
+  const legacyContainer = document.getElementById('rulesListContainer');
 
-  sections.forEach(sec => {
-    totalRulesCount += sec.rules.length;
-    sec.rules.forEach(r => {
-      const works = getRuleWorks(r);
-      if (Array.isArray(works)) totalWorksCount += works.length;
-    });
-  });
-
-  if (countBadge) {
-    countBadge.textContent = `${totalRulesCount} способов в ${sections.length} разд. (${totalWorksCount} поз.)`;
-  }
-
-  const query = getModalSearchQuery('rulesCardsSearchInput', 'rulesCardsClearSearchBtn');
-
-  if (sections.length === 0 || totalRulesCount === 0) {
-    container.innerHTML = renderCatalogEmptyState('Правила расчета отсутствуют', 'В файле сметных норм нет доступных правил', 'bx-layer-x');
-    return;
-  }
-
-  let missingNoticeHtml = '';
   const missingCable = (window.lastCableWorksCalc && window.lastCableWorksCalc.missingInRules) ? window.lastCableWorksCalc.missingInRules : [];
   const missingTrench = (window.lastTrenchWorksCalc && window.lastTrenchWorksCalc.missingInRules) ? window.lastTrenchWorksCalc.missingInRules : [];
-  const missingEquipment = (window.lastEquipmentWorksCalc && window.lastEquipmentWorksCalc.missingInRules) ? window.lastEquipmentWorksCalc.missingInRules : [];
 
-  if (missingCable.length > 0 || missingTrench.length > 0 || missingEquipment.length > 0) {
-    const cableNames = missingCable.map(m => `«${escapeHtml(m.type)}»`).join(', ');
-    const trenchNames = missingTrench.map(m => `«${escapeHtml(m.type)}»`).join(', ');
-    const eqNames = missingEquipment.map(m => `«${escapeHtml(m.type || m.mark)}»`).join(', ');
-    const parts = [];
-    if (cableNames) parts.push(`Для кабелей (Монтажные работы): ${cableNames}`);
-    if (trenchNames) parts.push(`Для траншей (Строительные работы): ${trenchNames}`);
-    if (eqNames) parts.push(`Для оборудования (Оборудование): ${eqNames}`);
-
-    missingNoticeHtml = `
+  // Helper to build a missing items alert
+  const buildMissingNotice = (items, label) => {
+    if (!items || items.length === 0) return '';
+    const names = items.map(m => `«${escapeHtml(m.type || m.mark)}»`).join(', ');
+    return `
       <div class="alert alert-warning py-2_5 px-3 mb-3 border-warning shadow-sm small">
         <div class="d-flex align-items-start gap-2">
           <i class="bx bx-alarm-exclamation fs-4 text-warning flex-shrink-0 mt-0_5"></i>
           <div class="flex-grow-1">
-            <div class="fw-bold text-dark">В загруженном проекте есть позиции без сметных правил:</div>
-            <div class="text-body-secondary mt-1">
-              ${parts.join('<br>')}
-            </div>
-            <div class="text-muted fs-xs mt-1">
-              Для формирования недостающих правил воспользуйтесь кнопками <strong>«Добавить способ»</strong>, <strong>«Добавить марку»</strong> или <strong>«Добавить оборудование»</strong> в соответствующих вкладках.
-            </div>
+            <div class="fw-bold text-dark">В проекте есть позиции без правил (${label}):</div>
+            <div class="text-body-secondary mt-1">${names}</div>
+            <div class="text-muted fs-xs mt-1">Добавьте способ прокладки для данных позиций с помощью кнопки выше.</div>
           </div>
         </div>
       </div>
     `;
+  };
+
+  // 1. Render Строительные работы
+  const constSec = sections.find(s => s.name === 'Строительные работы' || s.name.toLowerCase().includes('строит')) || { name: 'Строительные работы', rules: [] };
+  const constQuery = getModalSearchQuery('rulesConstructionSearchInput', 'rulesConstructionClearSearchBtn');
+  const constResult = renderSingleRulesSectionHtml(constSec, constQuery);
+
+  if (constContainer) {
+    constContainer.innerHTML = buildMissingNotice(missingTrench, 'Строительные работы') + constResult.html;
+  }
+  const constCountBadge = document.getElementById('worksConstructionCountBadge');
+  if (constCountBadge) {
+    constCountBadge.textContent = `${constResult.totalCount} способов (${constResult.worksCount} поз.)`;
+  }
+  const tabConstBadge = document.getElementById('tabWorksConstructionCountBadge');
+  if (tabConstBadge) {
+    tabConstBadge.textContent = constResult.totalCount;
   }
 
-  let html = '';
-  let matchedRulesTotal = 0;
+  // 2. Render Монтажные работы
+  const instSec = sections.find(s => s.name === 'Монтажные работы' || s.name.toLowerCase().includes('монтаж')) || { name: 'Монтажные работы', rules: [] };
+  const instQuery = getModalSearchQuery('rulesInstallationSearchInput', 'rulesInstallationClearSearchBtn');
+  const instResult = renderSingleRulesSectionHtml(instSec, instQuery);
 
-  sections.forEach((sec) => {
-    const isCableSec = sec.name.toLowerCase().includes('монтаж') || sec.name.toLowerCase().includes('кабел');
-    
-    const matchingRules = sec.rules.filter(rule => {
-      if (!query) return true;
-      const rName = rule["Марка"] || rule["Название"] || rule.mark || rule.name || '';
-      const works = getRuleWorks(rule);
-      const worksNames = works.map(w => {
-        if (!w) return '';
-        if (typeof w === 'string') return w;
-        return `${w["Наименование"] || w.name || ''} ${w["Единицы измерения"] || w.unit || ''} ${w["Тип"] || w.type || ''}`;
-      }).join(' ');
-      const rawWm = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] : (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
-      const tierKeys = (rawWm && typeof rawWm === 'object' && !Array.isArray(rawWm)) ? Object.keys(rawWm).join(' ') : '';
-      const haystack = `${sec.name} ${rName} ${worksNames} ${tierKeys}`.toLowerCase();
-      return haystack.includes(query);
-    });
-
-    if (matchingRules.length === 0) return;
-    matchedRulesTotal += matchingRules.length;
-
-    html += `
-      <div class="mb-3">
-        <div class="d-flex align-items-center gap-2 mb-2 pb-1 border-bottom">
-          <i class="bx bx-folder text-warning fs-5"></i>
-          <span class="fw-bold text-body fs-6">Раздел: ${escapeHtml(sec.name)}</span>
-          <span class="badge bg-secondary-subtle text-secondary-emphasis border ms-auto">${matchingRules.length} способов</span>
-        </div>
-        <div class="d-flex flex-column gap-2">
-    `;
-
-    matchingRules.forEach((rule, rIdx) => {
-      const rName = rule["Марка"] || rule["Название"] || 'Без названия';
-      const rawWm = rule["Работы и материалы"] !== undefined 
-        ? rule["Работы и материалы"] 
-        : (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
-      const works = getRuleWorks(rule);
-      const isObjectStructure = rawWm && typeof rawWm === 'object' && !Array.isArray(rawWm);
-
-      let worksHtml = '';
-      let ruleWorksCount = 0;
-      let ruleSubCount = 0;
-
-      const renderWorkWithSubItems = (w, wIdx, tierContext = null) => {
-        if (typeof w === 'string') {
-          ruleWorksCount++;
-          return `
-            <div class="p-2 rounded bg-body border mb-1 small">
-              <div class="fw-semibold text-body">${wIdx + 1}. ${escapeHtml(w)}</div>
-            </div>
-          `;
-        }
-
-        ruleWorksCount++;
-        const threshold = (tierContext && tierContext.threshold !== null) ? tierContext.threshold : null;
-        const isOver = tierContext ? tierContext.isOver : false;
-        const tierBadge = threshold !== null 
-          ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">до ${threshold} кг/м</span>`
-          : (isOver ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">свыше</span>` : '');
-
-        const cond = parseCableCountCondition(w);
-        const condBadge = cond.hasCondition
-          ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1 font-monospace" style="font-size: 0.7rem;" title="Условие применения: ${escapeHtml(cond.description)}"><i class="bx bx-git-branch me-0_5"></i>${escapeHtml(cond.description)}</span>`
-          : '';
-
-        const showFormula = shouldShowFormula(w);
-        const section = w["Раздел"] || w.section || sec.name;
-
-        const nested = getWorkItemNestedResources(w);
-        ruleSubCount += nested.length;
-
-        const subItemsHtml = nested.map((sub, sIdx) => {
-          if (typeof sub === 'string') {
-            return `
-              <div class="p-2 rounded bg-body border mb-1 ms-3 small">
-                <div class="text-body"><span class="text-muted me-1 fw-bold">↳</span>${wIdx + 1}.${sIdx + 1}. ${escapeHtml(sub)}</div>
-              </div>
-            `;
-          }
-
-          const isDirectSubEquip = Array.isArray(w["Оборудование"]) && w["Оборудование"].includes(sub);
-          const subType = sub["Тип"] || sub.type || (isDirectSubEquip ? 'оборудование' : 'материал');
-
-          return renderModalWorkItemHtml(sub, sIdx, {
-            isSub: true,
-            parentIdx: wIdx,
-            defaultType: subType,
-            defaultFormula: 'ДЛИНА',
-            defaultUnit: sub["Единицы измерения"] || sub.unit || 'м',
-            defaultSection: sub["Раздел"] || section,
-            parentShowFormula: showFormula
-          });
-        }).join('');
-
-        return renderModalWorkItemHtml(w, wIdx, {
-          defaultFormula: 'ДЛИНА',
-          defaultSection: section,
-          extraBadges: `${tierBadge}${condBadge}`
-        }) + subItemsHtml;
-      };
-
-      if (isObjectStructure) {
-        const isEquipSec = sec.name.toLowerCase().includes('оборудован');
-        Object.entries(rawWm).forEach(([key, itemsVal]) => {
-          const items = Array.isArray(itemsVal) ? itemsVal : (itemsVal ? [itemsVal] : []);
-          const isOptKey = key.toLowerCase().includes('оптич') || key.toLowerCase().includes('волс');
-          let groupTitle = `Ключ: "${escapeHtml(key)}"`;
-          let tierThreshold = null;
-          let tierIsOver = false;
-
-          if (isEquipSec) {
-            groupTitle = `Способ установки: «${escapeHtml(key)}»`;
-          } else if (rName.toLowerCase().includes('муфт')) {
-            const isRuleOpt = rName.toLowerCase().includes('оптич') || rName.toLowerCase().includes('волс');
-            const unitLabel = isRuleOpt ? 'волокон' : 'жил';
-            const cleanKey = String(key).trim().replace(',', '.');
-            const numK = parseFloat(cleanKey);
-            if (!isNaN(numK)) {
-              tierThreshold = numK;
-              groupTitle = `Емкость до ${tierThreshold} ${unitLabel} (ключ "${escapeHtml(key)}")`;
-            } else {
-              groupTitle = `Емкость "${escapeHtml(key)}"`;
-            }
-          } else if (isOptKey) {
-            groupTitle = `Оптический кабель (ключ "${escapeHtml(key)}")`;
-          } else {
-            const cleanKey = String(key).trim().replace(',', '.');
-            const numK = parseFloat(cleanKey);
-            if (!isNaN(numK) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
-              tierThreshold = numK;
-              groupTitle = `Категория до ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`;
-            } else {
-              const matchDo = cleanKey.match(/(?:до|макс(?:имум)?)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
-              if (matchDo) {
-                tierThreshold = parseFloat(matchDo[1].replace(',', '.'));
-              }
-              if (/(?:свыше|более|от|>)\s*[:;]?\s*\d+/i.test(cleanKey)) {
-                tierIsOver = true;
-                const matchOver = cleanKey.match(/(?:свыше|более|от|>)\s*[:;]?\s*(\d+(?:[.,]\d+)?)/i);
-                if (matchOver) tierThreshold = parseFloat(matchOver[1].replace(',', '.'));
-              }
-              if (tierThreshold === null && items && items.length > 0) {
-                for (const it of items) {
-                  if (it && typeof it === 'object' && it["МаксВес"] !== undefined) {
-                    const mw = parseFloat(String(it["МаксВес"]).replace(',', '.'));
-                    if (!isNaN(mw)) {
-                      tierThreshold = mw;
-                      break;
-                    }
-                  }
-                }
-              }
-              if (tierThreshold !== null) {
-                groupTitle = tierIsOver 
-                  ? `Категория свыше ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`
-                  : `Категория до ${tierThreshold} кг/м (ключ "${escapeHtml(key)}")`;
-              } else {
-                groupTitle = `Категория "${escapeHtml(key)}"`;
-              }
-            }
-          }
-
-          const tierContext = isCableSec ? { threshold: tierThreshold, isOver: tierIsOver } : null;
-
-          let tierWorksCount = 0;
-          let tierSubCount = 0;
-          const groupItemsHtml = items.map((w, wIdx) => {
-            const beforeWorks = ruleWorksCount;
-            const beforeSubs = ruleSubCount;
-            const res = renderWorkWithSubItems(w, wIdx, tierContext);
-            tierWorksCount += (ruleWorksCount - beforeWorks);
-            tierSubCount += (ruleSubCount - beforeSubs);
-            return res;
-          }).join('');
-
-          const tierBadgeText = tierSubCount > 0 
-            ? `${tierWorksCount} норм, ${tierSubCount} мат.`
-            : `${items.length} поз.`;
-
-          worksHtml += `
-            <div class="mb-2 p-2 rounded bg-body-tertiary border">
-              <div class="d-flex align-items-center justify-content-between mb-1">
-                <span class="fw-bold text-primary small d-flex align-items-center gap-1">
-                  <i class="bx bx-category-alt"></i> ${groupTitle}
-                </span>
-                <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs fw-semibold">${tierBadgeText}</span>
-              </div>
-              ${groupItemsHtml || '<div class="text-muted small ps-2">Нет позиций</div>'}
-            </div>
-          `;
-        });
-      } else {
-        const topWorks = Array.isArray(rawWm) ? rawWm : works;
-        worksHtml = topWorks.map((w, wIdx) => renderWorkWithSubItems(w, wIdx)).join('');
-      }
-
-      const cardBadges = [];
-      if (ruleWorksCount > 0) {
-        cardBadges.push(`<span class="badge bg-primary-subtle text-primary border">${ruleWorksCount} норм</span>`);
-      }
-      if (ruleSubCount > 0) {
-        cardBadges.push(`<span class="badge bg-warning-subtle text-warning-emphasis border">${ruleSubCount} мат./обор.</span>`);
-      }
-      if (cardBadges.length === 0) {
-        cardBadges.push(`<span class="badge bg-primary-subtle text-primary border">${works.length} поз.</span>`);
-      }
-
-      html += `
-        <div class="card border shadow-sm">
-          <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div class="fw-bold d-flex align-items-center gap-2">
-              <i class="bx bx-git-commit text-primary"></i>
-              <span>${rIdx + 1}. ${escapeHtml(rName)}</span>
-            </div>
-            <div class="d-flex align-items-center gap-1_5">
-              ${cardBadges.join('')}
-              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Редактировать этот способ прокладки">
-                <i class='bx bx-edit-alt me-0_5'></i>Изменить
-              </button>
-              <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Удалить этот способ прокладки из правил">
-                <i class='bx bx-trash'></i>
-              </button>
-            </div>
-          </div>
-          <div class="card-body p-3">
-            ${worksHtml || '<div class="text-muted small">Работы и материалы не определены</div>'}
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-        </div>
-      </div>
-    `;
-  });
-
-  if (matchedRulesTotal === 0 && query) {
-    container.innerHTML = missingNoticeHtml + renderCatalogEmptyState('Способы не найдены', 'Попробуйте изменить поисковый запрос');
-    return;
+  if (instContainer) {
+    instContainer.innerHTML = buildMissingNotice(missingCable, 'Монтажные работы') + instResult.html;
+  }
+  const instCountBadge = document.getElementById('worksInstallationCountBadge');
+  if (instCountBadge) {
+    instCountBadge.textContent = `${instResult.totalCount} способов (${instResult.worksCount} поз.)`;
+  }
+  const tabInstBadge = document.getElementById('tabWorksInstallationCountBadge');
+  if (tabInstBadge) {
+    tabInstBadge.textContent = instResult.totalCount;
   }
 
-  container.innerHTML = missingNoticeHtml + html;
+  // 3. Backward compatibility for legacyContainer
+  if (legacyContainer) {
+    let combinedHtml = '';
+    const query = getModalSearchQuery('rulesCardsSearchInput', 'rulesCardsClearSearchBtn');
+    sections.forEach(sec => {
+      const res = renderSingleRulesSectionHtml(sec, query);
+      combinedHtml += `<div class="mb-3"><h5 class="fw-bold border-bottom pb-1 text-primary">${escapeHtml(sec.name)}</h5>${res.html}</div>`;
+    });
+    legacyContainer.innerHTML = combinedHtml;
+  }
 }
 
 // Dynamically populate Cable Group dropdown and datalist from active rules catalog
@@ -947,7 +957,7 @@ function renderCableCatalogModalContent(rulesObj = null) {
             <td>${couplingFormatted}</td>
             <td class="text-end pe-3 text-nowrap">
               <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Редактировать параметры марки кабеля">
-                <i class='bx bx-edit-alt me-0_5'></i>Изменить
+                <i class='bx bx-edit-alt'></i>
               </button>
               <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Удалить эту марку кабеля из справочника">
                 <i class='bx bx-trash'></i>
@@ -1180,7 +1190,7 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             <div class="d-flex align-items-center gap-1">
               <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs">${worksList.length} поз.</span>
               <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Редактировать сметные нормы для способа «${escapeHtml(methodName)}»">
-                <i class='bx bx-edit-alt me-0_5'></i>Изменить способ
+                <i class='bx bx-edit-alt'></i>
               </button>
               <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Удалить этот способ установки">
                 <i class='bx bx-trash'></i>
@@ -1207,7 +1217,7 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             ${cardWorksCount > 0 ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border">${cardWorksCount} норм</span>` : ''}
             ${cardSubCount > 0 ? `<span class="badge bg-warning-subtle text-warning-emphasis border">${cardSubCount} мат./обор.</span>` : ''}
             <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Редактировать позицию оборудования">
-              <i class='bx bx-edit-alt me-0_5'></i>Изменить
+              <i class='bx bx-edit-alt'></i>
             </button>
             <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Удалить всё оборудование «${escapeHtml(mark)}»">
               <i class='bx bx-trash'></i>
@@ -1391,7 +1401,7 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
         <td class="text-center font-monospace text-muted small">${escapeHtml(unit)}</td>
         <td class="text-end pe-3 text-nowrap">
           <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Редактировать муфту">
-            <i class='bx bx-edit-alt me-0_5'></i>Изменить
+            <i class='bx bx-edit-alt'></i>
           </button>
           <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Удалить эту муфту из справочника">
             <i class='bx bx-trash'></i>
@@ -1533,7 +1543,8 @@ function openWorksRulesModal(activeTab = 'editor') {
 
   try {
     let tabBtnId = 'tabWorksJsonBtn';
-    if (activeTab === 'cards') tabBtnId = 'tabWorksCardsBtn';
+    if (activeTab === 'construction') tabBtnId = 'tabWorksConstructionBtn';
+    else if (activeTab === 'installation') tabBtnId = 'tabWorksInstallationBtn';
     else if (activeTab === 'cables') tabBtnId = 'tabWorksCablesBtn';
     else if (activeTab === 'couplings') tabBtnId = 'tabWorksCouplingsBtn';
     else if (activeTab === 'equipment') tabBtnId = 'tabWorksEquipmentBtn';
@@ -1614,16 +1625,24 @@ function validateWorksJsonInput() {
     if (tabEquipmentBadge) tabEquipmentBadge.textContent = eqList.length;
 
     if (badge) {
-      badge.className = 'badge bg-success-subtle text-success border border-success-subtle ms-2';
-      badge.innerHTML = "<i class='bx bx-check me-1'></i>Корректный JSON";
+      badge.classList.add('d-none');
+      badge.classList.remove('d-inline-flex');
     }
     if (errorAlert) errorAlert.classList.add('d-none');
     if (applyBtn) applyBtn.disabled = false;
     return true;
   } catch (err) {
     if (badge) {
-      badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle ms-2';
-      badge.innerHTML = "<i class='bx bx-x me-1'></i>Ошибка синтаксиса";
+      const badgeText = document.getElementById('worksJsonValidationText');
+      badge.classList.remove('d-none');
+      badge.classList.add('d-inline-flex');
+      badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle d-inline-flex align-items-center gap-1 shadow-sm';
+      badge.title = `Ошибка синтаксиса: ${err.message}`;
+      if (badgeText) {
+        badgeText.textContent = `Ошибка синтаксиса: ${err.message}`;
+      } else {
+        badge.innerHTML = `<i class='bx bx-error-circle flex-shrink-0'></i><span class="text-truncate">Ошибка синтаксиса: ${escapeHtml(err.message)}</span>`;
+      }
     }
     if (errorAlert) {
       errorAlert.classList.remove('d-none');
@@ -2802,39 +2821,56 @@ function setupWorksRulesListeners() {
     });
   }
 
+  function openAddRuleModalForSection(sectionName = 'Строительные работы') {
+    resetRuleModalToAddMode();
+    const form = document.getElementById('formAddRule');
+    if (form) form.reset();
+    const isInst = sectionName === 'Монтажные работы';
+    if (isInst && radioInstallation) {
+      radioInstallation.checked = true;
+    } else if (radioConstruction) {
+      radioConstruction.checked = true;
+    }
+    updateAddRuleSectionsVisibility();
+    if (!isInst && addRuleWorksCardsContainer) {
+      addRuleWorksCardsContainer.innerHTML = '';
+      appendUnifiedWorkCard(addRuleWorksCardsContainer, {
+        "Наименование": "Разработка грунта в траншее вручную",
+        "Единицы измерения": "м3 грунта",
+        "Формула": "0.4 * ДЛИНА",
+        "Тип": "работа",
+        "ОтображатьФормулу": true,
+        "Материалы": [
+          { "Наименование": "Песок для постели", "Тип": "материал", "Единицы измерения": "м3", "Формула": "0.1 * ДЛИНА", "ОтображатьФормулу": false }
+        ]
+      });
+      appendUnifiedWorkCard(addRuleWorksCardsContainer, {
+        "Наименование": "Засыпка траншей вручную",
+        "Единицы измерения": "м3 грунта",
+        "Формула": "0.4 * ДЛИНА",
+        "Тип": "работа",
+        "ОтображатьФормулу": true
+      });
+    }
+    const modalEl = document.getElementById('addRuleModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
   const quickAddRuleInTabBtn = document.getElementById('quickAddRuleInTabBtn');
   if (quickAddRuleInTabBtn) {
-    quickAddRuleInTabBtn.addEventListener('click', () => {
-      resetRuleModalToAddMode();
-      const form = document.getElementById('formAddRule');
-      if (form) form.reset();
-      if (radioConstruction) radioConstruction.checked = true;
-      updateAddRuleSectionsVisibility();
-      if (addRuleWorksCardsContainer) {
-        addRuleWorksCardsContainer.innerHTML = '';
-        appendUnifiedWorkCard(addRuleWorksCardsContainer, {
-          "Наименование": "Разработка грунта в траншее вручную",
-          "Единицы измерения": "м3 грунта",
-          "Формула": "0.4 * ДЛИНА",
-          "Тип": "работа",
-          "ОтображатьФормулу": true,
-          "Материалы": [
-            { "Наименование": "Песок для постели", "Тип": "материал", "Единицы измерения": "м3", "Формула": "0.1 * ДЛИНА", "ОтображатьФормулу": false }
-          ]
-        });
-        appendUnifiedWorkCard(addRuleWorksCardsContainer, {
-          "Наименование": "Засыпка траншей вручную",
-          "Единицы измерения": "м3 грунта",
-          "Формула": "0.4 * ДЛИНА",
-          "Тип": "работа",
-          "ОтображатьФормулу": true
-        });
-      }
-      const modalEl = document.getElementById('addRuleModal');
-      if (modalEl && window.bootstrap && bootstrap.Modal) {
-        bootstrap.Modal.getOrCreateInstance(modalEl).show();
-      }
-    });
+    quickAddRuleInTabBtn.addEventListener('click', () => openAddRuleModalForSection('Строительные работы'));
+  }
+
+  const quickAddConstructionRuleBtn = document.getElementById('quickAddConstructionRuleBtn');
+  if (quickAddConstructionRuleBtn) {
+    quickAddConstructionRuleBtn.addEventListener('click', () => openAddRuleModalForSection('Строительные работы'));
+  }
+
+  const quickAddInstallationRuleBtn = document.getElementById('quickAddInstallationRuleBtn');
+  if (quickAddInstallationRuleBtn) {
+    quickAddInstallationRuleBtn.addEventListener('click', () => openAddRuleModalForSection('Монтажные работы'));
   }
 
   const btnSaveNewRule = document.getElementById('btnSaveNewRule');
@@ -2916,21 +2952,27 @@ function setupWorksRulesListeners() {
     });
   }
 
-  const rulesCardsSearchInput = document.getElementById('rulesCardsSearchInput');
-  const rulesCardsClearSearchBtn = document.getElementById('rulesCardsClearSearchBtn');
-  if (rulesCardsSearchInput) {
-    const debouncedRenderRules = debounce(() => renderRulesModalContent(null, false), 180);
-    rulesCardsSearchInput.addEventListener('input', debouncedRenderRules);
+  function bindModalSearchInput(inputId, clearBtnId) {
+    const input = document.getElementById(inputId);
+    const clearBtn = document.getElementById(clearBtnId);
+    if (!input) return;
 
-    if (rulesCardsClearSearchBtn) {
-      rulesCardsClearSearchBtn.addEventListener('click', () => {
-        debouncedRenderRules.cancel();
-        rulesCardsSearchInput.value = '';
+    const debouncedRender = debounce(() => renderRulesModalContent(null, false), 180);
+    input.addEventListener('input', debouncedRender);
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        debouncedRender.cancel();
+        input.value = '';
         renderRulesModalContent(null, false);
-        rulesCardsSearchInput.focus();
+        input.focus();
       });
     }
   }
+
+  bindModalSearchInput('rulesConstructionSearchInput', 'rulesConstructionClearSearchBtn');
+  bindModalSearchInput('rulesInstallationSearchInput', 'rulesInstallationClearSearchBtn');
+  bindModalSearchInput('rulesCardsSearchInput', 'rulesCardsClearSearchBtn');
 
   // =========================================================================
   // ADD / EDIT CABLE MODAL
@@ -3822,7 +3864,7 @@ function setupWorksRulesListeners() {
 
         renderRulesModalContent(currentWorksRules);
 
-        if (currentData) {
+        if (typeof currentData !== 'undefined' && currentData && typeof calculateVolumes === 'function') {
           calculateVolumes();
         }
 
@@ -3853,7 +3895,7 @@ function setupWorksRulesListeners() {
       currentWorksRules = JSON.parse(JSON.stringify(draft));
       window.currentWorksRules = currentWorksRules;
       saveWorksRulesToLocalStorage(currentWorksRules);
-      if (currentData) calculateVolumes();
+      if (typeof currentData !== 'undefined' && currentData && typeof calculateVolumes === 'function') calculateVolumes();
       showToast('Текущие правила из редактора успешно сохранены в LocalStorage браузера', 'success', 'LocalStorage обновлен');
     });
   }
