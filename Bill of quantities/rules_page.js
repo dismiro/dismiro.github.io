@@ -13,16 +13,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('[rules_page] Ошибка загрузки правил:', err);
   }
 
-  // 2. Initialize CodeMirror Editor
-  initPageCodeMirror();
-
-  // 3. Setup Tab & Hash Navigation
+  // 2. Setup Tab & Hash Navigation
   setupSidebarNavigation();
 
-  // 4. Setup Toolbar & Hotkeys
+  // 3. Setup Toolbar & Hotkeys
   setupPageActions();
 
-  // 5. Initial Render
+  // 4. Initial Render
   if (rules) {
     window.currentWorksRules = rules;
     setWorksJsonEditorValue(JSON.stringify(rules, null, 2));
@@ -31,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateStorageStatusUi();
   }
 
-  // 6. Setup Modal and Rules Event Listeners
+  // 5. Setup Modal and Rules Event Listeners
   if (typeof setupWorksRulesListeners === 'function') {
     try {
       setupWorksRulesListeners();
@@ -40,47 +37,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 7. Listen for Store updates
+  // 6. Listen for Store updates
   window.rulesStore.subscribe((event) => {
     updateStorageStatusUi();
   });
 });
 
-/**
- * Initializes CodeMirror inside the page container.
- */
-function initPageCodeMirror() {
-  const container = document.getElementById('codeMirrorContainer');
-  const textarea = document.getElementById('worksJsonEditorTextarea');
-  if (!container || !textarea) return;
-
-  if (!worksJsonCodeMirror && window.CodeMirror) {
-    worksJsonCodeMirror = CodeMirror(container, {
-      value: textarea.value || '',
-      mode: { name: 'javascript', json: true },
-      lineNumbers: true,
-      lineWrapping: false,
-      foldGutter: true,
-      gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
-      matchBrackets: true,
-      autoCloseBrackets: true,
-      tabSize: 2,
-      indentUnit: 2
-    });
-
-    worksJsonCodeMirror.on('change', () => {
-      validateWorksJsonInput();
-      updateJsonLinesCount();
-    });
-
-    worksJsonCodeMirror.setSize('100%', '720px');
-  }
-}
-
 function updateJsonLinesCount() {
   const badge = document.getElementById('jsonLinesCountBadge');
-  if (badge && worksJsonCodeMirror) {
-    badge.textContent = `${worksJsonCodeMirror.lineCount()} строк`;
+  const codeEl = document.getElementById('worksJsonPreviewCode');
+  if (badge && codeEl) {
+    const lines = (codeEl.textContent || '').split('\n').length;
+    badge.textContent = `${lines} строк`;
   }
 }
 
@@ -114,11 +82,12 @@ function setupSidebarNavigation() {
       }
     });
 
-    // Refresh CodeMirror layout if switching to JSON tab
-    if (targetPaneId === 'tabWorksJsonPane' && worksJsonCodeMirror) {
-      setTimeout(() => {
-        worksJsonCodeMirror.refresh();
-      }, 50);
+    // Update JSON preview if switching to JSON tab
+    if (targetPaneId === 'tabWorksJsonPane') {
+      const draft = (typeof getDraftRulesFromEditor === 'function') ? getDraftRulesFromEditor() : window.currentWorksRules;
+      if (typeof setWorksJsonEditorValue === 'function') {
+        setWorksJsonEditorValue(JSON.stringify(draft || {}, null, 2));
+      }
     }
 
     // Refresh Settings form if switching to Settings tab
@@ -142,9 +111,9 @@ function setupSidebarNavigation() {
   const hashToPane = {
     '#construction': 'tabWorksConstructionPane',
     '#installation': 'tabWorksInstallationPane',
+    '#equipment': 'tabWorksEquipmentPane',
     '#cables': 'tabWorksCablesPane',
     '#couplings': 'tabWorksCouplingsPane',
-    '#equipment': 'tabWorksEquipmentPane',
     '#settings': 'tabWorksSettingsPane',
     '#json': 'tabWorksJsonPane',
     '#editor': 'tabWorksJsonPane'
@@ -260,19 +229,7 @@ function hideSaveValidationError() {
 }
 
 function saveRulesFromPage() {
-  const jsonVal = typeof getWorksJsonEditorValue === 'function' ? getWorksJsonEditorValue() : '';
-  let draft = null;
-
-  if (jsonVal) {
-    try {
-      draft = JSON.parse(jsonVal);
-    } catch (err) {
-      showSaveValidationError(`Синтаксическая ошибка в JSON: ${err.message}`, 'Ошибка сохранения');
-      return;
-    }
-  } else {
-    draft = typeof getDraftRulesFromEditor === 'function' ? getDraftRulesFromEditor() : window.currentWorksRules;
-  }
+  const draft = typeof getDraftRulesFromEditor === 'function' ? getDraftRulesFromEditor() : window.currentWorksRules;
 
   if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
     showSaveValidationError('Некорректная структура правил: данные должны быть JSON-объектом', 'Ошибка данных');

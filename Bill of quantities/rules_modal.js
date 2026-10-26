@@ -25,55 +25,43 @@ function debounce(fn, delay = 180) {
   return debounced;
 }
 
-// Get current JSON string from CodeMirror or fallback textarea
+// Get current JSON string from preview or draft object
 function getWorksJsonEditorValue() {
-  if (worksJsonCodeMirror) {
-    return worksJsonCodeMirror.getValue();
+  const codeEl = document.getElementById('worksJsonPreviewCode');
+  if (codeEl && codeEl.textContent && codeEl.textContent.trim() !== '{}') {
+    return codeEl.textContent;
   }
-  const textarea = document.getElementById('worksJsonEditorTextarea');
-  return textarea ? textarea.value : '';
+  const draft = modalDraftRules || window.currentWorksRules || cachedDefaultRules || {};
+  return JSON.stringify(draft, null, 2);
 }
 
-// Set JSON string in CodeMirror and fallback textarea
+// Set JSON string in preview code block and update lines count
 function setWorksJsonEditorValue(val) {
-  const textarea = document.getElementById('worksJsonEditorTextarea');
-  if (textarea) textarea.value = val;
-  if (worksJsonCodeMirror) {
-    const cursor = worksJsonCodeMirror.getCursor();
-    worksJsonCodeMirror.setValue(val);
-    try {
-      worksJsonCodeMirror.setCursor(cursor);
-    } catch {
-      // ignore cursor reset if length changed
-    }
+  const text = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
+  const codeEl = document.getElementById('worksJsonPreviewCode');
+  if (codeEl) {
+    codeEl.textContent = text;
+  }
+  const badge = document.getElementById('jsonLinesCountBadge');
+  if (badge) {
+    badge.textContent = `${text.split('\n').length} строк`;
   }
 }
 
-// Draft rules object currently active within the modal editor
+// Draft rules object currently active within the page
 let modalDraftRules = null;
 
-// Get current working draft rules from CodeMirror editor without modifying global currentWorksRules
+// Get current working draft rules without requiring CodeMirror DOM parsing
 function getDraftRulesFromEditor() {
-  try {
-    const val = getWorksJsonEditorValue();
-    if (!val) {
-      return modalDraftRules || currentWorksRules || cachedDefaultRules || {};
-    }
-    const parsed = JSON.parse(val);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      modalDraftRules = parsed;
-      return parsed;
-    }
-  } catch {
-    // ignore syntax error while user is actively typing in JSON
+  if (modalDraftRules && typeof modalDraftRules === 'object') {
+    return modalDraftRules;
   }
-  return modalDraftRules || currentWorksRules || cachedDefaultRules || {};
+  if (window.currentWorksRules && typeof window.currentWorksRules === 'object') {
+    return window.currentWorksRules;
+  }
+  return cachedDefaultRules || {};
 }
 
-// Backward compatible helper: updates internal modal draft cache only, NEVER overwrites global currentWorksRules
-function syncCurrentRulesFromEditorIfValid() {
-  return getDraftRulesFromEditor();
-}
 
 // Safely resolve rules object, rejecting DOM Event objects or invalid inputs
 function resolveValidRules(rulesObj) {
@@ -91,57 +79,42 @@ const LOCAL_STORAGE_RULES_META_KEY = 'si_works_rules_v1_meta';
 
 function saveWorksRulesToLocalStorage(rules) {
   if (!rules || typeof rules !== 'object') return false;
-  if (window.rulesStore && typeof window.rulesStore.saveRules === 'function') {
-    try {
-      window.rulesStore.saveRules(rules);
-      updateStorageStatusUi();
-      return true;
-    } catch (err) {
-      console.error('Ошибка сохранения правил через rulesStore:', err);
-    }
-  }
   try {
-    const jsonStr = JSON.stringify(rules);
-    localStorage.setItem(LOCAL_STORAGE_RULES_KEY, jsonStr);
-    const meta = {
-      savedAt: Date.now(),
-      sizeBytes: new Blob([jsonStr]).size,
-      version: 1
-    };
-    localStorage.setItem(LOCAL_STORAGE_RULES_META_KEY, JSON.stringify(meta));
+    if (window.rulesStore && typeof window.rulesStore.saveRules === 'function') {
+      window.rulesStore.saveRules(rules);
+    } else {
+      localStorage.setItem(LOCAL_STORAGE_RULES_KEY, JSON.stringify(rules));
+    }
     updateStorageStatusUi();
     return true;
   } catch (err) {
-    console.error('Ошибка сохранения правил в LocalStorage:', err);
-    showToast('Не удалось сохранить правила в LocalStorage: ' + (err.message || err), 'warning', 'LocalStorage');
+    console.error('Ошибка сохранения правил:', err);
+    showToast('Не удалось сохранить правила: ' + (err.message || err), 'warning', 'Сохранение');
     return false;
   }
 }
 
 function loadWorksRulesFromLocalStorage() {
+  if (window.rulesStore && typeof window.rulesStore.loadFromLocalStorage === 'function') {
+    return window.rulesStore.loadFromLocalStorage();
+  }
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_RULES_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed;
-    }
-  } catch (err) {
-    console.warn('Ошибка чтения правил из LocalStorage:', err);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
   }
-  return null;
 }
 
 function clearWorksRulesFromLocalStorage() {
-  try {
+  if (window.rulesStore && typeof window.rulesStore.clearStorage === 'function') {
+    window.rulesStore.clearStorage();
+  } else {
     localStorage.removeItem(LOCAL_STORAGE_RULES_KEY);
     localStorage.removeItem(LOCAL_STORAGE_RULES_META_KEY);
-    updateStorageStatusUi();
-    return true;
-  } catch (err) {
-    console.warn('Ошибка очистки LocalStorage:', err);
-    return false;
   }
+  updateStorageStatusUi();
+  return true;
 }
 
 function updateStorageStatusUi() {
@@ -421,16 +394,9 @@ function renderModalWorkItemHtml(w, wIdx, options = {}) {
 
 /// Helper to render rules cards for a specific section
 function renderSingleRulesSectionHtml(sec, query) {
-  if (!sec || !Array.isArray(sec.rules)) return { html: '', matchedCount: 0, totalCount: 0, worksCount: 0 };
+  if (!sec || !Array.isArray(sec.rules)) return { html: '', matchedCount: 0, totalCount: 0 };
 
-  const isCableSec = sec.name.toLowerCase().includes('монтаж') || sec.name.toLowerCase().includes('кабел');
   const totalCount = sec.rules.length;
-  let worksCount = 0;
-
-  sec.rules.forEach(r => {
-    const works = getRuleWorks(r);
-    if (Array.isArray(works)) worksCount += works.length;
-  });
 
   const matchingRules = sec.rules.filter(rule => {
     if (!query) return true;
@@ -451,8 +417,7 @@ function renderSingleRulesSectionHtml(sec, query) {
     return {
       html: renderCatalogEmptyState('Позиции не найдены', query ? 'Попробуйте изменить поисковый запрос' : 'В этом разделе пока нет правил', 'bx-search'),
       matchedCount: 0,
-      totalCount,
-      worksCount
+      totalCount
     };
   }
 
@@ -467,25 +432,15 @@ function renderSingleRulesSectionHtml(sec, query) {
     const isObjectStructure = rawWm && typeof rawWm === 'object' && !Array.isArray(rawWm);
 
     let worksHtml = '';
-    let ruleWorksCount = 0;
-    let ruleSubCount = 0;
 
-    const renderWorkWithSubItems = (w, wIdx, tierContext = null) => {
+    const renderWorkWithSubItems = (w, wIdx) => {
       if (typeof w === 'string') {
-        ruleWorksCount++;
         return `
           <div class="p-2 rounded bg-body border mb-1 small">
             <div class="fw-semibold text-body">${wIdx + 1}. ${escapeHtml(w)}</div>
           </div>
         `;
       }
-
-      ruleWorksCount++;
-      const threshold = (tierContext && tierContext.threshold !== null) ? tierContext.threshold : null;
-      const isOver = tierContext ? tierContext.isOver : false;
-      const tierBadge = threshold !== null 
-        ? `<span class="badge bg-info-subtle text-info-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">до ${threshold} кг/м</span>`
-        : (isOver ? `<span class="badge bg-warning-subtle text-warning-emphasis border ms-1 font-monospace" style="font-size: 0.7rem;">свыше</span>` : '');
 
       const cond = parseCableCountCondition(w);
       const condBadge = cond.hasCondition
@@ -496,7 +451,6 @@ function renderSingleRulesSectionHtml(sec, query) {
       const section = w["Раздел"] || w.section || sec.name;
 
       const nested = getWorkItemNestedResources(w);
-      ruleSubCount += nested.length;
 
       const subItemsHtml = nested.map((sub, sIdx) => {
         if (typeof sub === 'string') {
@@ -524,7 +478,7 @@ function renderSingleRulesSectionHtml(sec, query) {
       return renderModalWorkItemHtml(w, wIdx, {
         defaultFormula: 'ДЛИНА',
         defaultSection: section,
-        extraBadges: `${tierBadge}${condBadge}`
+        extraBadges: condBadge
       }) + subItemsHtml;
     };
 
@@ -589,22 +543,7 @@ function renderSingleRulesSectionHtml(sec, query) {
           }
         }
 
-        const tierContext = isCableSec ? { threshold: tierThreshold, isOver: tierIsOver } : null;
-
-        let tierWorksCount = 0;
-        let tierSubCount = 0;
-        const groupItemsHtml = items.map((w, wIdx) => {
-          const beforeWorks = ruleWorksCount;
-          const beforeSubs = ruleSubCount;
-          const res = renderWorkWithSubItems(w, wIdx, tierContext);
-          tierWorksCount += (ruleWorksCount - beforeWorks);
-          tierSubCount += (ruleSubCount - beforeSubs);
-          return res;
-        }).join('');
-
-        const tierBadgeText = tierSubCount > 0 
-          ? `${tierWorksCount} норм, ${tierSubCount} мат.`
-          : `${items.length} поз.`;
+        const groupItemsHtml = items.map((w, wIdx) => renderWorkWithSubItems(w, wIdx)).join('');
 
         worksHtml += `
           <div class="mb-2 p-2 rounded bg-body-tertiary border">
@@ -612,7 +551,7 @@ function renderSingleRulesSectionHtml(sec, query) {
               <span class="fw-bold text-primary small d-flex align-items-center gap-1">
                 <i class="bx bx-category-alt"></i> ${groupTitle}
               </span>
-              <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs fw-semibold">${tierBadgeText}</span>
+              <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs fw-semibold">${items.length} поз.</span>
             </div>
             ${groupItemsHtml || '<div class="text-muted small ps-2">Нет позиций</div>'}
           </div>
@@ -623,17 +562,6 @@ function renderSingleRulesSectionHtml(sec, query) {
       worksHtml = topWorks.map((w, wIdx) => renderWorkWithSubItems(w, wIdx)).join('');
     }
 
-    const cardBadges = [];
-    if (ruleWorksCount > 0) {
-      cardBadges.push(`<span class="badge bg-primary-subtle text-primary border">${ruleWorksCount} норм</span>`);
-    }
-    if (ruleSubCount > 0) {
-      cardBadges.push(`<span class="badge bg-warning-subtle text-warning-emphasis border">${ruleSubCount} мат./обор.</span>`);
-    }
-    if (cardBadges.length === 0) {
-      cardBadges.push(`<span class="badge bg-primary-subtle text-primary border">${works.length} поз.</span>`);
-    }
-
     html += `
       <div class="card border shadow-sm">
         <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -642,7 +570,6 @@ function renderSingleRulesSectionHtml(sec, query) {
             <span>${rIdx + 1}. ${escapeHtml(rName)}</span>
           </div>
           <div class="d-flex align-items-center gap-1_5">
-            ${cardBadges.join('')}
             <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Редактировать этот способ прокладки">
               <i class='bx bx-edit-alt'></i>
             </button>
@@ -663,8 +590,7 @@ function renderSingleRulesSectionHtml(sec, query) {
   return {
     html,
     matchedCount: matchingRules.length,
-    totalCount,
-    worksCount
+    totalCount
   };
 }
 
@@ -713,10 +639,6 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
   if (constContainer) {
     constContainer.innerHTML = buildMissingNotice(missingTrench, 'Строительные работы') + constResult.html;
   }
-  const constCountBadge = document.getElementById('worksConstructionCountBadge');
-  if (constCountBadge) {
-    constCountBadge.textContent = `${constResult.totalCount} способов (${constResult.worksCount} поз.)`;
-  }
   const tabConstBadge = document.getElementById('tabWorksConstructionCountBadge');
   if (tabConstBadge) {
     tabConstBadge.textContent = constResult.totalCount;
@@ -729,10 +651,6 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
 
   if (instContainer) {
     instContainer.innerHTML = buildMissingNotice(missingCable, 'Монтажные работы') + instResult.html;
-  }
-  const instCountBadge = document.getElementById('worksInstallationCountBadge');
-  if (instCountBadge) {
-    instCountBadge.textContent = `${instResult.totalCount} способов (${instResult.worksCount} поз.)`;
   }
   const tabInstBadge = document.getElementById('tabWorksInstallationCountBadge');
   if (tabInstBadge) {
@@ -1098,26 +1016,6 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
     return;
   }
 
-  let totalMethodsAcrossAll = 0;
-  let totalWorksAcrossAll = 0;
-  let totalSubItemsAcrossAll = 0;
-
-  equipmentList.forEach(item => {
-    const wm = getEquipmentItemWorksObject(item);
-    const mKeys = Object.keys(wm);
-    totalMethodsAcrossAll += mKeys.length;
-    mKeys.forEach(mk => {
-      const wList = wm[mk];
-      const arr = Array.isArray(wList) ? wList : (wList ? [wList] : []);
-      totalWorksAcrossAll += arr.length;
-      arr.forEach(w => {
-        if (w && typeof w === 'object') {
-          totalSubItemsAcrossAll += getWorkItemNestedResources(w).length;
-        }
-      });
-    });
-  });
-
   const cardsHtml = filtered.map((item, idx) => {
     const mark = (item["Марка"] || item.mark || 'Без марки').trim();
     const fullDesc = (item["Полное наименование"] || item["Описание"] || item["Название"] || item.description || '').trim();
@@ -1126,12 +1024,8 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
     const wm = getEquipmentItemWorksObject(item);
     const methodEntries = Object.entries(wm);
 
-    let cardWorksCount = 0;
-    let cardSubCount = 0;
-
     const methodsHtml = methodEntries.map(([methodName, worksArr]) => {
       const worksList = Array.isArray(worksArr) ? worksArr : (worksArr ? [worksArr] : []);
-      cardWorksCount += worksList.length;
 
       const worksItemsHtml = worksList.map((work, wIdx) => {
         if (typeof work === 'string') {
@@ -1148,7 +1042,6 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
         const section = work["Раздел"] || work.section || 'Монтажные работы';
 
         const nested = getWorkItemNestedResources(work);
-        cardSubCount += nested.length;
 
         const subItemsHtml = nested.map((sub, sIdx) => {
           if (typeof sub === 'string') {
@@ -1213,9 +1106,6 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             ${unitTop ? `<span class="badge bg-body text-body border font-monospace ms-1" style="font-size: 0.72rem;">${escapeHtml(unitTop)}</span>` : ''}
           </div>
           <div class="d-flex align-items-center gap-1_5">
-            <span class="badge bg-primary-subtle text-primary border">${methodEntries.length} способов установки</span>
-            ${cardWorksCount > 0 ? `<span class="badge bg-secondary-subtle text-secondary-emphasis border">${cardWorksCount} норм</span>` : ''}
-            ${cardSubCount > 0 ? `<span class="badge bg-warning-subtle text-warning-emphasis border">${cardSubCount} мат./обор.</span>` : ''}
             <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Редактировать позицию оборудования">
               <i class='bx bx-edit-alt'></i>
             </button>
@@ -1232,10 +1122,7 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
     `;
   }).join('');
 
-  container.innerHTML = `
-    ${renderCatalogHeaderBar(`Показано: <strong>${filtered.length}</strong> из ${totalEquipmentCount} позиций оборудования (${totalMethodsAcrossAll} способов установки, ${totalWorksAcrossAll} норм, ${totalSubItemsAcrossAll} вложенных мат./обор. в JSON)`)}
-    ${cardsHtml}
-  `;
+  container.innerHTML = cardsHtml;
 }
 
 // --------------------------------------------------------------------------
@@ -1268,73 +1155,6 @@ function renderSettingsModalContent(rulesObj = null) {
   if (pluginVerInput) pluginVerInput.value = settings.pluginVersion;
 }
 
-function saveSettingsFromUiToJson(showToastNotification = true) {
-  const currentDraft = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
-
-  const numMode = document.getElementById('settingNumberingMode')?.value || 'иерархическая';
-  const decWorks = parseInt(document.getElementById('settingDecimalsWorks')?.value, 10);
-  const decMats = parseInt(document.getElementById('settingDecimalsMaterials')?.value, 10);
-  const ggeVer = document.getElementById('settingGgeVersion')?.value || '3.01';
-  const accLevel = document.getElementById('settingAccessLevel')?.value || 'коммерческая тайна';
-  const softName = document.getElementById('settingSoftName')?.value || 'Программный комплекс "Строительный эксперт"  v7.3.1.7813';
-  const pluginVer = document.getElementById('settingPluginVersion')?.value || 'Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13';
-
-  const updatedSettings = {
-    "ТипНумерации": numMode,
-    "ВерсияGGE": ggeVer,
-    "УровеньДоступа": accLevel,
-    "ПрограммныйКомплекс": softName,
-    "ПлагинGGE": pluginVer,
-    "ОкруглениеРабот": !isNaN(decWorks) ? Math.max(0, Math.min(10, decWorks)) : 2,
-    "ОкруглениеМатериалов": !isNaN(decMats) ? Math.max(0, Math.min(10, decMats)) : 3
-  };
-
-  const newDraftObj = {
-    "Настройки": updatedSettings
-  };
-  for (const [k, v] of Object.entries(currentDraft)) {
-    if (k !== "Настройки") {
-      newDraftObj[k] = v;
-    }
-  }
-
-  modalDraftRules = newDraftObj;
-  setWorksJsonEditorValue(JSON.stringify(newDraftObj, null, 2));
-  validateWorksJsonInput();
-
-  if (showToastNotification) {
-    showToast('Параметры обновлены в редакторе JSON. Нажмите «Применить и пересчитать», чтобы применить изменения.', 'info', 'Настройки');
-  }
-}
-
-function resetDefaultSettings() {
-  const defaultSettings = {
-    "ТипНумерации": "иерархическая",
-    "ВерсияGGE": "3.01",
-    "УровеньДоступа": "коммерческая тайна",
-    "ПрограммныйКомплекс": "Программный комплекс \"Строительный эксперт\"  v7.3.1.7813",
-    "ПлагинGGE": "Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13",
-    "ОкруглениеРабот": 2,
-    "ОкруглениеМатериалов": 3
-  };
-
-  const currentDraft = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
-  const newDraftObj = {
-    "Настройки": defaultSettings
-  };
-  for (const [k, v] of Object.entries(currentDraft)) {
-    if (k !== "Настройки") {
-      newDraftObj[k] = v;
-    }
-  }
-
-  modalDraftRules = newDraftObj;
-  setWorksJsonEditorValue(JSON.stringify(newDraftObj, null, 2));
-  validateWorksJsonInput();
-  renderSettingsModalContent(newDraftObj);
-
-  showToast('Настройки в редакторе сброшены к стандартным значениям. Нажмите «Применить и пересчитать», чтобы применить их.', 'info', 'Сброс настроек');
-}
 
 // --------------------------------------------------------------------------
 // RENDER COUPLING CATALOG TAB
@@ -1437,86 +1257,17 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
 }
 
 // --------------------------------------------------------------------------
-// WORKS RULES & NORMS JSON EDITOR (WITH CODEMIRROR)
+// WORKS RULES & NORMS JSON PREVIEW
 // --------------------------------------------------------------------------
 
-function foldAllWorksJson() {
-  if (worksJsonCodeMirror) {
-    worksJsonCodeMirror.operation(() => {
-      for (let l = worksJsonCodeMirror.firstLine(); l <= worksJsonCodeMirror.lastLine(); ++l) {
-        worksJsonCodeMirror.foldCode({ line: l, ch: 0 }, null, "fold");
-      }
-    });
-    showToast('Все узлы JSON свернуты', 'info', 'Сворачивание');
-  }
-}
-
-function unfoldAllWorksJson() {
-  if (worksJsonCodeMirror) {
-    worksJsonCodeMirror.operation(() => {
-      for (let l = worksJsonCodeMirror.firstLine(); l <= worksJsonCodeMirror.lastLine(); ++l) {
-        worksJsonCodeMirror.foldCode({ line: l, ch: 0 }, null, "unfold");
-      }
-    });
-    showToast('Все узлы JSON развернуты', 'info', 'Разворачивание');
-  }
+function renderJsonPreviewContent(rulesObj = null) {
+  const data = rulesObj || modalDraftRules || window.currentWorksRules || cachedDefaultRules || {};
+  setWorksJsonEditorValue(JSON.stringify(data, null, 2));
 }
 
 function initWorksJsonCodeMirror() {
-  const textarea = document.getElementById('worksJsonEditorTextarea');
-  if (!textarea) return null;
-
-  if (worksJsonCodeMirror) {
-    worksJsonCodeMirror.refresh();
-    return worksJsonCodeMirror;
-  }
-
-  if (typeof CodeMirror !== 'undefined') {
-    worksJsonCodeMirror = CodeMirror.fromTextArea(textarea, {
-      lineNumbers: true,
-      mode: { name: "javascript", json: true },
-      lineWrapping: false,
-      foldGutter: true,
-      gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
-      matchBrackets: true,
-      autoCloseBrackets: true,
-      tabSize: 2,
-      indentUnit: 2,
-      extraKeys: {
-        "Ctrl-Q": function(cm) { cm.foldCode(cm.getCursor()); },
-        "Cmd-Q": function(cm) { cm.foldCode(cm.getCursor()); },
-        "Ctrl-F": "findPersistent",
-        "Cmd-F": "findPersistent"
-      }
-    });
-
-    const debouncedValidateCodeMirror = debounce(validateWorksJsonInput, 200);
-
-    worksJsonCodeMirror.on('change', () => {
-      textarea.value = worksJsonCodeMirror.getValue();
-      debouncedValidateCodeMirror();
-    });
-
-    const modalEl = document.getElementById('worksRulesModal');
-    if (modalEl) {
-      modalEl.addEventListener('shown.bs.modal', () => {
-        setTimeout(() => {
-          if (worksJsonCodeMirror) worksJsonCodeMirror.refresh();
-        }, 50);
-      });
-    }
-
-    const jsonTabBtn = document.getElementById('tabWorksJsonBtn');
-    if (jsonTabBtn) {
-      jsonTabBtn.addEventListener('shown.bs.tab', () => {
-        setTimeout(() => {
-          if (worksJsonCodeMirror) worksJsonCodeMirror.refresh();
-        }, 50);
-      });
-    }
-  }
-
-  return worksJsonCodeMirror;
+  renderJsonPreviewContent();
+  return null;
 }
 
 
@@ -1566,13 +1317,6 @@ function openWorksRulesModal(activeTab = 'editor') {
     console.error('Failed to open modal with Bootstrap:', err);
   }
 
-  setTimeout(() => {
-    try {
-      if (worksJsonCodeMirror) worksJsonCodeMirror.refresh();
-    } catch {
-      // ignore
-    }
-  }, 100);
 }
 window.openWorksRulesModal = openWorksRulesModal;
 
@@ -1655,47 +1399,8 @@ function validateWorksJsonInput() {
   }
 }
 
-// Setup Works Rules modal controls & JSON editor listeners
+// Setup Works Rules modal controls & JSON listeners
 function setupWorksRulesListeners() {
-  initWorksJsonCodeMirror();
-
-  const textarea = document.getElementById('worksJsonEditorTextarea');
-  if (textarea) {
-    const debouncedValidateTextarea = debounce(validateWorksJsonInput, 200);
-    textarea.addEventListener('input', debouncedValidateTextarea);
-
-    textarea.addEventListener('keydown', function(e) {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const start = this.selectionStart;
-        const end = this.selectionEnd;
-        this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
-        this.selectionStart = this.selectionEnd = start + 2;
-        debouncedValidateTextarea();
-      }
-    });
-  }
-
-  const foldAllBtn = document.getElementById('foldAllWorksJsonBtn');
-  if (foldAllBtn) foldAllBtn.addEventListener('click', foldAllWorksJson);
-
-  const unfoldAllBtn = document.getElementById('unfoldAllWorksJsonBtn');
-  if (unfoldAllBtn) unfoldAllBtn.addEventListener('click', unfoldAllWorksJson);
-
-  const formatBtn = document.getElementById('formatWorksJsonBtn');
-  if (formatBtn) {
-    formatBtn.addEventListener('click', () => {
-      try {
-        const val = getWorksJsonEditorValue();
-        const parsed = JSON.parse(val);
-        setWorksJsonEditorValue(JSON.stringify(parsed, null, 2));
-        validateWorksJsonInput();
-        showToast('JSON сметных норм отформатирован', 'info', 'Форматирование');
-      } catch (err) {
-        showToast('Невозможно отформатировать: ' + err.message, 'error', 'Ошибка синтаксиса');
-      }
-    });
-  }
 
   // =========================================================================
   // UNIFIED WORK ITEMS AND NESTED RESOURCES COMPONENT (WORKS & MATERIALS)
@@ -1997,6 +1702,48 @@ function setupWorksRulesListeners() {
       works.push(workObj);
     });
     return works;
+  }
+
+  function setupUnifiedWorkCardsContainerEvents(container, defaultCardOptions = {}, defaultRowOptions = {}) {
+    if (!container) return;
+    container.addEventListener('click', (e) => {
+      const addNestedBtn = e.target.closest('.btn-add-nested-row, .btn-add-work-material, .btn-add-equip-nested-item');
+      if (addNestedBtn) {
+        const card = addNestedBtn.closest('.unified-work-card, .rule-work-card, .equip-work-card');
+        const tbody = card ? (card.querySelector('.unified-nested-tbody') || card.querySelector('.rule-work-materials-tbody') || card.querySelector('.equip-work-nested-tbody')) : null;
+        if (tbody) {
+          appendUnifiedNestedItemRow(
+            tbody,
+            '',
+            defaultRowOptions.type || 'материал',
+            defaultRowOptions.unit || 'шт',
+            defaultRowOptions.formula || defaultCardOptions.defaultFormula || 'ДЛИНА',
+            defaultRowOptions.allowSectionSelect || false,
+            defaultRowOptions.defaultSection || defaultCardOptions.defaultSection || ''
+          );
+        }
+        return;
+      }
+
+      const removeRowBtn = e.target.closest('.btn-remove-nested-row, .btn-remove-mat-row, .btn-remove-equip-item-row');
+      if (removeRowBtn) {
+        const tr = removeRowBtn.closest('tr');
+        if (tr) tr.remove();
+        return;
+      }
+
+      const removeCardBtn = e.target.closest('.btn-remove-unified-work-card, .btn-remove-work-card, .btn-remove-equip-work-card');
+      if (removeCardBtn) {
+        const card = removeCardBtn.closest('.unified-work-card, .rule-work-card, .equip-work-card');
+        if (card) {
+          card.remove();
+          refreshUnifiedWorkCardBadges(container);
+          if (container.children.length === 0) {
+            appendUnifiedWorkCard(container, null, defaultCardOptions);
+          }
+        }
+      }
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -2559,9 +2306,14 @@ function setupWorksRulesListeners() {
       const container = document.getElementById('addRuleWorksCardsContainer');
       if (container) {
         container.innerHTML = '';
-        const works = getRuleWorks(ruleObj);
-        if (Array.isArray(works) && works.length > 0) {
-          works.forEach(w => appendUnifiedWorkCard(container, w, { defaultSection: sectionName, defaultFormula: 'ДЛИНА', defaultUnit: 'м' }));
+        
+        const rawWorks = Array.isArray(ruleObj)
+          ? ruleObj
+          : (ruleObj["Работы"] || ruleObj["Работы и материалы"] || ruleObj.works || []);
+        
+        const worksList = Array.isArray(rawWorks) ? rawWorks : [];
+        if (worksList.length > 0) {
+          worksList.forEach(w => appendUnifiedWorkCard(container, w, { defaultSection: sectionName, defaultFormula: 'ДЛИНА', defaultUnit: 'м' }));
         } else {
           appendUnifiedWorkCard(container, null, { defaultSection: sectionName, defaultFormula: 'ДЛИНА', defaultUnit: 'м' });
         }
@@ -2574,26 +2326,6 @@ function setupWorksRulesListeners() {
     }
   }
 
-  // Legacy compatibility aliases
-  function appendAddRuleWorkMaterialRow(tbody, name = '', unit = 'м', formula = 'ДЛИНА', show = false, section = '') {
-    appendUnifiedNestedItemRow(tbody, name, 'материал', unit, formula, show, section);
-  }
-  function refreshAddRuleWorkCardBadges() {
-    refreshUnifiedWorkCardBadges(document.getElementById('addRuleWorksCardsContainer'));
-  }
-  function appendAddRuleWorkCard(title = '', unit = 'м', formula = 'ДЛИНА', showFormula = true, materials = [], condition = '', section = '') {
-    const workData = {
-      "Наименование": title,
-      "Единицы измерения": unit,
-      "Формула": formula,
-      "Тип": "работа",
-      "ОтображатьФормулу": showFormula,
-      "Условие": condition,
-      "Раздел": section,
-      "Материалы": materials
-    };
-    appendUnifiedWorkCard(document.getElementById('addRuleWorksCardsContainer'), workData, { defaultFormula: 'ДЛИНА', defaultUnit: 'м' });
-  }
 
   const btnAddRuleWorkRow = document.getElementById('btnAddRuleWorkRow');
   if (btnAddRuleWorkRow) {
@@ -2603,39 +2335,11 @@ function setupWorksRulesListeners() {
   }
 
   const addRuleWorksCardsContainer = document.getElementById('addRuleWorksCardsContainer');
-  if (addRuleWorksCardsContainer) {
-    addRuleWorksCardsContainer.addEventListener('click', (e) => {
-      const addNestedBtn = e.target.closest('.btn-add-nested-row, .btn-add-work-material');
-      if (addNestedBtn) {
-        const card = addNestedBtn.closest('.unified-work-card, .rule-work-card');
-        const tbody = card ? (card.querySelector('.unified-nested-tbody') || card.querySelector('.rule-work-materials-tbody')) : null;
-        if (tbody) {
-          appendUnifiedNestedItemRow(tbody, '', 'материал', 'шт', 'ДЛИНА', false, '');
-        }
-        return;
-      }
-
-      const removeRowBtn = e.target.closest('.btn-remove-nested-row, .btn-remove-mat-row');
-      if (removeRowBtn) {
-        const tr = removeRowBtn.closest('tr');
-        if (tr) tr.remove();
-        return;
-      }
-
-      const removeCardBtn = e.target.closest('.btn-remove-unified-work-card, .btn-remove-work-card');
-      if (removeCardBtn) {
-        const card = removeCardBtn.closest('.unified-work-card, .rule-work-card');
-        if (card) {
-          card.remove();
-          refreshUnifiedWorkCardBadges(addRuleWorksCardsContainer);
-          if (addRuleWorksCardsContainer.children.length === 0) {
-            appendUnifiedWorkCard(addRuleWorksCardsContainer, null, { defaultFormula: 'ДЛИНА', defaultUnit: 'м' });
-          }
-        }
-        return;
-      }
-    });
-  }
+  setupUnifiedWorkCardsContainerEvents(
+    addRuleWorksCardsContainer,
+    { defaultFormula: 'ДЛИНА', defaultUnit: 'м' },
+    { type: 'материал', unit: 'шт', formula: 'ДЛИНА' }
+  );
 
   const radioConstruction = document.getElementById('addRuleSecConstruction');
   const radioInstallation = document.getElementById('addRuleSecInstallation');
@@ -2930,25 +2634,12 @@ function setupWorksRulesListeners() {
         };
       }
 
-      modalDraftRules = currentObj;
-      setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-      validateWorksJsonInput();
-      renderRulesModalContent(modalDraftRules);
-
-      const modalEl = document.getElementById('addRuleModal');
-      if (modalEl && window.bootstrap && bootstrap.Modal) {
-        bootstrap.Modal.getInstance(modalEl)?.hide();
-      }
-
       const isEdit = addRuleEditContext && addRuleEditContext.mode === 'edit';
-      resetRuleModalToAddMode();
-
-      showToast(
-        isEdit ? `Способ «${wayName}» успешно обновлен в разделе «${targetSectionKey}».` : `Способ «${wayName}» успешно добавлен в раздел «${targetSectionKey}».`,
-        'success',
-        isEdit ? 'Правило обновлено' : 'Правило добавлено',
-        5000
-      );
+      commitDraftRulesMutation(currentObj, {
+        modalId: 'addRuleModal',
+        resetFn: resetRuleModalToAddMode,
+        toast: isEdit ? `Способ «${wayName}» успешно обновлен в разделе «${targetSectionKey}».` : `Способ «${wayName}» успешно добавлен в раздел «${targetSectionKey}».`
+      });
     });
   }
 
@@ -3240,29 +2931,19 @@ function setupWorksRulesListeners() {
         "Полное описание": description
       };
 
-      modalDraftRules = currentObj;
-      setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-      validateWorksJsonInput();
-      saveWorksRulesToLocalStorage(modalDraftRules);
-      populateDynamicCableGroups(modalDraftRules);
-      renderCableCatalogModalContent(modalDraftRules);
-      renderCableGroupsOverviewModalContent(modalDraftRules);
-
-      const modalEl = document.getElementById('addCableModal');
-      if (modalEl && window.bootstrap && bootstrap.Modal) {
-        bootstrap.Modal.getInstance(modalEl)?.hide();
-      }
-
+      populateDynamicCableGroups(currentObj);
       const isEdit = addCableEditContext && addCableEditContext.mode === 'edit';
-      resetCableModalToAddMode();
-
       const displayGroup = groupKey === '' ? 'Основная группа ("")' : `группа "${groupKey}"`;
-      showToast(
-        isEdit ? `Марка кабеля «${mark}» успешно изменена.` : `Марка кабеля «${mark}» успешно добавлена в ${displayGroup}.`,
-        'success',
-        isEdit ? 'Марка изменена' : 'Марка добавлена',
-        5000
-      );
+      commitDraftRulesMutation(currentObj, {
+        saveToStorage: true,
+        renderFn: (obj) => {
+          renderCableCatalogModalContent(obj);
+          renderCableGroupsOverviewModalContent(obj);
+        },
+        modalId: 'addCableModal',
+        resetFn: resetCableModalToAddMode,
+        toast: isEdit ? `Марка кабеля «${mark}» успешно изменена.` : `Марка кабеля «${mark}» успешно добавлена в ${displayGroup}.`
+      });
     });
   }
 
@@ -3396,25 +3077,13 @@ function setupWorksRulesListeners() {
 
       currentObj["Справочник муфт"][mark] = couplingEntry;
 
-      modalDraftRules = currentObj;
-      setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-      validateWorksJsonInput();
-      renderCouplingCatalogModalContent(modalDraftRules);
-
-      const modalEl = document.getElementById('addCouplingModal');
-      if (modalEl && window.bootstrap && bootstrap.Modal) {
-        bootstrap.Modal.getInstance(modalEl)?.hide();
-      }
-
       const isEdit = addCouplingEditContext && addCouplingEditContext.mode === 'edit';
-      resetCouplingModalToAddMode();
-
-      showToast(
-        isEdit ? `Муфта «${mark}» успешно изменена.` : `Муфта «${mark}» успешно добавлена в справочник муфт.`,
-        'success',
-        isEdit ? 'Муфта изменена' : 'Муфта добавлена',
-        5000
-      );
+      commitDraftRulesMutation(currentObj, {
+        renderFn: renderCouplingCatalogModalContent,
+        modalId: 'addCouplingModal',
+        resetFn: resetCouplingModalToAddMode,
+        toast: isEdit ? `Муфта «${mark}» успешно изменена.` : `Муфта «${mark}» успешно добавлена в справочник муфт.`
+      });
     });
   }
 
@@ -3492,25 +3161,6 @@ function setupWorksRulesListeners() {
     }
   }
 
-  // Legacy compatibility aliases for equipment
-  function appendAddEquipNestedItemRow(tbody, name = '', type = 'материал', unit = 'шт', formula = 'КОЛИЧЕСТВО', show = true) {
-    appendUnifiedNestedItemRow(tbody, name, type, unit, formula, show, 'Монтажные работы');
-  }
-  function refreshAddEquipWorkCardBadges() {
-    refreshUnifiedWorkCardBadges(document.getElementById('addEquipWorksContainer'));
-  }
-  function appendAddEquipWorkCard(title = '', unit = 'шт', formula = 'КОЛИЧЕСТВО', showFormula = false, section = 'Монтажные работы', nestedItems = []) {
-    const workData = {
-      "Наименование": title,
-      "Единицы измерения": unit,
-      "Формула": formula,
-      "Тип": "работа",
-      "ОтображатьФормулу": showFormula,
-      "Раздел": section,
-      "Материалы": nestedItems
-    };
-    appendUnifiedWorkCard(document.getElementById('addEquipWorksContainer'), workData, { defaultSection: section, defaultFormula: 'КОЛИЧЕСТВО', defaultUnit: 'шт', defaultShowFormula: false });
-  }
 
   // Проверка дубликата способа установки для активной марки
   function checkEquipMethodExists() {
@@ -3543,38 +3193,12 @@ function setupWorksRulesListeners() {
   }
 
   const addEquipWorksContainer = document.getElementById('addEquipWorksContainer');
+  setupUnifiedWorkCardsContainerEvents(
+    addEquipWorksContainer,
+    { defaultSection: 'Монтажные работы', defaultFormula: 'КОЛИЧЕСТВО', defaultUnit: 'шт' },
+    { type: 'материал', unit: 'шт', formula: 'КОЛИЧЕСТВО', allowSectionSelect: true, defaultSection: 'Монтажные работы' }
+  );
   if (addEquipWorksContainer) {
-    addEquipWorksContainer.addEventListener('click', (e) => {
-      const addNestedBtn = e.target.closest('.btn-add-nested-row, .btn-add-equip-nested-item');
-      if (addNestedBtn) {
-        const card = addNestedBtn.closest('.unified-work-card, .equip-work-card');
-        const tbody = card ? (card.querySelector('.unified-nested-tbody') || card.querySelector('.equip-work-nested-tbody')) : null;
-        if (tbody) {
-          appendUnifiedNestedItemRow(tbody, '', 'материал', 'шт', 'КОЛИЧЕСТВО', true, 'Монтажные работы');
-        }
-        return;
-      }
-
-      const removeRowBtn = e.target.closest('.btn-remove-nested-row, .btn-remove-equip-item-row');
-      if (removeRowBtn) {
-        const tr = removeRowBtn.closest('tr');
-        if (tr) tr.remove();
-        return;
-      }
-
-      const removeWorkBtn = e.target.closest('.btn-remove-unified-work-card, .btn-remove-equip-work-card');
-      if (removeWorkBtn) {
-        const card = removeWorkBtn.closest('.unified-work-card, .equip-work-card');
-        if (card) {
-          card.remove();
-          refreshUnifiedWorkCardBadges(addEquipWorksContainer);
-          if (addEquipWorksContainer.children.length === 0) {
-            appendUnifiedWorkCard(addEquipWorksContainer, null, { defaultSection: 'Монтажные работы', defaultFormula: 'КОЛИЧЕСТВО', defaultUnit: 'шт' });
-          }
-        }
-        return;
-      }
-    });
 
     addEquipWorksContainer.addEventListener('input', (e) => {
       if (e.target.classList.contains('unified-work-title') || e.target.classList.contains('equip-work-title') || e.target.classList.contains('unified-nested-name')) {
@@ -3726,25 +3350,13 @@ function setupWorksRulesListeners() {
         currentObj["Оборудование"][mark]["Работы"][method] = parsedWorks;
       }
 
-      modalDraftRules = currentObj;
-      setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-      validateWorksJsonInput();
-      renderEquipmentCatalogModalContent(modalDraftRules);
-
-      const modalEl = document.getElementById('addEquipmentModal');
-      if (modalEl && window.bootstrap && bootstrap.Modal) {
-        bootstrap.Modal.getInstance(modalEl)?.hide();
-      }
-
       const isEdit = addEquipEditContext && addEquipEditContext.mode === 'edit';
-      resetEquipmentModalToAddMode();
-
-      showToast(
-        isEdit ? `Оборудование «${mark}» [${method}]: сметные нормы успешно обновлены.` : `Оборудование «${mark}» [${method}]: успешно добавлено ${parsedWorks.length} работ.`,
-        'success',
-        isEdit ? 'Нормы обновлены' : 'Оборудование добавлено',
-        5000
-      );
+      commitDraftRulesMutation(currentObj, {
+        renderFn: renderEquipmentCatalogModalContent,
+        modalId: 'addEquipmentModal',
+        resetFn: resetEquipmentModalToAddMode,
+        toast: isEdit ? `Оборудование «${mark}» [${method}]: сметные нормы успешно обновлены.` : `Оборудование «${mark}» [${method}]: успешно добавлено ${parsedWorks.length} работ.`
+      });
     });
   }
 
@@ -3787,20 +3399,25 @@ function setupWorksRulesListeners() {
     });
   }
 
-  const syncSettingsBtn = document.getElementById('syncSettingsToJsonBtn');
-  if (syncSettingsBtn) syncSettingsBtn.addEventListener('click', () => saveSettingsFromUiToJson(true));
-
-  const resetSettingsBtn = document.getElementById('resetDefaultSettingsBtn');
-  if (resetSettingsBtn) resetSettingsBtn.addEventListener('click', resetDefaultSettings);
-
   [
-    'settingNumberingMode',
-    'settingDecimalsWorks', 'settingDecimalsMaterials',
-    'settingGgeVersion', 'settingAccessLevel',
-    'settingSoftName', 'settingPluginVersion'
-  ].forEach(id => {
+    ['settingNumberingMode', 'ТипНумерации', v => v],
+    ['settingDecimalsWorks', 'ОкруглениеРабот', v => parseInt(v, 10) || 2],
+    ['settingDecimalsMaterials', 'ОкруглениеМатериалов', v => parseInt(v, 10) || 3],
+    ['settingGgeVersion', 'ВерсияGGE', v => v],
+    ['settingAccessLevel', 'УровеньДоступа', v => v],
+    ['settingSoftName', 'ПрограммныйКомплекс', v => v],
+    ['settingPluginVersion', 'ПлагинGGE', v => v]
+  ].forEach(([id, key, transform]) => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('change', () => saveSettingsFromUiToJson(false));
+    if (el) {
+      el.addEventListener('input', () => {
+        const currentDraft = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
+        if (!currentDraft["Настройки"]) currentDraft["Настройки"] = {};
+        currentDraft["Настройки"][key] = transform(el.value);
+        modalDraftRules = currentDraft;
+        setWorksJsonEditorValue(JSON.stringify(currentDraft, null, 2));
+      });
+    }
   });
 
   const equipmentSearchInput = document.getElementById('equipmentCatalogSearchInput');
@@ -4062,103 +3679,84 @@ function setupWorksRulesListeners() {
   // DELETION LOGIC (RULES, CABLES, COUPLINGS, EQUIPMENT)
   // =========================================================================
 
+  function commitDraftRulesMutation(newObj, options = {}) {
+    modalDraftRules = newObj;
+    setWorksJsonEditorValue(JSON.stringify(newObj, null, 2));
+    validateWorksJsonInput();
+
+    if (options.saveToStorage) {
+      saveWorksRulesToLocalStorage(modalDraftRules);
+    }
+    if (typeof options.renderFn === 'function') {
+      options.renderFn(modalDraftRules);
+    } else {
+      renderRulesModalContent(modalDraftRules, options.updateAll !== false);
+    }
+
+    if (options.modalId) {
+      const modalEl = document.getElementById(options.modalId);
+      if (modalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+      }
+    }
+    if (typeof options.resetFn === 'function') options.resetFn();
+    if (options.toast) showToast(options.toast, options.toastType || 'success', options.toastTitle || 'Удалено');
+  }
+
   function deleteRuleItem(sectionName, ruleName) {
     if (!sectionName || !ruleName) return;
     const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
-    let deleted = false;
-
-    if (currentObj[sectionName] && typeof currentObj[sectionName] === 'object') {
-      if (currentObj[sectionName][ruleName] !== undefined) {
-        delete currentObj[sectionName][ruleName];
-        deleted = true;
-      } else {
-        const foundKey = Object.keys(currentObj[sectionName]).find(k => k.trim() === ruleName.trim());
-        if (foundKey) {
-          delete currentObj[sectionName][foundKey];
-          deleted = true;
-        }
-      }
-    }
-
-    if (!deleted) {
-      for (const [secKey, secVal] of Object.entries(currentObj)) {
+    if (currentObj[sectionName]?.[ruleName] !== undefined) {
+      delete currentObj[sectionName][ruleName];
+    } else {
+      for (const secVal of Object.values(currentObj)) {
         if (secVal && typeof secVal === 'object' && secVal[ruleName] !== undefined) {
           delete secVal[ruleName];
-          deleted = true;
           break;
         }
       }
     }
-
-    modalDraftRules = currentObj;
-    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-    validateWorksJsonInput();
-    renderRulesModalContent(modalDraftRules, true);
-
-    const modalEl = document.getElementById('addRuleModal');
-    if (modalEl && window.bootstrap && bootstrap.Modal) {
-      bootstrap.Modal.getInstance(modalEl)?.hide();
-    }
-    resetRuleModalToAddMode();
-
-    showToast(`Способ «${ruleName}» успешно удален из раздела «${sectionName}».`, 'success', 'Удалено');
+    commitDraftRulesMutation(currentObj, {
+      modalId: 'addRuleModal',
+      resetFn: resetRuleModalToAddMode,
+      toast: `Способ «${ruleName}» успешно удален из раздела «${sectionName}».`
+    });
   }
 
   function deleteCableItem(groupName, markKey) {
     if (!markKey) return;
     const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
-    const catalog = currentObj["Справочник кабелей"];
-    let deleted = false;
-
-    if (catalog && typeof catalog === 'object') {
-      if (groupName !== undefined && catalog[groupName]?.["Тип"]?.[markKey]) {
-        delete catalog[groupName]["Тип"][markKey];
-        deleted = true;
-      }
-      if (!deleted) {
-        for (const g of Object.values(catalog)) {
-          if (g?.["Тип"]?.[markKey]) {
-            delete g["Тип"][markKey];
-            deleted = true;
-            break;
-          }
+    const catalog = currentObj["Справочник кабелей"] || {};
+    if (groupName !== undefined && catalog[groupName]?.["Тип"]?.[markKey]) {
+      delete catalog[groupName]["Тип"][markKey];
+    } else {
+      for (const g of Object.values(catalog)) {
+        if (g?.["Тип"]?.[markKey]) {
+          delete g["Тип"][markKey];
+          break;
         }
       }
     }
-
-    modalDraftRules = currentObj;
-    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-    validateWorksJsonInput();
-    renderCableCatalogModalContent(modalDraftRules);
-
-    const modalEl = document.getElementById('addCableModal');
-    if (modalEl && window.bootstrap && bootstrap.Modal) {
-      bootstrap.Modal.getInstance(modalEl)?.hide();
-    }
-    resetCableModalToAddMode();
-
-    showToast(`Марка кабеля «${markKey}» успешно удалена из справочника.`, 'success', 'Удалено');
+    commitDraftRulesMutation(currentObj, {
+      renderFn: renderCableCatalogModalContent,
+      modalId: 'addCableModal',
+      resetFn: resetCableModalToAddMode,
+      toast: `Марка кабеля «${markKey}» успешно удалена из справочника.`
+    });
   }
 
   function deleteCouplingItem(markKey) {
     if (!markKey) return;
     const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
-    if (currentObj["Справочник муфт"] && currentObj["Справочник муфт"][markKey]) {
+    if (currentObj["Справочник муфт"]?.[markKey]) {
       delete currentObj["Справочник муфт"][markKey];
     }
-
-    modalDraftRules = currentObj;
-    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-    validateWorksJsonInput();
-    renderCouplingCatalogModalContent(modalDraftRules);
-
-    const modalEl = document.getElementById('addCouplingModal');
-    if (modalEl && window.bootstrap && bootstrap.Modal) {
-      bootstrap.Modal.getInstance(modalEl)?.hide();
-    }
-    resetCouplingModalToAddMode();
-
-    showToast(`Муфта «${markKey}» успешно удалена из справочника.`, 'success', 'Удалено');
+    commitDraftRulesMutation(currentObj, {
+      renderFn: renderCouplingCatalogModalContent,
+      modalId: 'addCouplingModal',
+      resetFn: resetCouplingModalToAddMode,
+      toast: `Муфта «${markKey}» успешно удалена из справочника.`
+    });
   }
 
   function deleteEquipmentMethodItem(markKey, methodName) {
@@ -4166,47 +3764,29 @@ function setupWorksRulesListeners() {
     const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
     const eqObj = currentObj["Оборудование"]?.[markKey];
     if (eqObj) {
-      if (eqObj["Работы"] && eqObj["Работы"][methodName]) {
-        delete eqObj["Работы"][methodName];
-      }
-      if (eqObj["Работы и материалы"] && eqObj["Работы и материалы"][methodName]) {
-        delete eqObj["Работы и материалы"][methodName];
-      }
+      if (eqObj["Работы"]) delete eqObj["Работы"][methodName];
+      if (eqObj["Работы и материалы"]) delete eqObj["Работы и материалы"][methodName];
     }
-
-    modalDraftRules = currentObj;
-    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-    validateWorksJsonInput();
-    renderEquipmentCatalogModalContent(modalDraftRules);
-
-    const modalEl = document.getElementById('addEquipmentModal');
-    if (modalEl && window.bootstrap && bootstrap.Modal) {
-      bootstrap.Modal.getInstance(modalEl)?.hide();
-    }
-    resetEquipmentModalToAddMode();
-
-    showToast(`Способ установки «${methodName}» для оборудования «${markKey}» удален.`, 'success', 'Удалено');
+    commitDraftRulesMutation(currentObj, {
+      renderFn: renderEquipmentCatalogModalContent,
+      modalId: 'addEquipmentModal',
+      resetFn: resetEquipmentModalToAddMode,
+      toast: `Способ установки «${methodName}» для оборудования «${markKey}» удален.`
+    });
   }
 
   function deleteEquipmentAllItem(markKey) {
     if (!markKey) return;
     const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
-    if (currentObj["Оборудование"] && currentObj["Оборудование"][markKey]) {
+    if (currentObj["Оборудование"]?.[markKey]) {
       delete currentObj["Оборудование"][markKey];
     }
-
-    modalDraftRules = currentObj;
-    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-    validateWorksJsonInput();
-    renderEquipmentCatalogModalContent(modalDraftRules);
-
-    const modalEl = document.getElementById('addEquipmentModal');
-    if (modalEl && window.bootstrap && bootstrap.Modal) {
-      bootstrap.Modal.getInstance(modalEl)?.hide();
-    }
-    resetEquipmentModalToAddMode();
-
-    showToast(`Оборудование «${markKey}» полностью удалено из справочника.`, 'success', 'Удалено');
+    commitDraftRulesMutation(currentObj, {
+      renderFn: renderEquipmentCatalogModalContent,
+      modalId: 'addEquipmentModal',
+      resetFn: resetEquipmentModalToAddMode,
+      toast: `Оборудование «${markKey}» полностью удалено из справочника.`
+    });
   }
 
   // =========================================================================
@@ -4362,31 +3942,19 @@ function setupWorksRulesListeners() {
       });
     }
 
-    modalDraftRules = currentObj;
-    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-    validateWorksJsonInput();
-    saveWorksRulesToLocalStorage(modalDraftRules);
-
-    // Re-populate and re-render
-    populateDynamicCableGroups(modalDraftRules);
-    renderCableCatalogModalContent(modalDraftRules);
-    renderCableGroupsOverviewModalContent(modalDraftRules);
-
-    const modalEl = document.getElementById('editCableGroupModal');
-    if (modalEl && window.bootstrap && bootstrap.Modal) {
-      bootstrap.Modal.getInstance(modalEl)?.hide();
-    }
-    resetCableGroupModalToAddMode();
-
-    const displayKey = newKey === '' ? '"" (без знака)' : `"${newKey}"`;
-    showToast(
-      isEdit 
-        ? `Соответствие марки «${newName}» и условного обозначения ${displayKey} успешно сохранено.`
-        : `Группа кабелей «${newName}» с условным обозначением ${displayKey} создана.`,
-      'success',
-      'Сохранено',
-      5000
-    );
+    populateDynamicCableGroups(currentObj);
+    commitDraftRulesMutation(currentObj, {
+      saveToStorage: true,
+      renderFn: (obj) => {
+        renderCableCatalogModalContent(obj);
+        renderCableGroupsOverviewModalContent(obj);
+      },
+      modalId: 'editCableGroupModal',
+      resetFn: resetCableGroupModalToAddMode,
+      toast: isEdit 
+        ? `Соответствие марки «${newName}» и условного обозначения ${newKey === '' ? '"" (без знака)' : `"${newKey}"`} успешно сохранено.`
+        : `Группа кабелей «${newName}» с условным обозначением ${newKey === '' ? '"" (без знака)' : `"${newKey}"`} создана.`
+    });
   }
 
   function deleteCableGroupItem(groupKey) {
@@ -4399,23 +3967,18 @@ function setupWorksRulesListeners() {
     const displayKey = groupKey === '' ? '"" (без знака)' : `"${groupKey}"`;
 
     delete currentObj["Справочник кабелей"][groupKey];
+    populateDynamicCableGroups(currentObj);
 
-    modalDraftRules = currentObj;
-    setWorksJsonEditorValue(JSON.stringify(currentObj, null, 2));
-    validateWorksJsonInput();
-    saveWorksRulesToLocalStorage(modalDraftRules);
-
-    populateDynamicCableGroups(modalDraftRules);
-    renderCableCatalogModalContent(modalDraftRules);
-    renderCableGroupsOverviewModalContent(modalDraftRules);
-
-    const modalEl = document.getElementById('editCableGroupModal');
-    if (modalEl && window.bootstrap && bootstrap.Modal) {
-      bootstrap.Modal.getInstance(modalEl)?.hide();
-    }
-    resetCableGroupModalToAddMode();
-
-    showToast(`Группа кабелей «${brandName}» (${displayKey}) успешно удалена из справочника.`, 'success', 'Группа удалена');
+    commitDraftRulesMutation(currentObj, {
+      saveToStorage: true,
+      renderFn: (obj) => {
+        renderCableCatalogModalContent(obj);
+        renderCableGroupsOverviewModalContent(obj);
+      },
+      modalId: 'editCableGroupModal',
+      resetFn: resetCableGroupModalToAddMode,
+      toast: `Группа кабелей «${brandName}» (${displayKey}) успешно удалена из справочника.`
+    });
   }
 
   function openAddCableModalForGroup(groupKey, groupName) {

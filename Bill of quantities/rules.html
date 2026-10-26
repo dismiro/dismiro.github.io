@@ -11,11 +11,6 @@
   <link href="/assets/theme.min.css" rel="stylesheet">
   <link href="/assets/bootstrap-icons.css" rel="stylesheet">
   
-  <!-- CodeMirror 5 with Fold & Search addons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css">
-
   <style>
   :root {
     --si-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -27,58 +22,6 @@
     flex-direction: column;
     padding-top: 64px;
     background-color: var(--si-body-bg, #f8fafc);
-  }
-
-  /* CodeMirror customizations */
-  .CodeMirror {
-    height: 720px;
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', monospace;
-    font-size: 13.5px;
-    line-height: 1.5;
-    border: 1px solid var(--si-border-color, #e2e8f0);
-    border-radius: 0.5rem;
-  }
-  .CodeMirror-foldmarker {
-    color: #0969da;
-    background-color: #ddf4ff;
-    border: 1px solid #54aeff;
-    font-family: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0 5px;
-    border-radius: 4px;
-    margin: 0 3px;
-  }
-  .CodeMirror-foldgutter {
-    width: 1.2em;
-    cursor: pointer;
-  }
-  .CodeMirror-foldgutter-open:after {
-    content: "▼";
-    font-size: 0.62rem;
-    color: #8c959f;
-  }
-  .CodeMirror-foldgutter-folded:after {
-    content: "▶";
-    font-size: 0.62rem;
-    color: #0969da;
-    font-weight: bold;
-  }
-
-  .cm-s-default .cm-property { color: #0550ae !important; font-weight: 600; }
-  .cm-s-default .cm-string { color: #0a3069 !important; }
-  .cm-s-default .cm-number { color: #0550ae !important; }
-  .cm-s-default .cm-atom { color: #cf222e !important; font-weight: 600; }
-  .cm-s-default .cm-variable { color: #24292f !important; }
-
-  [data-bs-theme="dark"] .CodeMirror {
-    background: #0d1117;
-    color: #e6edf3;
-    border-color: #30363d;
-  }
-  [data-bs-theme="dark"] .CodeMirror-gutters {
-    background: #161b22;
-    border-right-color: #30363d;
   }
 
   /* Animations & glow */
@@ -182,6 +125,11 @@
               <span>Монтажные работы</span>
               <span id="tabWorksInstallationCountBadge" class="badge bg-secondary-subtle text-secondary-emphasis border ms-auto font-monospace" style="font-size: 0.7rem;"></span>
             </a>
+            <a href="#equipment" class="rules-nav-pill" id="navPillEquipment" data-pane="tabWorksEquipmentPane">
+              <i class='bx bx-cube fs-5 text-info'></i>
+              <span>Оборудование</span>
+              <span id="tabWorksEquipmentCountBadge" class="badge bg-secondary-subtle text-secondary-emphasis border ms-auto font-monospace" style="font-size: 0.7rem;"></span>
+            </a>
             <a href="#cables" class="rules-nav-pill" id="navPillCables" data-pane="tabWorksCablesPane">
               <i class='bx bx-cable fs-5 text-success'></i>
               <span>Справочник кабелей</span>
@@ -191,11 +139,6 @@
               <i class='bx bx-git-merge fs-5 text-warning'></i>
               <span>Справочник муфт</span>
               <span id="tabWorksCouplingsCountBadge" class="badge bg-secondary-subtle text-secondary-emphasis border ms-auto font-monospace" style="font-size: 0.7rem;"></span>
-            </a>
-            <a href="#equipment" class="rules-nav-pill" id="navPillEquipment" data-pane="tabWorksEquipmentPane">
-              <i class='bx bx-cube fs-5 text-info'></i>
-              <span>Оборудование</span>
-              <span id="tabWorksEquipmentCountBadge" class="badge bg-secondary-subtle text-secondary-emphasis border ms-auto font-monospace" style="font-size: 0.7rem;"></span>
             </a>
             <a href="#settings" class="rules-nav-pill" id="navPillSettings" data-pane="tabWorksSettingsPane">
               <i class='bx bx-cog fs-5 text-secondary'></i>
@@ -253,7 +196,6 @@
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-hard-hat fs-5 text-primary'></i>
                   <h2 class="fs-6 fw-bold mb-0">Строительные работы (траншеи, земляные работы, проколы)</h2>
-                  <span id="worksConstructionCountBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle fs-xs">Загрузка...</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                   <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" id="quickAddConstructionRuleBtn">
@@ -284,7 +226,6 @@
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-wrench fs-5 text-info'></i>
                   <h2 class="fs-6 fw-bold mb-0">Монтажные работы (прокладка кабелей, лотки, конструкции)</h2>
-                  <span id="worksInstallationCountBadge" class="badge bg-info-subtle text-info-emphasis border border-info-subtle fs-xs">Загрузка...</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                   <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" id="quickAddInstallationRuleBtn">
@@ -308,7 +249,37 @@
             </div>
           </div>
 
-          <!-- Pane 2: Справочник кабелей -->
+          <!-- Pane 3: Оборудование -->
+          <div class="tab-pane fade" id="tabWorksEquipmentPane" role="tabpanel">
+            <div class="card border shadow-sm mb-3">
+              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div class="d-flex align-items-center gap-2">
+                  <i class='bx bx-cube fs-5 text-info'></i>
+                  <h2 class="fs-6 fw-bold mb-0">Справочник оборудования и способов монтажа</h2>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" id="quickAddEquipmentInTabBtn">
+                    <i class='bx bx-plus-circle'></i> Добавить оборудование
+                  </button>
+                </div>
+              </div>
+              <div class="card-body p-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                  <div class="input-group input-group-sm" style="max-width: 420px;">
+                    <span class="input-group-text bg-light border-end-0"><i class='bx bx-search'></i></span>
+                    <input type="text" class="form-control border-start-0" id="equipmentCatalogSearchInput" placeholder="Поиск по марке оборудования, способу монтажа или работе...">
+                    <button class="btn btn-outline-secondary d-none" type="button" id="equipmentCatalogClearSearchBtn"><i class='bx bx-x'></i></button>
+                  </div>
+                </div>
+
+                <div id="equipmentCatalogContainer">
+                  <!-- Dynamic equipment cards rendered by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pane 4: Справочник кабелей -->
           <div class="tab-pane fade" id="tabWorksCablesPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
               <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -349,7 +320,7 @@
             </div>
           </div>
 
-          <!-- Pane 3: Справочник муфт -->
+          <!-- Pane 5: Справочник муфт -->
           <div class="tab-pane fade" id="tabWorksCouplingsPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
               <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -379,52 +350,13 @@
             </div>
           </div>
 
-          <!-- Pane 4: Оборудование -->
-          <div class="tab-pane fade" id="tabWorksEquipmentPane" role="tabpanel">
-            <div class="card border shadow-sm mb-3">
-              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <div class="d-flex align-items-center gap-2">
-                  <i class='bx bx-cube fs-5 text-info'></i>
-                  <h2 class="fs-6 fw-bold mb-0">Справочник оборудования и способов монтажа</h2>
-                  <span id="tabWorksEquipmentCountBadge" class="badge bg-info-subtle text-info border border-info-subtle fs-xs">0 позиций</span>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                  <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" id="quickAddEquipmentInTabBtn">
-                    <i class='bx bx-plus-circle'></i> Добавить оборудование
-                  </button>
-                </div>
-              </div>
-              <div class="card-body p-3">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                  <div class="input-group input-group-sm" style="max-width: 420px;">
-                    <span class="input-group-text bg-light border-end-0"><i class='bx bx-search'></i></span>
-                    <input type="text" class="form-control border-start-0" id="equipmentCatalogSearchInput" placeholder="Поиск по марке оборудования, способу монтажа или работе...">
-                    <button class="btn btn-outline-secondary d-none" type="button" id="equipmentCatalogClearSearchBtn"><i class='bx bx-x'></i></button>
-                  </div>
-                </div>
-
-                <div id="equipmentCatalogContainer">
-                  <!-- Dynamic equipment cards rendered by JS -->
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Pane 5: Настройки расчета -->
+          <!-- Pane 6: Настройки расчета -->
           <div class="tab-pane fade" id="tabWorksSettingsPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
               <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-cog fs-5 text-secondary'></i>
                   <h2 class="fs-6 fw-bold mb-0">Параметры расчетов, экспорта GGE и округления</h2>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                  <button type="button" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" id="resetDefaultSettingsBtn" title="Сбросить параметры к стандартным">
-                    <i class='bx bx-reset'></i> По умолчанию
-                  </button>
-                  <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" id="syncSettingsToJsonBtn" title="Применить изменения настроек">
-                    <i class='bx bx-check'></i> Сохранить настройки
-                  </button>
                 </div>
               </div>
               <div class="card-body p-4" id="worksSettingsContainer">
@@ -472,24 +404,13 @@
             </div>
           </div>
 
-          <!-- Pane 6: Исходный JSON (CodeMirror) -->
-          <div class="tab-pane fade show active" id="tabWorksJsonPane" role="tabpanel">
+          <!-- Pane 7: Исходный JSON (Легковесный просмотр) -->
+          <div class="tab-pane fade" id="tabWorksJsonPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
-              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-code-curly fs-5 text-warning'></i>
                   <h2 class="fs-6 fw-bold mb-0">Исходный JSON правил и нормативной базы</h2>
-                </div>
-                <div class="d-flex align-items-center gap-1 flex-wrap">
-                  <button type="button" id="foldAllWorksJsonBtn" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Свернуть все узлы JSON">
-                    <i class='bx bx-collapse-vertical'></i> Свернуть всё
-                  </button>
-                  <button type="button" id="unfoldAllWorksJsonBtn" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Развернуть все узлы JSON">
-                    <i class='bx bx-expand-vertical'></i> Развернуть всё
-                  </button>
-                  <button type="button" id="formatWorksJsonBtn" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" title="Отформатировать JSON">
-                    <i class='bx bx-align-left'></i> Форматировать
-                  </button>
                 </div>
               </div>
               <div class="card-body p-3">
@@ -498,11 +419,12 @@
                   <div class="font-monospace fs-xs" id="worksJsonErrorMessage">Синтаксическая ошибка в JSON</div>
                 </div>
 
-                <textarea id="worksJsonEditorTextarea" class="form-control font-monospace d-none" rows="28" spellcheck="false"></textarea>
-                <div id="codeMirrorContainer" class="w-100"></div>
+                <div class="position-relative">
+                  <pre class="bg-body-tertiary p-3 rounded border font-monospace fs-xs mb-0 user-select-all" style="max-height: 720px; overflow: auto; line-height: 1.45;"><code id="worksJsonPreviewCode" class="text-body font-monospace">{}</code></pre>
+                </div>
 
                 <div class="mt-2 text-muted small d-flex align-items-center justify-content-between flex-wrap gap-2">
-                  <span class="fs-xs"><i class='bx bx-bulb text-warning me-1'></i>Горячие клавиши: <code>Ctrl+F</code> — поиск, <code>Ctrl+G</code> — далее, <code>Ctrl+H</code> — замена, <code>Ctrl+S</code> — сохранить.</span>
+                  <span class="fs-xs"><i class='bx bx-info-circle text-primary me-1'></i>Редактирование выполняется через вкладки и формы выше. Здесь отображается актуальная сформированная структура JSON.</span>
                   <span id="jsonLinesCountBadge" class="badge bg-light text-muted border font-monospace">0 строк</span>
                 </div>
               </div>
@@ -963,19 +885,6 @@
   <!-- Scripts -->
   <script src="/assets/theme.min.js"></script>
   <script src="/assets/theme-switcher.js"></script>
-
-  <!-- CodeMirror 5 with Fold & Search addons -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/jump-to-line.min.js"></script>
 
   <script src="./rules_store.js"></script>
   <script src="./rules_modal.js"></script>
