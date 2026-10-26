@@ -570,10 +570,10 @@ function renderSingleRulesSectionHtml(sec, query) {
             <span>${rIdx + 1}. ${escapeHtml(rName)}</span>
           </div>
           <div class="d-flex align-items-center gap-1_5">
-            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Редактировать этот способ прокладки">
+            <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-edit-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Редактировать этот способ прокладки">
               <i class='bx bx-edit-alt'></i>
             </button>
-            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Удалить этот способ прокладки из правил">
+            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 btn-delete-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Удалить этот способ прокладки из правил">
               <i class='bx bx-trash'></i>
             </button>
           </div>
@@ -874,10 +874,10 @@ function renderCableCatalogModalContent(rulesObj = null) {
             <td class="text-center">${weightFormatted}</td>
             <td>${couplingFormatted}</td>
             <td class="text-end pe-3 text-nowrap">
-              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Редактировать параметры марки кабеля">
+              <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-edit-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Редактировать параметры марки кабеля">
                 <i class='bx bx-edit-alt'></i>
               </button>
-              <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Удалить эту марку кабеля из справочника">
+              <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 btn-delete-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Удалить эту марку кабеля из справочника">
                 <i class='bx bx-trash'></i>
               </button>
             </td>
@@ -905,7 +905,7 @@ function renderCableCatalogModalContent(rulesObj = null) {
             <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-add-mark-to-group d-inline-flex align-items-center gap-1" data-group-key="${escapeHtml(g.key)}" data-group-name="${escapeHtml(g.brandName)}" title="Добавить типоразмер кабеля в эту группу">
               <i class='bx bx-plus'></i> Добавить марку
             </button>
-            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-1_5 btn-delete-cable-group" data-group-key="${escapeHtml(g.key)}" data-group-name="${escapeHtml(g.brandName)}" title="Удалить эту группу кабелей и условное обозначение">
+            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 btn-delete-cable-group" data-group-key="${escapeHtml(g.key)}" data-group-name="${escapeHtml(g.brandName)}" title="Удалить эту группу кабелей и условное обозначение">
               <i class='bx bx-trash'></i>
             </button>
           </div>
@@ -1106,10 +1106,10 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             ${unitTop ? `<span class="badge bg-body text-body border font-monospace ms-1" style="font-size: 0.72rem;">${escapeHtml(unitTop)}</span>` : ''}
           </div>
           <div class="d-flex align-items-center gap-1_5">
-            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Редактировать позицию оборудования">
+            <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-edit-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Редактировать позицию оборудования">
               <i class='bx bx-edit-alt'></i>
             </button>
-            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Удалить всё оборудование «${escapeHtml(mark)}»">
+            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 btn-delete-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Удалить всё оборудование «${escapeHtml(mark)}»">
               <i class='bx bx-trash'></i>
             </button>
           </div>
