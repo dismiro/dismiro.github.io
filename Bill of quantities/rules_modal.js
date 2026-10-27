@@ -1,10 +1,8 @@
 /**
- * Bill of quantities - Works Rules & Catalogs Modal Manager
- * Handles rules modal UI, tabs (Rules, Cables, Couplings, Equipment, Settings),
- * CodeMirror JSON editor integration, validation and quick-add actions.
+ * Bill of quantities - Works Rules & Catalogs Editor Manager
+ * Handles rules page cards rendering, catalog views (Rules, Cables, Couplings, Equipment, Settings),
+ * JSON validation and quick-add actions.
  */
-
-let worksJsonCodeMirror = null;
 
 // Universal debounce helper with cancel method
 function debounce(fn, delay = 180) {
@@ -51,24 +49,43 @@ function setWorksJsonEditorValue(val) {
 // Draft rules object currently active within the page
 let modalDraftRules = null;
 
+function setModalDraftRules(rulesObj) {
+  if (rulesObj && typeof rulesObj === 'object' && !Array.isArray(rulesObj)) {
+    modalDraftRules = rulesObj;
+    window.currentWorksRules = rulesObj;
+    return modalDraftRules;
+  }
+  return modalDraftRules;
+}
+window.setModalDraftRules = setModalDraftRules;
+
 // Get current working draft rules without requiring CodeMirror DOM parsing
 function getDraftRulesFromEditor() {
   if (modalDraftRules && typeof modalDraftRules === 'object') {
     return modalDraftRules;
   }
   if (window.currentWorksRules && typeof window.currentWorksRules === 'object') {
-    return window.currentWorksRules;
+    modalDraftRules = window.currentWorksRules;
+    return modalDraftRules;
   }
   return cachedDefaultRules || {};
 }
 
-
 // Safely resolve rules object, rejecting DOM Event objects or invalid inputs
 function resolveValidRules(rulesObj) {
   if (rulesObj && typeof rulesObj === 'object' && !(rulesObj instanceof Event) && !('target' in rulesObj) && !Array.isArray(rulesObj)) {
+    modalDraftRules = rulesObj;
     return rulesObj;
   }
   return getDraftRulesFromEditor();
+}
+
+if (window.rulesStore && typeof window.rulesStore.subscribe === 'function') {
+  window.rulesStore.subscribe((event) => {
+    if (event && event.rules && typeof event.rules === 'object') {
+      modalDraftRules = event.rules;
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -355,8 +372,8 @@ function renderModalWorkItemHtml(w, wIdx, options = {}) {
   const typeTitle = w["Тип"] || (isEquip ? 'оборудование' : (isMat ? 'материал' : 'работа'));
 
   const formulaDispBadge = showFormula
-    ? `<span class="badge bg-light text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы включено"><i class="bx bx-show me-0_5"></i>в формулах</span>`
-    : `<span class="badge bg-secondary-subtle text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы отключено («ОтображатьФормулу»: false)"><i class="bx bx-hide me-0_5"></i>без формулы</span>`;
+    ? `<span class="badge bg-light text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы включено">в формулах</span>`
+    : `<span class="badge bg-secondary-subtle text-muted border ms-1" style="font-size: 0.68rem;" title="Отображение формулы отключено («ОтображатьФормулу»: false)">без формулы</span>`;
 
   const explicitDec = (w["Округление"] !== undefined && w["Округление"] !== null && !isNaN(Number(w["Округление"])))
     ? Number(w["Округление"])
@@ -384,7 +401,7 @@ function renderModalWorkItemHtml(w, wIdx, options = {}) {
         <span class="fw-medium">Формула:</span>
         <code class="px-1 py-0 bg-body-tertiary border rounded text-primary">${escapeHtml(formula)}</code>
         ${formulaDispBadge}${roundingBadge}
-        ${section ? `<span class="badge bg-light text-secondary border ms-1" style="font-size: 0.68rem;">Раздел: ${escapeHtml(section)}</span>` : ''}
+        ${section ? `<span class="badge bg-body-secondary text-body-secondary border ms-1" style="font-size: 0.68rem;">Раздел: ${escapeHtml(section)}</span>` : ''}
         <span class="badge ${typeBadgeClass} ms-auto"><i class='bx ${typeIcon} me-0_5'></i>${escapeHtml(typeTitle)}</span>
       </div>
       ${workComment ? `<div class="text-muted fs-xs mt-1 fst-italic"><i class='bx bx-comment-detail me-0_5'></i>${escapeHtml(workComment)}</div>` : ''}
@@ -569,12 +586,12 @@ function renderSingleRulesSectionHtml(sec, query) {
             <i class="bx bx-git-commit text-primary"></i>
             <span>${rIdx + 1}. ${escapeHtml(rName)}</span>
           </div>
-          <div class="d-flex align-items-center gap-1_5">
-            <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-edit-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Редактировать этот способ прокладки">
+          <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
+            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Редактировать этот способ прокладки">
               <i class='bx bx-edit-alt'></i>
             </button>
-            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 btn-delete-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Удалить этот способ прокладки из правил">
-              <i class='bx bx-trash'></i>
+            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Удалить этот способ прокладки из правил">
+              <i class='bx bx-x fs-6'></i>
             </button>
           </div>
         </div>
@@ -597,6 +614,7 @@ function renderSingleRulesSectionHtml(sec, query) {
 // Render rules modal cards, cable catalog, couplings, equipment and settings tabs
 function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
   const rules = resolveValidRules(rulesObj);
+  modalDraftRules = rules;
   
   if (updateAllTabs) {
     renderCableCatalogModalContent(rules);
@@ -864,7 +882,7 @@ function renderCableCatalogModalContent(rulesObj = null) {
               <div class="fw-bold text-dark font-monospace">${escapeHtml(m.mark)} ${markBadge}</div>
               <div class="fs-xs text-muted">
                 Обозначение: <span class="font-monospace fw-semibold text-primary">${escapeHtml(displayGroupSymbol)}</span>
-                <span class="fst-italic text-secondary">(${escapeHtml(g.brandName)})</span>
+                <span class="fst-italic text-body-secondary">(${escapeHtml(g.brandName)})</span>
               </div>
             </td>
             <td>
@@ -874,12 +892,14 @@ function renderCableCatalogModalContent(rulesObj = null) {
             <td class="text-center">${weightFormatted}</td>
             <td>${couplingFormatted}</td>
             <td class="text-end pe-3 text-nowrap">
-              <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-edit-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Редактировать параметры марки кабеля">
-                <i class='bx bx-edit-alt'></i>
-              </button>
-              <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 btn-delete-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Удалить эту марку кабеля из справочника">
-                <i class='bx bx-trash'></i>
-              </button>
+              <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
+                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Редактировать параметры марки кабеля">
+                  <i class='bx bx-edit-alt'></i>
+                </button>
+                <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Удалить эту марку кабеля из справочника">
+                  <i class='bx bx-x fs-6'></i>
+                </button>
+              </div>
             </td>
           </tr>
         `;
@@ -890,7 +910,7 @@ function renderCableCatalogModalContent(rulesObj = null) {
       <div class="card border shadow-sm mb-3">
         <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <i class="bx ${isOptGroup ? 'bx-broadcast text-info' : 'bx-cable text-primary'} fs-5"></i>
+            <i class="bx ${isOptGroup ? 'bx-broadcast text-info' : 'bx-network-chart text-primary'} fs-5"></i>
             <div class="d-flex align-items-center gap-2">
               ${codeBadge}
               <span class="fs-6 fw-bold text-dark">${escapeHtml(g.brandName)}</span>
@@ -905,8 +925,8 @@ function renderCableCatalogModalContent(rulesObj = null) {
             <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-add-mark-to-group d-inline-flex align-items-center gap-1" data-group-key="${escapeHtml(g.key)}" data-group-name="${escapeHtml(g.brandName)}" title="Добавить типоразмер кабеля в эту группу">
               <i class='bx bx-plus'></i> Добавить марку
             </button>
-            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 btn-delete-cable-group" data-group-key="${escapeHtml(g.key)}" data-group-name="${escapeHtml(g.brandName)}" title="Удалить эту группу кабелей и условное обозначение">
-              <i class='bx bx-trash'></i>
+            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-cable-group" data-group-key="${escapeHtml(g.key)}" data-group-name="${escapeHtml(g.brandName)}" title="Удалить эту группу кабелей и условное обозначение">
+              <i class='bx bx-x fs-6'></i>
             </button>
           </div>
         </div>
@@ -934,38 +954,7 @@ function renderCableCatalogModalContent(rulesObj = null) {
   container.innerHTML = renderCatalogHeaderBar(`Показано: <strong>${matchCount}</strong> из ${totalMarksCount} марок кабелей в справочнике`) + html;
 }
 
-// Helper to get equipment rules dictionary
-function getEquipmentRulesDict(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object') return {};
-  const raw = rulesData["Оборудование"];
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    return raw;
-  }
-  return {};
-}
-
-// Helper to extract equipment list from dictionary
-function getEquipmentRulesList(rulesData) {
-  const dict = getEquipmentRulesDict(rulesData);
-  return Object.entries(dict).map(([markKey, itemVal]) => {
-    return {
-      "Марка": markKey,
-      ...(itemVal && typeof itemVal === 'object' ? itemVal : {})
-    };
-  });
-}
-
-// Helper to extract equipment works object
-function getEquipmentItemWorksObject(item) {
-  if (!item || typeof item !== 'object') return {};
-  if (item["Работы"] && typeof item["Работы"] === 'object') {
-    return item["Работы"];
-  }
-  if (item["Работы и материалы"] && typeof item["Работы и материалы"] === 'object') {
-    return item["Работы и материалы"];
-  }
-  return {};
-}
+// (Equipment dictionary and list helpers are provided centrally by rules_store.js)
 
 function renderEquipmentCatalogModalContent(rulesObj = null) {
   const container = document.getElementById('equipmentCatalogContainer');
@@ -1082,12 +1071,14 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             </span>
             <div class="d-flex align-items-center gap-1">
               <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs">${worksList.length} поз.</span>
-              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Редактировать сметные нормы для способа «${escapeHtml(methodName)}»">
-                <i class='bx bx-edit-alt'></i>
-              </button>
-              <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Удалить этот способ установки">
-                <i class='bx bx-trash'></i>
-              </button>
+              <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
+                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Редактировать сметные нормы для способа «${escapeHtml(methodName)}»">
+                  <i class='bx bx-edit-alt'></i>
+                </button>
+                <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Удалить этот способ установки">
+                  <i class='bx bx-x fs-6'></i>
+                </button>
+              </div>
             </div>
           </div>
           ${worksItemsHtml || '<div class="text-muted small ps-2">Работы и материалы не определены</div>'}
@@ -1105,12 +1096,12 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             ${fullDesc ? `<span class="text-muted small fw-normal ms-1">(${escapeHtml(fullDesc)})</span>` : ''}
             ${unitTop ? `<span class="badge bg-body text-body border font-monospace ms-1" style="font-size: 0.72rem;">${escapeHtml(unitTop)}</span>` : ''}
           </div>
-          <div class="d-flex align-items-center gap-1_5">
-            <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-edit-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Редактировать позицию оборудования">
+          <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
+            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Редактировать позицию оборудования">
               <i class='bx bx-edit-alt'></i>
             </button>
-            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 btn-delete-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Удалить всё оборудование «${escapeHtml(mark)}»">
-              <i class='bx bx-trash'></i>
+            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Удалить всё оборудование «${escapeHtml(mark)}»">
+              <i class='bx bx-x fs-6'></i>
             </button>
           </div>
         </div>
@@ -1220,12 +1211,14 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
         </td>
         <td class="text-center font-monospace text-muted small">${escapeHtml(unit)}</td>
         <td class="text-end pe-3 text-nowrap">
-          <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1_5 btn-edit-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Редактировать муфту">
-            <i class='bx bx-edit-alt'></i>
-          </button>
-          <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-delete-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Удалить эту муфту из справочника">
-            <i class='bx bx-trash'></i>
-          </button>
+          <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
+            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Редактировать муфту">
+              <i class='bx bx-edit-alt'></i>
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Удалить эту муфту из справочника">
+              <i class='bx bx-x fs-6'></i>
+            </button>
+          </div>
         </td>
       </tr>
     `;
@@ -1265,58 +1258,19 @@ function renderJsonPreviewContent(rulesObj = null) {
   setWorksJsonEditorValue(JSON.stringify(data, null, 2));
 }
 
-function initWorksJsonCodeMirror() {
-  renderJsonPreviewContent();
-  return null;
-}
-
-
 function openWorksRulesModal(activeTab = 'editor') {
-  const modalEl = document.getElementById('worksRulesModal');
-  if (!modalEl) return;
+  let tabBtnId = 'tabWorksJsonBtn';
+  if (activeTab === 'construction') tabBtnId = 'tabWorksConstructionBtn';
+  else if (activeTab === 'installation') tabBtnId = 'tabWorksInstallationBtn';
+  else if (activeTab === 'cables') tabBtnId = 'tabWorksCablesBtn';
+  else if (activeTab === 'couplings') tabBtnId = 'tabWorksCouplingsBtn';
+  else if (activeTab === 'equipment') tabBtnId = 'tabWorksEquipmentBtn';
+  else if (activeTab === 'settings') tabBtnId = 'tabWorksSettingsBtn';
 
-  try {
-    initWorksJsonCodeMirror();
-    const activeRulesCopy = JSON.parse(JSON.stringify(currentWorksRules || cachedDefaultRules || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} }));
-    modalDraftRules = activeRulesCopy;
-    setWorksJsonEditorValue(JSON.stringify(activeRulesCopy, null, 2));
-    validateWorksJsonInput();
-  } catch (err) {
-    console.warn('Editor sync warning:', err);
+  const tabBtn = document.getElementById(tabBtnId);
+  if (tabBtn) {
+    tabBtn.click();
   }
-
-  try {
-    renderRulesModalContent(modalDraftRules);
-    updateStorageStatusUi();
-  } catch (err) {
-    console.warn('Modal content render warning:', err);
-  }
-
-  try {
-    let tabBtnId = 'tabWorksJsonBtn';
-    if (activeTab === 'construction') tabBtnId = 'tabWorksConstructionBtn';
-    else if (activeTab === 'installation') tabBtnId = 'tabWorksInstallationBtn';
-    else if (activeTab === 'cables') tabBtnId = 'tabWorksCablesBtn';
-    else if (activeTab === 'couplings') tabBtnId = 'tabWorksCouplingsBtn';
-    else if (activeTab === 'equipment') tabBtnId = 'tabWorksEquipmentBtn';
-    else if (activeTab === 'settings') tabBtnId = 'tabWorksSettingsBtn';
-
-    const tabBtn = document.getElementById(tabBtnId);
-    if (tabBtn && window.bootstrap && bootstrap.Tab) {
-      bootstrap.Tab.getOrCreateInstance(tabBtn).show();
-    }
-  } catch (err) {
-    console.warn('Tab switch warning:', err);
-  }
-
-  try {
-    if (window.bootstrap && bootstrap.Modal) {
-      bootstrap.Modal.getOrCreateInstance(modalEl).show();
-    }
-  } catch (err) {
-    console.error('Failed to open modal with Bootstrap:', err);
-  }
-
 }
 window.openWorksRulesModal = openWorksRulesModal;
 
@@ -1504,7 +1458,7 @@ function setupWorksRulesListeners() {
       </td>
       <td style="width: 5%;" class="text-center">
         <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-remove-nested-row" title="Удалить позицию">
-          <i class='bx bx-trash'></i>
+          <i class='bx bx-x fs-6'></i>
         </button>
       </td>
     `;
@@ -1847,7 +1801,7 @@ function setupWorksRulesListeners() {
             <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 btn-move-tier-up" title="Поднять выше"><i class='bx bx-chevron-up'></i></button>
             <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 btn-move-tier-down" title="Опустить ниже"><i class='bx bx-chevron-down'></i></button>
           </div>
-          <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-remove-tier" title="Удалить эту категорию"><i class='bx bx-trash'></i></button>
+          <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-remove-tier" title="Удалить эту категорию"><i class='bx bx-x fs-6'></i></button>
         </div>
       </div>
 
@@ -4071,12 +4025,14 @@ function setupWorksRulesListeners() {
           </td>
           <td class="text-center font-monospace fw-semibold">${count}</td>
           <td class="text-end pe-3 text-nowrap">
-            <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-edit-cable-group" data-group-key="${escapeHtml(grpKey)}" title="Изменить соответствие марки и условного обозначения">
-              <i class='bx bx-edit-alt me-0_5'></i>Изменить
-            </button>
-            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-1_5 btn-delete-cable-group" data-group-key="${escapeHtml(grpKey)}" data-group-name="${escapeHtml(brandName)}" title="Удалить эту группу кабелей">
-              <i class='bx bx-trash'></i>
-            </button>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
+              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-cable-group" data-group-key="${escapeHtml(grpKey)}" title="Изменить соответствие марки и условного обозначения">
+                <i class='bx bx-edit-alt me-0_5'></i>Изменить
+              </button>
+              <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-cable-group" data-group-key="${escapeHtml(grpKey)}" data-group-name="${escapeHtml(brandName)}" title="Удалить эту группу кабелей">
+                <i class='bx bx-x fs-6'></i>
+              </button>
+            </div>
           </td>
         </tr>
       `;

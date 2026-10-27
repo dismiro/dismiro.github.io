@@ -184,7 +184,7 @@
      */
     async importRulesJsonFile(file) {
       if (!file) throw new Error('Файл не выбран');
-      const text = await file.text();
+      const text = await readFileAsTextWithEncoding(file);
       const parsed = JSON.parse(text);
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
         throw new Error('Файл не содержит корректную структуру JSON-объекта');
@@ -402,12 +402,13 @@
   if (typeof window.getCableRules !== 'function') window.getCableRules = getCableRules;
 
   function getCableCatalog(rulesData) {
-    if (rulesData && typeof rulesData === 'object' && !Array.isArray(rulesData)) {
-      if (rulesData["Справочник кабелей"] && typeof rulesData["Справочник кабелей"] === 'object') {
-        return rulesData["Справочник кабелей"];
+    const rules = rulesData || window.currentWorksRules || (window.rulesStore ? window.rulesStore.getRulesSync() : null) || window.cachedDefaultRules;
+    if (rules && typeof rules === 'object' && !Array.isArray(rules)) {
+      if (rules["Справочник кабелей"] && typeof rules["Справочник кабелей"] === 'object') {
+        return rules["Справочник кабелей"];
       }
-      if (rulesData["Кабели"] && typeof rulesData["Кабели"] === 'object') {
-        return rulesData["Кабели"];
+      if (rules["Кабели"] && typeof rules["Кабели"] === 'object') {
+        return rules["Кабели"];
       }
     }
     if (window.cachedDefaultRules && window.cachedDefaultRules["Справочник кабелей"] && typeof window.cachedDefaultRules["Справочник кабелей"] === 'object') {
@@ -415,15 +416,16 @@
     }
     return {};
   }
-  if (typeof window.getCableCatalog !== 'function') window.getCableCatalog = getCableCatalog;
+  window.getCableCatalog = getCableCatalog;
 
   function getCouplingCatalog(rulesData) {
-    if (rulesData && typeof rulesData === 'object' && !Array.isArray(rulesData)) {
-      if (rulesData["Справочник муфт"] && typeof rulesData["Справочник муфт"] === 'object') {
-        return rulesData["Справочник муфт"];
+    const rules = rulesData || window.currentWorksRules || (window.rulesStore ? window.rulesStore.getRulesSync() : null) || window.cachedDefaultRules;
+    if (rules && typeof rules === 'object' && !Array.isArray(rules)) {
+      if (rules["Справочник муфт"] && typeof rules["Справочник муфт"] === 'object') {
+        return rules["Справочник муфт"];
       }
-      if (rulesData["Муфты"] && typeof rulesData["Муфты"] === 'object') {
-        return rulesData["Муфты"];
+      if (rules["Муфты"] && typeof rules["Муфты"] === 'object') {
+        return rules["Муфты"];
       }
     }
     if (window.cachedDefaultRules && window.cachedDefaultRules["Справочник муфт"] && typeof window.cachedDefaultRules["Справочник муфт"] === 'object') {
@@ -431,7 +433,7 @@
     }
     return {};
   }
-  if (typeof window.getCouplingCatalog !== 'function') window.getCouplingCatalog = getCouplingCatalog;
+  window.getCouplingCatalog = getCouplingCatalog;
 
   function getRuleWorks(rule, defaultSection = '') {
     if (!rule || typeof rule !== 'object') return [];
@@ -683,10 +685,14 @@
         try {
           const buffer = event.target.result;
           const uint8 = new Uint8Array(buffer);
+
+          // 1. Проверка BOM UTF-8 (EF BB BF)
           if (uint8.length >= 3 && uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) {
             const text = new TextDecoder('utf-8').decode(uint8.subarray(3));
             return resolve(text.replace(/^\uFEFF/, '').trim());
           }
+
+          // 2. Проверка BOM UTF-16 LE / BE
           if (uint8.length >= 2 && uint8[0] === 0xFF && uint8[1] === 0xFE) {
             const text = new TextDecoder('utf-16le').decode(uint8.subarray(2));
             return resolve(text.replace(/^\uFEFF/, '').trim());
@@ -695,13 +701,60 @@
             const text = new TextDecoder('utf-16be').decode(uint8.subarray(2));
             return resolve(text.replace(/^\uFEFF/, '').trim());
           }
+
+          // 3. Пытаемся строго декодировать через UTF-8 (fatal: true)
+          let utf8Text = null;
+          let utf8Valid = false;
           try {
-            const text = new TextDecoder('utf-8', { fatal: true }).decode(uint8);
-            return resolve(text.replace(/^\uFEFF/, '').trim());
+            utf8Text = new TextDecoder('utf-8', { fatal: true }).decode(uint8);
+            utf8Valid = true;
           } catch (e) {
-            const text1251 = new TextDecoder('windows-1251').decode(uint8);
-            return resolve(text1251.replace(/^\uFEFF/, '').trim());
+            utf8Valid = false;
           }
+
+          // Если это валидный UTF-8, проверим, парсится ли как валидный JSON
+          if (utf8Valid && utf8Text) {
+            try {
+              JSON.parse(utf8Text.replace(/^\uFEFF/, '').trim());
+              return resolve(utf8Text.replace(/^\uFEFF/, '').trim());
+            } catch (e) {
+              // Если не JSON, всё равно может быть текстом UTF-8
+            }
+          }
+
+          // 4. Пробуем декодировать как Windows-1251 (CP1251)
+          let winText = null;
+          try {
+            const winDecoder = new TextDecoder('windows-1251');
+            winText = winDecoder.decode(uint8);
+          } catch (e) {
+            try {
+              const cpDecoder = new TextDecoder('cp1251');
+              winText = cpDecoder.decode(uint8);
+            } catch (err) {}
+          }
+
+          if (winText) {
+            try {
+              JSON.parse(winText.replace(/^\uFEFF/, '').trim());
+              return resolve(winText.replace(/^\uFEFF/, '').trim());
+            } catch (e) {}
+          }
+
+          // Если UTF-8 не прошел проверку байтов, отдаем Windows-1251
+          if (!utf8Valid && winText) {
+            return resolve(winText.replace(/^\uFEFF/, '').trim());
+          }
+
+          if (utf8Text) {
+            return resolve(utf8Text.replace(/^\uFEFF/, '').trim());
+          }
+
+          if (winText) {
+            return resolve(winText.replace(/^\uFEFF/, '').trim());
+          }
+
+          return resolve(new TextDecoder('utf-8').decode(uint8).replace(/^\uFEFF/, '').trim());
         } catch (err) {
           reject(err);
         }
@@ -709,17 +762,18 @@
       reader.readAsArrayBuffer(file);
     });
   }
-  if (typeof window.readFileAsTextWithEncoding !== 'function') window.readFileAsTextWithEncoding = readFileAsTextWithEncoding;
+  window.readFileAsTextWithEncoding = readFileAsTextWithEncoding;
 
   function getEquipmentRulesDict(rulesData) {
-    if (!rulesData || typeof rulesData !== 'object') return {};
-    const raw = rulesData["Оборудование"];
+    const rules = rulesData || window.currentWorksRules || (window.rulesStore ? window.rulesStore.getRulesSync() : null);
+    if (!rules || typeof rules !== 'object') return {};
+    const raw = rules["Оборудование"];
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
       return raw;
     }
     return {};
   }
-  if (typeof window.getEquipmentRulesDict !== 'function') window.getEquipmentRulesDict = getEquipmentRulesDict;
+  window.getEquipmentRulesDict = getEquipmentRulesDict;
 
   function getEquipmentRulesList(rulesData) {
     const dict = getEquipmentRulesDict(rulesData);
@@ -730,7 +784,7 @@
       };
     });
   }
-  if (typeof window.getEquipmentRulesList !== 'function') window.getEquipmentRulesList = getEquipmentRulesList;
+  window.getEquipmentRulesList = getEquipmentRulesList;
 
   function getEquipmentItemWorksObject(item) {
     if (!item || typeof item !== 'object') return {};
@@ -742,9 +796,25 @@
     }
     return {};
   }
-  if (typeof window.getEquipmentItemWorksObject !== 'function') window.getEquipmentItemWorksObject = getEquipmentItemWorksObject;
+  window.getEquipmentItemWorksObject = getEquipmentItemWorksObject;
 
+  // Single Source of Truth exports on rulesStore namespace
   if (window.rulesStore) {
+    window.rulesStore.escapeHtml = escapeHtml;
+    window.rulesStore.showToast = showToast;
+    window.rulesStore.getRulesSections = getRulesSections;
+    window.rulesStore.getTrenchRules = getTrenchRules;
+    window.rulesStore.getCableRules = getCableRules;
+    window.rulesStore.getCableCatalog = getCableCatalog;
+    window.rulesStore.getCouplingCatalog = getCouplingCatalog;
+    window.rulesStore.getRuleWorks = getRuleWorks;
+    window.rulesStore.shouldShowFormula = shouldShowFormula;
+    window.rulesStore.getRulesSettings = getRulesSettings;
+    window.rulesStore.parseCableCountCondition = parseCableCountCondition;
+    window.rulesStore.parseMaxCoresFromString = parseMaxCoresFromString;
+    window.rulesStore.getCouplingRuleTiers = getCouplingRuleTiers;
+    window.rulesStore.getCouplingInstallationTier = getCouplingInstallationTier;
+    window.rulesStore.readFileAsTextWithEncoding = readFileAsTextWithEncoding;
     window.rulesStore.getEquipmentRulesDict = getEquipmentRulesDict;
     window.rulesStore.getEquipmentRulesList = getEquipmentRulesList;
     window.rulesStore.getEquipmentItemWorksObject = getEquipmentItemWorksObject;

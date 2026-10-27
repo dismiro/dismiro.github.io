@@ -22,69 +22,7 @@ function debounce(fn, delay = 180) {
   return debounced;
 }
 
-// Helper to extract works/materials array from a rule object, supporting nested "Материалы" arrays
-function getRuleWorks(rule, defaultSection = '') {
-  if (!rule || typeof rule !== 'object') return [];
-  const ruleSec = (rule && rule["Раздел"]) || defaultSection || '';
-  const raw = rule["Работы и материалы"] !== undefined ? rule["Работы и материалы"] : (rule["Работы"] !== undefined ? rule["Работы"] : rule.works);
-  const list = [];
-
-  function appendItemWithResources(item, tierKey = null) {
-    if (!item || typeof item !== 'object') return;
-    const workEntry = tierKey !== null ? { ...item, _tierKey: tierKey } : item;
-    list.push(workEntry);
-
-    const mats = Array.isArray(item["Материалы"]) ? item["Материалы"] : [];
-    const equips = Array.isArray(item["Оборудование"]) ? item["Оборудование"] : [];
-    const parentSection = item["Раздел"] || ruleSec;
-    const parentCondition = item["Условие"] !== undefined ? item["Условие"] : item["condition"];
-    const parentWorkName = item["Наименование"] || item.name || '';
-    const parentWorkUnit = item["Единицы измерения"] || item.unit || '';
-
-    mats.forEach(mat => {
-      if (mat && typeof mat === 'object') {
-        const matEntry = {
-          ...mat,
-          "Тип": mat["Тип"] || mat.type || "материал",
-          "Раздел": mat["Раздел"] || parentSection,
-          "Условие": mat["Условие"] !== undefined ? mat["Условие"] : parentCondition,
-          parentWorkName: mat.parentWorkName || parentWorkName,
-          parentWorkUnit: mat.parentWorkUnit || parentWorkUnit,
-          parentWorkSection: mat.parentWorkSection || parentSection
-        };
-        if (tierKey !== null) matEntry._tierKey = tierKey;
-        list.push(matEntry);
-      }
-    });
-
-    equips.forEach(eq => {
-      if (eq && typeof eq === 'object') {
-        const eqEntry = {
-          ...eq,
-          "Тип": eq["Тип"] || eq.type || "оборудование",
-          "Раздел": eq["Раздел"] || parentSection,
-          "Условие": eq["Условие"] !== undefined ? eq["Условие"] : parentCondition,
-          parentWorkName: eq.parentWorkName || parentWorkName,
-          parentWorkUnit: eq.parentWorkUnit || parentWorkUnit,
-          parentWorkSection: eq.parentWorkSection || parentSection
-        };
-        if (tierKey !== null) eqEntry._tierKey = tierKey;
-        list.push(eqEntry);
-      }
-    });
-  }
-
-  if (Array.isArray(raw)) {
-    raw.forEach(item => appendItemWithResources(item));
-  } else if (raw && typeof raw === 'object') {
-    Object.entries(raw).forEach(([tierKey, arr]) => {
-      if (Array.isArray(arr)) {
-        arr.forEach(item => appendItemWithResources(item, tierKey));
-      }
-    });
-  }
-  return list;
-}
+// (getRuleWorks is provided centrally by rules_store.js)
 
 // --------------------------------------------------------------------------
 // FORMULA MATH OPERATOR NORMALIZATION
@@ -369,37 +307,7 @@ function buildWorkFormulaDisplay(formula, totalLength, itemsCount, unit) {
   return normalizeFormulaMathOperators(disp);
 }
 
-// Check if calculation formula should be displayed for work or material item
-// Controlled by "ОтображатьФормулу", "Показывать формулу", "showFormula", etc.
-function shouldShowFormula(item, fallbackValue = true) {
-  if (!item || typeof item !== 'object') return fallbackValue;
-
-  const formulaKeyRegex = /^(?:отображать|показывать|show|display)[ _-]*(?:формулу|формула|formula)$/i;
-
-  let val = undefined;
-  for (const [key, v] of Object.entries(item)) {
-    if (formulaKeyRegex.test(key.trim())) {
-      val = v;
-      break;
-    }
-  }
-
-  if (val === undefined || val === null) {
-    if (item.showFormula !== undefined) val = item.showFormula;
-  }
-
-  if (val === undefined || val === null) return fallbackValue;
-  if (typeof val === 'boolean') return val;
-  if (typeof val === 'number') return val !== 0;
-  if (typeof val === 'string') {
-    const s = val.trim().toLowerCase();
-    if (s === 'false' || s === '0' || s === 'нет' || s === 'ложь' || s === 'off' || s === 'no' || s === 'не показывать' || s === 'не отображать') {
-      return false;
-    }
-    return true;
-  }
-  return !!val;
-}
+// (shouldShowFormula is provided centrally by rules_store.js)
 
 // Build display string for coupling installation work formula
 function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume, unit = 'шт') {
@@ -446,83 +354,7 @@ function buildCouplingSingleItemFormulaDisplay(formula, count, calculatedVolume,
   return normalizeFormulaMathOperators(disp);
 }
 
-// Parse condition for cable count in a trench segment
-// Supports "Условие": "кабелей > 4", "более 4 кабелей", "свыше 4", ">= 5", "до 4 кабелей", "от 2 до 4 кабелей"
-// (and group key in object structure e.g. "более 4 кабелей")
-function parseCableCountCondition(work) {
-  if (!work || typeof work !== 'object') {
-    return { hasCondition: false, minCables: null, maxCables: null, description: '' };
-  }
-
-  const condText = [
-    work["Условие"],
-    work["condition"],
-    work._tierKey
-  ].filter(Boolean).map(String).join(' ').trim();
-
-  if (!condText) {
-    return { hasCondition: false, minCables: null, maxCables: null, description: '' };
-  }
-
-  let minCables = null;
-  let maxCables = null;
-
-  // Range: "от 2 до 4 кабелей"
-  const mRange = condText.match(/от\s*(\d+)\s*до\s*(\d+)(?:\s*(?:кабелей|кабеля|кабел|каб))?/i);
-  if (mRange) {
-    minCables = parseInt(mRange[1], 10);
-    maxCables = parseInt(mRange[2], 10);
-  } else {
-    // Greater than: "> 4", "кабелей > 4", "более 4 кабелей", "свыше 4"
-    const mGt = condText.match(/(?:кабелей|кабеля|каб\.?)?\s*(?<!не\s*)(?:более|свыше|>)\s*(\d+)/i) ||
-                condText.match(/(?<!не\s*)(?:более|свыше|>)\s*(\d+)(?:\s*(?:кабелей|кабеля|каб\.?))?/i);
-    if (mGt) {
-      minCables = parseInt(mGt[1], 10) + 1;
-    }
-
-    // Greater or equal: ">= 5", "кабелей >= 5", "от 5 кабелей"
-    const mGte = condText.match(/(?:кабелей|кабеля|каб\.?)?\s*(?:>=|от)\s*(\d+)/i) ||
-                 condText.match(/(?:>=|от)\s*(\d+)(?:\s*(?:кабелей|кабеля|каб\.?))?/i);
-    if (mGte && !mGt) {
-      minCables = parseInt(mGte[1], 10);
-    }
-
-    // Less or equal / up to: "<= 4", "до 4 кабелей", "не более 4"
-    const mLte = condText.match(/(?:кабелей|кабеля|каб\.?)?\s*(?:до|не более|<=)\s*(\d+)/i) ||
-                 condText.match(/(?:до|не более|<=)\s*(\d+)(?:\s*(?:кабелей|кабеля|каб\.?))?/i);
-    if (mLte) {
-      maxCables = parseInt(mLte[1], 10);
-    }
-
-    // Less than: "< 5", "менее 5 кабелей"
-    const mLt = condText.match(/(?:кабелей|кабеля|каб\.?)?\s*(?:менее|<)\s*(\d+)/i) ||
-                condText.match(/(?:менее|<)\s*(\d+)(?:\s*(?:кабелей|кабеля|каб\.?))?/i);
-    if (mLt && !mLte) {
-      maxCables = parseInt(mLt[1], 10) - 1;
-    }
-  }
-
-  const hasCondition = (minCables !== null) || (maxCables !== null);
-  let desc = '';
-  if (hasCondition) {
-    if (work["Условие"]) {
-      desc = String(work["Условие"]);
-    } else if (minCables !== null && maxCables !== null) {
-      desc = `от ${minCables} до ${maxCables} каб.`;
-    } else if (minCables !== null) {
-      desc = `кабелей > ${minCables - 1}`;
-    } else if (maxCables !== null) {
-      desc = `до ${maxCables} каб.`;
-    }
-  }
-
-  return {
-    hasCondition,
-    minCables,
-    maxCables,
-    description: desc
-  };
-}
+// (parseCableCountCondition is provided centrally by rules_store.js)
 
 // Parse and normalize rule's "Работы" object structure:
 // "Работы": { "1": [...], "2": [...], "3": [...], "оптический": [...] }
@@ -632,72 +464,7 @@ function parseRuleWorksAndMaterials(rule) {
   return { optical, tiers, allItems, isObjectStructure: true, rawObj: wmObj };
 }
 
-// Helper to extract all sections from rules object (where top-level keys are section names)
-function getRulesSections(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object' || Array.isArray(rulesData)) return [];
-  const sections = [];
-  for (const [key, val] of Object.entries(rulesData)) {
-    if (key === "Настройки" || key === "Оборудование" || key === "Справочник кабелей" || key === "Справочник муфт") continue;
-    if (val && typeof val === 'object' && !Array.isArray(val)) {
-      const rulesList = Object.entries(val).map(([ruleName, ruleVal]) => ({
-        "Название": ruleName,
-        ...(ruleVal && typeof ruleVal === 'object' ? ruleVal : {})
-      }));
-      sections.push({ name: key, rawKey: key, rules: rulesList });
-    }
-  }
-  return sections;
-}
-
-// Trench calculation rules - trenches are calculated from the "Строительные работы" section
-function getTrenchRules(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object' || Array.isArray(rulesData)) {
-    return { sectionName: 'Строительные работы', rules: [] };
-  }
-  const val = rulesData["Строительные работы"];
-  if (val && typeof val === 'object' && !Array.isArray(val)) {
-    const rulesList = Object.entries(val).map(([ruleName, ruleVal]) => ({
-      "Название": ruleName,
-      "Раздел": (ruleVal && ruleVal["Раздел"]) || 'Строительные работы',
-      ...(ruleVal && typeof ruleVal === 'object' ? ruleVal : {})
-    }));
-    return { sectionName: 'Строительные работы', rules: rulesList };
-  }
-  return { sectionName: 'Строительные работы', rules: [] };
-}
-
-// Cable calculation rules - cables are calculated from the "Монтажные работы" section
-function getCableRules(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object' || Array.isArray(rulesData)) {
-    return { sectionName: 'Монтажные работы', rules: [] };
-  }
-  const val = rulesData["Монтажные работы"];
-  if (val && typeof val === 'object' && !Array.isArray(val)) {
-    const rulesList = Object.entries(val).map(([ruleName, ruleVal]) => ({
-      "Название": ruleName,
-      "Раздел": (ruleVal && ruleVal["Раздел"]) || 'Монтажные работы',
-      ...(ruleVal && typeof ruleVal === 'object' ? ruleVal : {})
-    }));
-    return { sectionName: 'Монтажные работы', rules: rulesList };
-  }
-  return { sectionName: 'Монтажные работы', rules: [] };
-}
-
-// Helper to get active cable catalog from rules data
-function getCableCatalog(rulesData) {
-  if (rulesData && typeof rulesData === 'object' && !Array.isArray(rulesData)) {
-    if (rulesData["Справочник кабелей"] && typeof rulesData["Справочник кабелей"] === 'object') {
-      return rulesData["Справочник кабелей"];
-    }
-    if (rulesData["Кабели"] && typeof rulesData["Кабели"] === 'object') {
-      return rulesData["Кабели"];
-    }
-  }
-  if (cachedDefaultRules && cachedDefaultRules["Справочник кабелей"] && typeof cachedDefaultRules["Справочник кабелей"] === 'object') {
-    return cachedDefaultRules["Справочник кабелей"];
-  }
-  return {};
-}
+// (getRulesSections, getTrenchRules, getCableRules, and getCableCatalog are provided centrally by rules_store.js)
 
 // Helper to normalize cable names for flexible catalog lookup (ignoring quote styles and extra spaces)
 function normalizeCableLookupKey(s) {
@@ -1463,16 +1230,7 @@ async function initWorksRules() {
 }
 window.initWorksRules = initWorksRules;
 
-function escapeHtml(str) {
-  if (typeof str !== 'string') return str === null || str === undefined ? '' : String(str);
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-window.escapeHtml = escapeHtml;
+// (escapeHtml is provided centrally by rules_store.js)
 
 // Initialize tooltips and event listeners
 document.addEventListener('DOMContentLoaded', () => {
@@ -1528,42 +1286,7 @@ function initTooltips() {
   }
 }
 
-function showToast(message, type = 'info', title = 'Уведомление', delay = 4000) {
-  const toastEl = document.getElementById('liveToast');
-  const toastText = document.getElementById('toastText');
-  const toastTitle = document.getElementById('toastTitle');
-  const toastHeader = document.getElementById('toastHeader');
-  const toastIcon = document.getElementById('toastIcon');
-
-  if (!toastEl || !toastText) {
-    alert(message);
-    return;
-  }
-
-  toastText.textContent = message;
-  if (toastTitle) toastTitle.textContent = title;
-
-  if (toastHeader) {
-    toastHeader.className = 'toast-header ' + (
-      type === 'error' ? 'bg-danger text-white' :
-      type === 'warning' ? 'bg-warning text-dark' :
-      type === 'success' ? 'bg-success text-white' : 'bg-primary text-white'
-    );
-  }
-
-  if (toastIcon) {
-    toastIcon.className = 'fs-4 me-2 bx ' + (
-      type === 'error' ? 'bx-error-circle' :
-      type === 'warning' ? 'bx-alarm-exclamation text-dark' :
-      type === 'success' ? 'bx-check-circle' : 'bx-info-circle'
-    );
-  }
-
-  if (window.bootstrap && bootstrap.Toast) {
-    const toast = new bootstrap.Toast(toastEl, { delay: type === 'warning' ? Math.max(delay, 7000) : delay });
-    toast.show();
-  }
-}
+// (showToast is provided centrally by rules_store.js)
 
 function setupEventListeners() {
   const fileInput = document.getElementById('input');
@@ -1763,100 +1486,7 @@ function handleFileInput(e) {
   e.target.value = '';
 }
 
-/**
- * Считывает файл как текст с надежным автоопределением кодировки (UTF-8, Windows-1251 / CP1251).
- * Автоматически корректно распознает русскоязычные файлы JSON, сформированные в кодировке Windows-1251.
- * @param {File|Blob} file 
- * @returns {Promise<string>}
- */
-function readFileAsTextWithEncoding(file) {
-  return new Promise((resolve, reject) => {
-    if (!file) return reject(new Error('Файл не задан'));
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Ошибка чтения файла'));
-    reader.onload = (event) => {
-      try {
-        const buffer = event.target.result;
-        const uint8 = new Uint8Array(buffer);
-
-        // 1. Проверка BOM UTF-8 (EF BB BF)
-        if (uint8.length >= 3 && uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) {
-          const text = new TextDecoder('utf-8').decode(uint8.subarray(3));
-          return resolve(text.replace(/^\uFEFF/, '').trim());
-        }
-
-        // 2. Проверка BOM UTF-16 LE / BE
-        if (uint8.length >= 2 && uint8[0] === 0xFF && uint8[1] === 0xFE) {
-          const text = new TextDecoder('utf-16le').decode(uint8.subarray(2));
-          return resolve(text.replace(/^\uFEFF/, '').trim());
-        }
-        if (uint8.length >= 2 && uint8[0] === 0xFE && uint8[1] === 0xFF) {
-          const text = new TextDecoder('utf-16be').decode(uint8.subarray(2));
-          return resolve(text.replace(/^\uFEFF/, '').trim());
-        }
-
-        // 3. Пытаемся строго декодировать через UTF-8 (fatal: true)
-        let utf8Text = null;
-        let utf8Valid = false;
-        try {
-          utf8Text = new TextDecoder('utf-8', { fatal: true }).decode(uint8);
-          utf8Valid = true;
-        } catch (e) {
-          utf8Valid = false;
-        }
-
-        // Если это валидный UTF-8, проверим, парсится ли как валидный JSON
-        if (utf8Valid && utf8Text) {
-          try {
-            JSON.parse(utf8Text.replace(/^\uFEFF/, '').trim());
-            return resolve(utf8Text.replace(/^\uFEFF/, '').trim());
-          } catch (e) {
-            // Если не JSON, всё равно может быть текстом UTF-8
-          }
-        }
-
-        // 4. Пробуем декодировать как Windows-1251 (CP1251)
-        let winText = null;
-        try {
-          const winDecoder = new TextDecoder('windows-1251');
-          winText = winDecoder.decode(uint8);
-        } catch (e) {
-          try {
-            const cpDecoder = new TextDecoder('cp1251');
-            winText = cpDecoder.decode(uint8);
-          } catch (err) {}
-        }
-
-        if (winText) {
-          try {
-            JSON.parse(winText.replace(/^\uFEFF/, '').trim());
-            return resolve(winText.replace(/^\uFEFF/, '').trim());
-          } catch (e) {}
-        }
-
-        // Если UTF-8 не прошел проверку байтов, отдаем Windows-1251
-        if (!utf8Valid && winText) {
-          return resolve(winText.replace(/^\uFEFF/, '').trim());
-        }
-
-        if (utf8Text) {
-          return resolve(utf8Text.replace(/^\uFEFF/, '').trim());
-        }
-
-        if (winText) {
-          return resolve(winText.replace(/^\uFEFF/, '').trim());
-        }
-
-        // Резервный вариант
-        const fallback = new TextDecoder('utf-8').decode(uint8);
-        return resolve(fallback.replace(/^\uFEFF/, '').trim());
-      } catch (err) {
-        reject(err);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  });
-}
+// (readFileAsTextWithEncoding is provided centrally by rules_store.js)
 
 async function processFile(file) {
   const fileName = file.name;
@@ -3893,31 +3523,7 @@ function extractItemDecimals(item) {
   return undefined;
 }
 
-function getRulesSettings(rulesData) {
-  const raw = (rulesData && typeof rulesData === 'object')
-    ? (rulesData["Настройки"] || {})
-    : {};
-
-  const numModeRaw = String(raw["ТипНумерации"] || 'иерархическая').trim().toLowerCase();
-  const isSeq = numModeRaw.includes('сквозн');
-
-  const decWorksRaw = raw["ОкруглениеРабот"] !== undefined ? raw["ОкруглениеРабот"] : 2;
-  const decMatsRaw = raw["ОкруглениеМатериалов"] !== undefined ? raw["ОкруглениеМатериалов"] : 3;
-
-  const decimalsWorks = (!isNaN(Number(decWorksRaw)) && Number(decWorksRaw) >= 0) ? Math.min(10, Math.floor(Number(decWorksRaw))) : 2;
-  const decimalsMaterials = (!isNaN(Number(decMatsRaw)) && Number(decMatsRaw) >= 0) ? Math.min(10, Math.floor(Number(decMatsRaw))) : 3;
-
-  return {
-    numberingMode: isSeq ? 'сквозная' : 'иерархическая',
-    ggeVersion: String(raw["ВерсияGGE"] || '3.01').trim(),
-    accessLevel: String(raw["УровеньДоступа"] || 'коммерческая тайна').trim(),
-    softName: String(raw["ПрограммныйКомплекс"] || 'Программный комплекс "Строительный эксперт"  v7.3.1.7813').trim(),
-    pluginVersion: String(raw["ПлагинGGE"] || 'Plugin EvhEstGGE.dll v3.6.1.1377 2026-09-08 12:08:13').trim(),
-    decimalsWorks: decimalsWorks,
-    decimalsMaterials: decimalsMaterials,
-    raw: raw
-  };
-}
+// (getRulesSettings is provided centrally by rules_store.js)
 
 /**
  * Returns the decimal precision for a specific item, work, or material based on:
@@ -5021,38 +4627,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 // EQUIPMENT RULES & CALCULATION FUNCTIONS
 // --------------------------------------------------------------------------
 
-function getEquipmentRulesDict(rulesData) {
-  if (!rulesData || typeof rulesData !== 'object') return {};
-  const raw = rulesData["Оборудование"];
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    return raw;
-  }
-  return {};
-}
-window.getEquipmentRulesDict = getEquipmentRulesDict;
-
-function getEquipmentRulesList(rulesData) {
-  const dict = getEquipmentRulesDict(rulesData);
-  return Object.entries(dict).map(([markKey, itemVal]) => {
-    return {
-      "Марка": markKey,
-      ...(itemVal && typeof itemVal === 'object' ? itemVal : {})
-    };
-  });
-}
-window.getEquipmentRulesList = getEquipmentRulesList;
-
-function getEquipmentItemWorksObject(item) {
-  if (!item || typeof item !== 'object') return {};
-  if (item["Работы"] && typeof item["Работы"] === 'object') {
-    return item["Работы"];
-  }
-  if (item["Работы и материалы"] && typeof item["Работы и материалы"] === 'object') {
-    return item["Работы и материалы"];
-  }
-  return {};
-}
-window.getEquipmentItemWorksObject = getEquipmentItemWorksObject;
+// (getEquipmentRulesDict, getEquipmentRulesList, and getEquipmentItemWorksObject are provided centrally by rules_store.js)
 
 function getEquipmentRules(rulesData) {
   const rules = getEquipmentRulesList(rulesData);

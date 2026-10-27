@@ -67,6 +67,41 @@
     z-index: 10;
     background-color: var(--si-tertiary-bg, #f1f5f9) !important;
   }
+
+  /* Silicon theme fixes: prevent invisible white text on light backgrounds */
+  .text-secondary,
+  i.text-secondary {
+    color: var(--si-secondary-color, #475569) !important;
+  }
+  [data-bs-theme="dark"] .text-secondary,
+  [data-bs-theme="dark"] i.text-secondary {
+    color: #94a3b8 !important;
+  }
+  .badge.bg-light,
+  .badge.bg-body,
+  .badge.bg-body-secondary,
+  .badge.bg-body-tertiary {
+    color: var(--si-body-color, #334155) !important;
+  }
+  .badge.text-secondary,
+  .badge.text-secondary-emphasis {
+    color: var(--si-secondary-color, #475569) !important;
+  }
+  .badge.text-muted,
+  .badge.text-body-secondary {
+    color: var(--si-secondary-color, #64748b) !important;
+  }
+  .badge-material {
+    display: inline-block;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: 0.25rem;
+    background-color: var(--si-secondary-bg, #f1f5f9);
+    color: var(--si-body-color, #334155) !important;
+    border: 1px solid var(--si-border-color, #cbd5e1);
+  }
   </style>
 </head>
 <body>
@@ -131,7 +166,7 @@
               <span id="tabWorksEquipmentCountBadge" class="badge bg-secondary-subtle text-secondary-emphasis border ms-auto font-monospace" style="font-size: 0.7rem;"></span>
             </a>
             <a href="#cables" class="rules-nav-pill" id="navPillCables" data-pane="tabWorksCablesPane">
-              <i class='bx bx-cable fs-5 text-success'></i>
+              <i class='bx bx-network-chart fs-5 text-success'></i>
               <span>Справочник кабелей</span>
               <span id="tabWorksCablesCountBadge" class="badge bg-secondary-subtle text-secondary-emphasis border ms-auto font-monospace" style="font-size: 0.7rem;"></span>
             </a>
@@ -141,7 +176,7 @@
               <span id="tabWorksCouplingsCountBadge" class="badge bg-secondary-subtle text-secondary-emphasis border ms-auto font-monospace" style="font-size: 0.7rem;"></span>
             </a>
             <a href="#settings" class="rules-nav-pill" id="navPillSettings" data-pane="tabWorksSettingsPane">
-              <i class='bx bx-cog fs-5 text-secondary'></i>
+              <i class='bx bx-cog fs-5 text-primary'></i>
               <span>Настройки расчета</span>
             </a>
             <a href="#json" class="rules-nav-pill" id="navPillJson" data-pane="tabWorksJsonPane">
@@ -284,7 +319,7 @@
             <div class="card border shadow-sm mb-3">
               <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
                 <div class="d-flex align-items-center gap-2">
-                  <i class='bx bx-cable fs-5 text-success'></i>
+                  <i class='bx bx-network-chart fs-5 text-success'></i>
                   <h2 class="fs-6 fw-bold mb-0">Справочник кабельной продукции, строительных длин и соответствия обозначений</h2>
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -303,12 +338,15 @@
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                   <div class="input-group input-group-sm" style="max-width: 420px;">
                     <span class="input-group-text bg-light border-end-0"><i class='bx bx-search'></i></span>
-                    <input type="text" class="form-control border-start-0" id="cableSearchInput" placeholder="Поиск по марке, типоразмеру, муфте, группе или обозначению...">
-                    <button class="btn btn-outline-secondary d-none" type="button" id="cableClearSearchBtn"><i class='bx bx-x'></i></button>
+                    <input type="text" class="form-control border-start-0" id="cableCatalogSearchInput" placeholder="Поиск по марке, типоразмеру, муфте, группе или обозначению...">
+                    <button class="btn btn-outline-secondary d-none" type="button" id="cableCatalogClearSearchBtn"><i class='bx bx-x'></i></button>
                   </div>
                   <div class="d-flex align-items-center gap-2">
                     <select class="form-select form-select-sm" id="cableCatalogCategoryFilter" style="max-width: 240px;">
                       <option value="all">Все группы и категории</option>
+                      <option value="signaling">Кабели СЦБ (сигнализация и блокировка)</option>
+                      <option value="special">Особые кабели</option>
+                      <option value="optical">Оптические кабели (ВОЛС)</option>
                     </select>
                   </div>
                 </div>
@@ -338,8 +376,8 @@
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                   <div class="input-group input-group-sm" style="max-width: 420px;">
                     <span class="input-group-text bg-light border-end-0"><i class='bx bx-search'></i></span>
-                    <input type="text" class="form-control border-start-0" id="couplingSearchInput" placeholder="Поиск по марке муфты, жильности или типу...">
-                    <button class="btn btn-outline-secondary d-none" type="button" id="couplingClearSearchBtn"><i class='bx bx-x'></i></button>
+                    <input type="text" class="form-control border-start-0" id="couplingCatalogSearchInput" placeholder="Поиск по марке муфты, жильности или типу...">
+                    <button class="btn btn-outline-secondary d-none" type="button" id="couplingCatalogClearSearchBtn"><i class='bx bx-x'></i></button>
                   </div>
                 </div>
 
@@ -355,7 +393,7 @@
             <div class="card border shadow-sm mb-3">
               <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2">
-                  <i class='bx bx-cog fs-5 text-secondary'></i>
+                  <i class='bx bx-cog fs-5 text-primary'></i>
                   <h2 class="fs-6 fw-bold mb-0">Параметры расчетов, экспорта GGE и округления</h2>
                 </div>
               </div>
@@ -443,12 +481,9 @@
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content border shadow">
         <div class="modal-header py-2 px-3 bg-light border-bottom d-flex align-items-center justify-content-between">
-          <div class="d-flex align-items-center gap-2">
-            <i class='bx bx-layer-plus text-primary fs-4'></i>
-            <div>
-              <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="addRuleModalTitle">Добавить способ прокладки</h5>
-              <small class="text-muted" style="font-size: 0.75rem;">Заполните параметры способа прокладки и сметные работы</small>
-            </div>
+          <div>
+            <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="addRuleModalTitle">Добавить способ прокладки</h5>
+            <small class="text-muted" style="font-size: 0.75rem;">Заполните параметры способа прокладки и сметные работы</small>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
         </div>
@@ -537,12 +572,9 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content border shadow">
         <div class="modal-header py-2 px-3 bg-light border-bottom d-flex align-items-center justify-content-between">
-          <div class="d-flex align-items-center gap-2">
-            <i class='bx bx-cable text-success fs-4'></i>
-            <div>
-              <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="addCableModalTitle">Добавить марку кабеля</h5>
-              <small class="text-muted" style="font-size: 0.75rem;">Заполните технические параметры и нормативные длины</small>
-            </div>
+          <div>
+            <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="addCableModalTitle">Добавить марку кабеля</h5>
+            <small class="text-muted" style="font-size: 0.75rem;">Заполните технические параметры и нормативные длины</small>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
         </div>
@@ -625,12 +657,9 @@
     <div class="modal-dialog modal-md modal-dialog-scrollable">
       <div class="modal-content border shadow">
         <div class="modal-header py-2 px-3 bg-light border-bottom d-flex align-items-center justify-content-between">
-          <div class="d-flex align-items-center gap-2">
-            <i class='bx bx-purchase-tag text-primary fs-4'></i>
-            <div>
-              <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="editCableGroupModalTitle">Соответствие марки и условного обозначения</h5>
-              <small class="text-muted" style="font-size: 0.75rem;">Связь знака на чертеже плана и марки кабеля</small>
-            </div>
+          <div>
+            <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="editCableGroupModalTitle">Соответствие марки и условного обозначения</h5>
+            <small class="text-muted" style="font-size: 0.75rem;">Связь знака на чертеже плана и марки кабеля</small>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
         </div>
@@ -701,12 +730,9 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content border shadow">
         <div class="modal-header py-2 px-3 bg-light border-bottom d-flex align-items-center justify-content-between">
-          <div class="d-flex align-items-center gap-2">
-            <i class='bx bx-slider-alt text-primary fs-4'></i>
-            <div>
-              <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="manageCableGroupsOverviewModalTitle">Управление соответствием марок и условных обозначений</h5>
-              <small class="text-muted" style="font-size: 0.75rem;">Все условные обозначения чертежа и привязанные марки кабелей</small>
-            </div>
+          <div>
+            <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="manageCableGroupsOverviewModalTitle">Управление соответствием марок и условных обозначений</h5>
+            <small class="text-muted" style="font-size: 0.75rem;">Все условные обозначения чертежа и привязанные марки кабелей</small>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
         </div>
@@ -751,12 +777,9 @@
     <div class="modal-dialog modal-md modal-dialog-scrollable">
       <div class="modal-content border shadow">
         <div class="modal-header py-2 px-3 bg-light border-bottom d-flex align-items-center justify-content-between">
-          <div class="d-flex align-items-center gap-2">
-            <i class='bx bx-git-merge text-warning fs-4'></i>
-            <div>
-              <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="addCouplingModalTitle">Добавить муфту</h5>
-              <small class="text-muted" style="font-size: 0.75rem;">Внесение новой муфты в справочник</small>
-            </div>
+          <div>
+            <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="addCouplingModalTitle">Добавить муфту</h5>
+            <small class="text-muted" style="font-size: 0.75rem;">Внесение новой муфты в справочник</small>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
         </div>
@@ -806,12 +829,9 @@
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content border shadow">
         <div class="modal-header py-2 px-3 bg-light border-bottom d-flex align-items-center justify-content-between">
-          <div class="d-flex align-items-center gap-2">
-            <i class='bx bx-cube text-info fs-4'></i>
-            <div>
-              <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="addEquipmentModalTitle">Добавить оборудование</h5>
-              <small class="text-muted" style="font-size: 0.75rem;">Заполните марку оборудования, способ монтажа и сметные нормы</small>
-            </div>
+          <div>
+            <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="addEquipmentModalTitle">Добавить оборудование</h5>
+            <small class="text-muted" style="font-size: 0.75rem;">Заполните марку оборудования, способ монтажа и сметные нормы</small>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
         </div>

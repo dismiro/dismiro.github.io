@@ -1,6 +1,6 @@
 /**
  * Bill of quantities - Dedicated Rules & Catalog Page Controller
- * Controls rules.html: tab switching, sidebar navigation, CodeMirror lifecycle,
+ * Controls rules.html: tab switching, sidebar navigation, JSON preview lifecycle,
  * hotkeys, and integration with rulesStore.
  */
 
@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 4. Initial Render
   if (rules) {
     window.currentWorksRules = rules;
+    if (typeof setModalDraftRules === 'function') setModalDraftRules(rules);
     setWorksJsonEditorValue(JSON.stringify(rules, null, 2));
     validateWorksJsonInput();
     renderRulesModalContent(rules);
@@ -39,6 +40,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 6. Listen for Store updates
   window.rulesStore.subscribe((event) => {
+    if (event && event.rules) {
+      window.currentWorksRules = event.rules;
+      if (typeof setModalDraftRules === 'function') setModalDraftRules(event.rules);
+    }
     updateStorageStatusUi();
   });
 });
@@ -146,6 +151,8 @@ function setupPageActions() {
       if (!file) return;
       try {
         const imported = await window.rulesStore.importRulesJsonFile(file);
+        window.currentWorksRules = imported;
+        if (typeof setModalDraftRules === 'function') setModalDraftRules(imported);
         setWorksJsonEditorValue(JSON.stringify(imported, null, 2));
         validateWorksJsonInput();
         renderRulesModalContent(imported);
@@ -181,6 +188,8 @@ function setupPageActions() {
       }
       try {
         const defaultData = await window.rulesStore.resetToDefaultRules();
+        window.currentWorksRules = defaultData;
+        if (typeof setModalDraftRules === 'function') setModalDraftRules(defaultData);
         setWorksJsonEditorValue(JSON.stringify(defaultData, null, 2));
         validateWorksJsonInput();
         renderRulesModalContent(defaultData);

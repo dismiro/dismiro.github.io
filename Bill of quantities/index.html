@@ -10,12 +10,6 @@
   <link href="../assets/theme.min.css" rel="stylesheet">
   <link href="../assets/bootstrap-icons.css" rel="stylesheet">
 
-  <!-- CodeMirror 5 (with Code Folding, Search, and Syntax Highlighting) -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/matchesonscrollbar.min.css">
-
   <style>
   .main-container { 
     max-width: 1750px;
@@ -39,123 +33,6 @@
     background: transparent;
   }
 
-  .CodeMirror {
-    height: 52vh;
-    min-height: 420px;
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    font-size: 0.86rem;
-    line-height: 1.55;
-    border: 1px solid var(--si-border-color);
-    border-radius: var(--si-border-radius, 0.5rem);
-    background: #ffffff;
-    color: #24292f;
-  }
-  .CodeMirror-gutters {
-    background: #f6f8fa;
-    border-right: 1px solid #d0d7de;
-  }
-  .CodeMirror-linenumber {
-    color: #8c959f;
-    padding: 0 6px 0 2px;
-  }
-  .CodeMirror-foldmarker {
-    color: #0969da;
-    background-color: #ddf4ff;
-    border: 1px solid #54aeff;
-    font-family: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0 5px;
-    border-radius: 4px;
-    margin: 0 3px;
-  }
-  .CodeMirror-foldgutter {
-    width: 1.2em;
-    cursor: pointer;
-  }
-  .CodeMirror-foldgutter-open:after {
-    content: "▼";
-    font-size: 0.62rem;
-    color: #8c959f;
-  }
-  .CodeMirror-foldgutter-folded:after {
-    content: "▶";
-    font-size: 0.62rem;
-    color: #0969da;
-    font-weight: bold;
-  }
-
-  .CodeMirror-cursor {
-    border-left: 2px solid #0969da !important;
-    width: 0;
-  }
-  .CodeMirror-selected {
-    background: #b6e3ff !important;
-  }
-  .CodeMirror-focused .CodeMirror-selected {
-    background: #b6e3ff !important;
-  }
-  .CodeMirror-matchingbracket {
-    background-color: #ddf4ff !important;
-    outline: 1px solid #0969da;
-    border-radius: 2px;
-  }
-
-  .cm-s-default .cm-property { color: #0550ae !important; font-weight: 600; }
-  .cm-s-default .cm-string { color: #0a3069 !important; }
-  .cm-s-default .cm-number { color: #0550ae !important; }
-  .cm-s-default .cm-atom { color: #cf222e !important; font-weight: 600; }
-  .cm-s-default .cm-variable { color: #24292f !important; }
-  .cm-s-default .cm-operator, .cm-s-default .cm-punctuation { color: #24292f !important; }
-
-  [data-bs-theme="dark"] .CodeMirror {
-    background: #0d1117;
-    color: #e6edf3;
-    border-color: #30363d;
-  }
-  [data-bs-theme="dark"] .CodeMirror-gutters {
-    background: #161b22;
-    border-right-color: #30363d;
-  }
-  [data-bs-theme="dark"] .CodeMirror-linenumber {
-    color: #6e7681;
-  }
-  [data-bs-theme="dark"] .CodeMirror-cursor {
-    border-left: 2px solid #58a6ff !important;
-  }
-  [data-bs-theme="dark"] .CodeMirror-selected {
-    background: rgba(56, 139, 253, 0.3) !important;
-  }
-  [data-bs-theme="dark"] .CodeMirror-focused .CodeMirror-selected {
-    background: rgba(56, 139, 253, 0.35) !important;
-  }
-  [data-bs-theme="dark"] .CodeMirror-line::selection, 
-  [data-bs-theme="dark"] .CodeMirror-line > span::selection, 
-  [data-bs-theme="dark"] .CodeMirror-line > span > span::selection {
-    background: rgba(56, 139, 253, 0.35) !important;
-  }
-  [data-bs-theme="dark"] .CodeMirror-foldgutter-open:after {
-    color: #6e7681;
-  }
-  [data-bs-theme="dark"] .CodeMirror-foldgutter-folded:after {
-    color: #58a6ff;
-  }
-  [data-bs-theme="dark"] .CodeMirror-foldmarker {
-    color: #58a6ff;
-    background-color: rgba(56, 139, 253, 0.15);
-    border-color: rgba(56, 139, 253, 0.4);
-  }
-  [data-bs-theme="dark"] .CodeMirror-matchingbracket {
-    background-color: rgba(56, 139, 253, 0.25) !important;
-    outline: 1px solid #58a6ff;
-  }
-
-  [data-bs-theme="dark"] .cm-s-default .cm-property { color: #7ee787 !important; font-weight: 600; }
-  [data-bs-theme="dark"] .cm-s-default .cm-string { color: #a5d6ff !important; }
-  [data-bs-theme="dark"] .cm-s-default .cm-number { color: #79c0ff !important; }
-  [data-bs-theme="dark"] .cm-s-default .cm-atom { color: #ff7b72 !important; font-weight: 600; }
-  [data-bs-theme="dark"] .cm-s-default .cm-variable { color: #e6edf3 !important; }
-  [data-bs-theme="dark"] .cm-s-default .cm-operator, [data-bs-theme="dark"] .cm-s-default .cm-punctuation { color: #e6edf3 !important; }
  /* Text wrap utility - NEVER TRUNCATE */
   .cell-wrap {
     white-space: normal !important;
@@ -698,7 +575,7 @@
                         </div>
                       </a>
                       <a id='menuViewCablesCatalog' href="rules.html#cables" class="dropdown-item d-flex align-items-center gap-2 py-2">
-                        <i class='bx bx-cable text-success fs-5'></i>
+                        <i class='bx bx-network-chart text-success fs-5'></i>
                         <div>
                           <div class="fw-semibold">Справочник кабелей...</div>
                           <small class="text-muted fs-xs">Марки, строительные длины, вес и муфты</small>
@@ -1006,12 +883,9 @@
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content border shadow">
       <div class="modal-header py-2 px-3 bg-light border-bottom d-flex align-items-center justify-content-between">
-        <div class="d-flex align-items-center gap-2">
-          <i class='bx bx-error-circle text-primary fs-4'></i>
-          <div>
-            <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="ggeExportWarningsModalLabel">Замечания перед экспортом ВОР</h5>
-            <small class="text-muted" style="font-size: 0.75rem;" id="ggeExportWarningsModalSub">Сводная информация об ошибках формул, недостающих правилах и сметных нормах</small>
-          </div>
+        <div>
+          <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="ggeExportWarningsModalLabel">Замечания перед экспортом ВОР</h5>
+          <small class="text-muted" style="font-size: 0.75rem;" id="ggeExportWarningsModalSub">Сводная информация об ошибках формул, недостающих правилах и сметных нормах</small>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
       </div>
@@ -1030,10 +904,6 @@
     </div>
   </div>
 </div>
-
-<datalist id="datalistCableGroups"></datalist>
-<datalist id="datalistCouplingsList"></datalist>
-<datalist id="datalistEquipMethods"></datalist>
 
 <!-- Toast notification container -->
 <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
