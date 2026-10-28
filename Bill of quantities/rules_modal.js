@@ -3700,47 +3700,34 @@ function setupWorksRulesListeners() {
     return '';
   }
 
-  // Helper to format a single mark's full description using the group template and differing sizes
+  // Helper to format a single mark's full description using the group template strictly:
+  // substitutes "МАРКА" with the group's "Название" and "ТИПОРАЗМЕР" with the markKey,
+  // without heuristic analysis of existing data or arbitrary suffix additions.
   function formatCableFullDescriptionFromTemplate(template, brandName, markKey, existingDesc = '') {
-    const tpl = (template || '').trim();
-    const brand = (brandName || '').trim();
-    const key = (markKey || '').trim();
-
+    if (template === undefined || template === null) {
+      return existingDesc || '';
+    }
+    const tpl = String(template).trim();
     if (!tpl) {
-      return existingDesc || `${brand} ${key}`.trim();
+      return existingDesc || '';
     }
 
-    // Determine the specific size/dimension for this mark
-    let sizePart = key;
-    if (existingDesc && typeof existingDesc === 'string') {
-      const descStr = existingDesc.trim();
-      if (brand && descStr.includes(brand)) {
-        const tail = descStr.slice(descStr.indexOf(brand) + brand.length).trim();
-        if (tail) {
-          sizePart = tail;
-        }
-      } else {
-        const words = descStr.split(/\s+/);
-        const lastWord = words[words.length - 1];
-        if (lastWord && (lastWord.startsWith(key) || lastWord.includes(key))) {
-          sizePart = lastWord;
-        }
-      }
-    }
+    const brand = (brandName !== undefined && brandName !== null) ? String(brandName).trim() : '';
+    const key = (markKey !== undefined && markKey !== null) ? String(markKey).trim() : '';
 
     let result = tpl;
-    if (result.includes('{МАРКА}')) {
-      result = result.split('{МАРКА}').join(brand);
-    }
-    if (result.includes('{ТИПОРАЗМЕР}')) {
-      result = result.split('{ТИПОРАЗМЕР}').join(sizePart);
-    } else if (result.includes('{ТИП}')) {
-      result = result.split('{ТИП}').join(sizePart);
-    } else if (result.includes('{РАЗМЕР}')) {
-      result = result.split('{РАЗМЕР}').join(sizePart);
-    } else {
-      result = `${result.trim()} ${sizePart}`;
-    }
+
+    // Substitute "{МАРКА}" placeholder strictly with the brand name ("Название")
+    result = result.split('{МАРКА}').join(brand);
+    result = result.split('{марка}').join(brand);
+
+    // Substitute "{ТИПОРАЗМЕР}" placeholder strictly with the key of this size from the object
+    result = result.split('{ТИПОРАЗМЕР}').join(key);
+    result = result.split('{типоразмер}').join(key);
+    result = result.split('{ТИП}').join(key);
+    result = result.split('{тип}').join(key);
+    result = result.split('{РАЗМЕР}').join(key);
+    result = result.split('{размер}').join(key);
 
     return result.replace(/\s+/g, ' ').trim();
   }
@@ -3761,17 +3748,15 @@ function setupWorksRulesListeners() {
     }
 
     let sampleMark = '1х2';
-    let sampleDesc = '';
     if (addCableGroupEditContext && addCableGroupEditContext.groupData && addCableGroupEditContext.groupData["Тип"]) {
       const types = Object.entries(addCableGroupEditContext.groupData["Тип"]);
       if (types.length > 0) {
         sampleMark = types[0][0];
-        sampleDesc = types[0][1]?.["Полное описание"] || '';
       }
     }
 
     if (previewLabel) previewLabel.textContent = sampleMark;
-    const formatted = formatCableFullDescriptionFromTemplate(tpl, brand, sampleMark, sampleDesc);
+    const formatted = formatCableFullDescriptionFromTemplate(tpl, brand, sampleMark);
     previewEl.textContent = formatted || 'Шаблон пока не заполнен';
   }
 
