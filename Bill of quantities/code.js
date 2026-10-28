@@ -3,26 +3,7 @@ let currentData = null;
 let currentFileName = '';
 let isRawColCollapsed = false;
 
-// Universal debounce helper with cancel method
-function debounce(fn, delay = 180) {
-  let timer = null;
-  const debounced = function(...args) {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      timer = null;
-      fn.apply(this, args);
-    }, delay);
-  };
-  debounced.cancel = function() {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  };
-  return debounced;
-}
-
-// (getRuleWorks is provided centrally by rules_store.js)
+// (debounce and getRuleWorks are provided centrally by rules_store.js)
 
 // --------------------------------------------------------------------------
 // FORMULA MATH OPERATOR NORMALIZATION
@@ -689,40 +670,7 @@ function lookupCableInfo(rawType, catalog) {
 // COUPLING CATALOG & HELPER FUNCTIONS
 // --------------------------------------------------------------------------
 
-// Helper to get active coupling catalog from rules data
-function getCouplingCatalog(rulesData) {
-  if (rulesData && typeof rulesData === 'object' && !Array.isArray(rulesData)) {
-    if (rulesData["Справочник муфт"] && typeof rulesData["Справочник муфт"] === 'object') {
-      return rulesData["Справочник муфт"];
-    }
-    if (rulesData["Муфты"] && typeof rulesData["Муфты"] === 'object') {
-      return rulesData["Муфты"];
-    }
-  }
-  if (cachedDefaultRules && cachedDefaultRules["Справочник муфт"] && typeof cachedDefaultRules["Справочник муфт"] === 'object') {
-    return cachedDefaultRules["Справочник муфт"];
-  }
-  return {};
-}
-
-// Parse max cores from string (e.g. "24х0,9", "3-24х0,9", "7х0,9", "до 27 жил")
-function parseMaxCoresFromString(str) {
-  if (!str) return 0;
-  const s = String(str);
-  // Match "до 12", "до: 27", etc.
-  const doMatch = s.match(/до[:\s]+(\d+)/i);
-  if (doMatch) return parseInt(doMatch[1], 10);
-  // Match "3-24х0,9" or "27-61х0,9" -> take the larger number before 'х'
-  const rangeMatch = s.match(/(\d+)[-–](\d+)х/i);
-  if (rangeMatch) return parseInt(rangeMatch[2], 10);
-  // Match "24х0,9" or "7х" -> number before 'х'
-  const xMatch = s.match(/(\d+)х/i);
-  if (xMatch) return parseInt(xMatch[1], 10);
-  // Match any standalone number
-  const numMatch = s.match(/(\d+)/);
-  if (numMatch) return parseInt(numMatch[1], 10);
-  return 0;
-}
+// (getCouplingCatalog and parseMaxCoresFromString are provided centrally by rules_store.js)
 
 // Lookup coupling metadata (full name, max cores, unit, foundInCatalog, isOptical)
 function lookupCouplingInfo(rawType, couplingCatalog, isCableOptical = false) {
@@ -793,47 +741,6 @@ function lookupCouplingInfo(rawType, couplingCatalog, isCableOptical = false) {
     showFormula: true,
     foundInCatalog: false
   };
-}
-
-// Extract all numeric coupling installation tiers dynamically from works_rules.json (e.g. [12, 27, 48, 61, 78...] or [8, 16, 32, 48, 96, 144...])
-function getCouplingRuleTiers(rulesData, isOptical = false) {
-  const rules = rulesData || currentWorksRules || cachedDefaultRules;
-  const cableRules = getCableRules(rules);
-  const tiersSet = new Set();
-
-  for (const r of (cableRules && cableRules.rules ? cableRules.rules : [])) {
-    const rName = (r["Название"] || r.name || '').toLowerCase();
-    if (rName.includes('муфт')) {
-      const isRuleOpt = rName.includes('оптич') || rName.includes('волс');
-      if (isOptical && !isRuleOpt) continue;
-      if (!isOptical && isRuleOpt) continue;
-
-      const wm = r["Работы"] || r["Работы и материалы"] || {};
-      if (wm && typeof wm === 'object' && !Array.isArray(wm)) {
-        Object.keys(wm).forEach(k => {
-          const num = parseFloat(String(k).trim().replace(',', '.'));
-          if (!isNaN(num) && num > 0) {
-            tiersSet.add(num);
-          }
-        });
-      }
-    }
-  }
-
-  const sortedTiers = Array.from(tiersSet).sort((a, b) => a - b);
-  if (sortedTiers.length > 0) return sortedTiers;
-  return isOptical ? [8, 16, 32, 48, 96, 144] : [12, 27, 48, 61];
-}
-
-// Determine coupling installation tier dynamically from rules (e.g. 12, 27, 48, 61, 78... or 8, 16, 32, 48, 96, 144...)
-function getCouplingInstallationTier(maxCores, rulesData, isOptical = false) {
-  const cores = Number(maxCores) || 0;
-  const availableTiers = getCouplingRuleTiers(rulesData, isOptical);
-  
-  for (const t of availableTiers) {
-    if (cores <= t) return t;
-  }
-  return availableTiers[availableTiers.length - 1];
 }
 
 // Get coupling installation works array from rules or fallback
@@ -3102,8 +3009,8 @@ function renderInstallationWorks(cableWorksCalc) {
       <div class="text-center py-4 px-2 text-muted small bg-light rounded border">
         <i class="bx bx-info-circle fs-4 d-block mb-1 text-secondary"></i>
         <div>Работы не определены для текущих способов прокладки кабелей и оборудования.</div>
-        <a href="rules.html#construction" class="btn btn-sm btn-outline-primary mt-2">
-          <i class="bx bx-edit"></i> Настроить правила строительных работ
+        <a href="rules.html#installation" class="btn btn-sm btn-outline-primary mt-2">
+          <i class="bx bx-edit"></i> Настроить правила монтажных работ
         </a>
       </div>
     `;
@@ -3289,8 +3196,8 @@ function renderConstructionWorks(worksCalc) {
       <div class="text-center py-4 px-2 text-muted small bg-light rounded border">
         <i class="bx bx-info-circle fs-4 d-block mb-1 text-secondary"></i>
         <div>Работы не определены для текущих способов прокладки.</div>
-        <a href="rules.html#installation" class="btn btn-sm btn-outline-primary mt-2">
-          <i class="bx bx-edit"></i> Настроить правила монтажных работ
+        <a href="rules.html#construction" class="btn btn-sm btn-outline-primary mt-2">
+          <i class="bx bx-edit"></i> Настроить правила строительных работ
         </a>
       </div>
     `;

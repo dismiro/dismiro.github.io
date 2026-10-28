@@ -312,6 +312,26 @@
   }
   if (typeof window.escapeHtml !== 'function') window.escapeHtml = escapeHtml;
 
+  // Universal debounce helper with cancel method
+  function debounce(fn, delay = 180) {
+    let timer = null;
+    const debounced = function(...args) {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        fn.apply(this, args);
+      }, delay);
+    };
+    debounced.cancel = function() {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+    return debounced;
+  }
+  if (typeof window.debounce !== 'function') window.debounce = debounce;
+
   function showToast(message, type = 'info', title = 'Уведомление', delay = 4000) {
     const toastEl = document.getElementById('liveToast');
     const toastText = document.getElementById('toastText');
@@ -801,6 +821,7 @@
   // Single Source of Truth exports on rulesStore namespace
   if (window.rulesStore) {
     window.rulesStore.escapeHtml = escapeHtml;
+    window.rulesStore.debounce = debounce;
     window.rulesStore.showToast = showToast;
     window.rulesStore.getRulesSections = getRulesSections;
     window.rulesStore.getTrenchRules = getTrenchRules;

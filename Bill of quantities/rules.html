@@ -702,10 +702,33 @@
               </select>
             </div>
 
+            <div class="mb-3">
+              <div class="d-flex align-items-center justify-content-between mb-1">
+                <label for="editCableGroupDescriptionTemplate" class="form-label small fw-bold mb-0">
+                  Шаблон полного наименования по ГОСТ/ТУ
+                </label>
+                <div class="d-flex gap-1">
+                  <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5" id="btnInsertTemplateBrandTag" title="Вставить тег марки кабеля">+{МАРКА}</button>
+                  <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5" id="btnInsertTemplateSizeTag" title="Вставить тег типоразмера">+{ТИПОРАЗМЕР}</button>
+                </div>
+              </div>
+              <textarea class="form-control form-control-sm" id="editCableGroupDescriptionTemplate" rows="3" placeholder="например: Кабель для сигнализации и блокировки с медными жилами {МАРКА} {ТИПОРАЗМЕР}"></textarea>
+              <div class="form-text fs-xs text-muted mt-1">
+                Используйте плейсхолдеры <code>{МАРКА}</code> и <code>{ТИПОРАЗМЕР}</code>. В них автоматически подставятся марка кабеля и отличающийся типоразмер каждой позиции.
+              </div>
+              <div class="mt-2 p-2 bg-body-tertiary border rounded small" id="editCableGroupPreviewContainer">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="text-muted fs-xs">Предпросмотр для марки <code id="editCableGroupPreviewMarkLabel" class="text-primary font-monospace">1х2</code>:</span>
+                  <span class="badge bg-secondary-subtle text-secondary-emphasis border fs-xs">образец</span>
+                </div>
+                <div class="text-dark fw-medium" id="editCableGroupDescPreview" style="font-size: 0.8rem; line-height: 1.35;"></div>
+              </div>
+            </div>
+
             <div class="form-check form-switch mb-2">
               <input class="form-check-input" type="checkbox" id="editCableGroupUpdateFullDesc" checked>
               <label class="form-check-label small" for="editCableGroupUpdateFullDesc">
-                Автоматически обновить марку в полных описаниях марок этой группы
+                Сформировать и обновить полное наименование всех марок этой группы по шаблону
               </label>
             </div>
           </form>

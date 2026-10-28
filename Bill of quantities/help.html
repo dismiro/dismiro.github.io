@@ -721,7 +721,7 @@
                   <div>
                     <h3 class="h6 fw-bold mb-1">При необходимости скорректируйте сметные нормы</h3>
                     <p class="small text-muted mb-0">
-                      Нажмите кнопку <span class="badge bg-light text-dark border"><i class='bx bx-slider-alt'></i></span> в шапке первого столбца, чтобы открыть окно сметных норм и справочников. После внесения правок нажмите зеленую кнопку <strong>«Применить и пересчитать работы»</strong>.
+                      Нажмите кнопку <span class="badge bg-light text-dark border"><i class='bx bx-slider-alt'></i></span> в шапке первого столбца, чтобы перейти на страницу сметных норм и справочников (<code>rules.html</code>). После внесения изменений нажмите <strong>«Сохранить в LocalStorage»</strong> (<kbd>Ctrl+S</kbd>) — данные автоматически синхронизируются с калькулятором работ.
                     </p>
                   </div>
                 </div>
@@ -827,25 +827,25 @@
             </div>
           </section>
 
-          <!-- SECTION 5: МОДАЛЬНОЕ ОКНО ПРАВИЛ -->
+          <!-- SECTION 5: НОРМАТИВНАЯ БАЗА (RULES.HTML) -->
           <section id="section-rules-modal" class="card module-card">
             <div class="card-header py-3 px-4 d-flex align-items-center gap-2">
               <i class='bx bx-slider-alt text-warning fs-3'></i>
-              <h2 class="h5 my-0 fw-bold">5. Управление сметными нормами и справочниками</h2>
+              <h2 class="h5 my-0 fw-bold">5. Управление сметными нормами и справочниками (rules.html)</h2>
             </div>
             <div class="card-body p-4">
               <p class="small text-muted mb-3">
-                Окно <strong>«Сметные нормы и работы (JSON)»</strong> включает 6 специализированных вкладок. Все изменения внутри окна сначала сохраняются в черновик редактора и вступают в силу только после нажатия кнопки <strong>«Применить и пересчитать работы»</strong>.
+                Нормативная база и справочники вынесены на отдельную страницу <strong>«ВОР · Нормативная база»</strong> (<code>rules.html</code>), разделенную на 7 функциональных разделов с визуальными формами, фильтрацией и возможностью быстрого добавления позиций. Все изменения сохраняются в LocalStorage браузера кнопкой <strong>«Сохранить в LocalStorage»</strong> или горячей клавишей <kbd>Ctrl+S</kbd> (<kbd>Cmd+S</kbd>) и мгновенно применяются в калькуляторе на главной странице.
               </p>
 
               <div class="row g-3">
                 <div class="col-12 col-md-6">
                   <div class="p-3 rounded border h-100">
                     <div class="fw-bold mb-1 d-flex align-items-center gap-2">
-                      <i class='bx bx-code-curly text-warning fs-5'></i> 1. Редактор JSON
+                      <i class='bx bx-hard-hat text-primary fs-5'></i> 1. Строительные работы
                     </div>
                     <p class="small text-muted mb-0">
-                      Редактор CodeMirror с подсветкой синтаксиса, проверкой валидности JSON на лету, сворачиванием блоков (<kbd>Ctrl+Q</kbd>) и поиском по тексту (<kbd>Ctrl+F</kbd>). Позволяет загрузить внешний файл норм или скачать текущие правила.
+                      Карточки способов прокладки (траншеи, трубы, каналы, подвес) с формулами объемов работ, единицами измерения и вложенными материалами. Поддерживает редактирование, удаление и добавление новых способов прокладки через визуальное модальное окно.
                     </p>
                   </div>
                 </div>
@@ -853,10 +853,10 @@
                 <div class="col-12 col-md-6">
                   <div class="p-3 rounded border h-100">
                     <div class="fw-bold mb-1 d-flex align-items-center gap-2">
-                      <i class='bx bx-list-check text-primary fs-5'></i> 2. Сметные нормы
+                      <i class='bx bx-wrench text-info fs-5'></i> 2. Монтажные работы
                     </div>
                     <p class="small text-muted mb-0">
-                      Наглядное отображение всех правил по разделам в виде карточек с формулами, единицами измерения и условиями. Кнопка <strong>«JSON»</strong> на любой карточке мгновенно прокручивает редактор к нужному узлу и подсвечивает его.
+                      Сметные нормы затягивания и прокладки кабелей по способам прокладки с дифференциацией по весовым ступеням (масса 1 м кабеля), числу жил/волокон и условиям (число параллельно прокладываемых кабелей).
                     </p>
                   </div>
                 </div>
@@ -864,10 +864,10 @@
                 <div class="col-12 col-md-6">
                   <div class="p-3 rounded border h-100">
                     <div class="fw-bold mb-1 d-flex align-items-center gap-2">
-                      <i class='bx bx-cable text-success fs-5'></i> 3. Справочник кабелей
+                      <i class='bx bx-cube text-info fs-5'></i> 3. Оборудование
                     </div>
                     <p class="small text-muted mb-0">
-                      Каталог кабелей с фильтрацией по категориям (ВОЛС, Особый кабель, кабели СЦБ). Содержит строительную длину, массу 1 м (для выбора весовой ступени прокладки), марку муфты и полное наименование по ГОСТ/ТУ.
+                      Сметные нормы для напольных устройств СЦБ и связи (стрелочные электроприводы, светофоры, путевые ящики, муфты) с распределением по способам установки (например, <code>«Не указано»</code>, <code>«Боковые пути»</code>).
                     </p>
                   </div>
                 </div>
@@ -875,10 +875,10 @@
                 <div class="col-12 col-md-6">
                   <div class="p-3 rounded border h-100">
                     <div class="fw-bold mb-1 d-flex align-items-center gap-2">
-                      <i class='bx bx-git-merge text-warning fs-5'></i> 4. Справочник муфт
+                      <i class='bx bx-network-chart text-success fs-5'></i> 4. Справочник кабелей
                     </div>
                     <p class="small text-muted mb-0">
-                      Перечень кабельных и оптических муфт с указанием полного наименования, максимального числа жил/волокон (<code>МаксЖил</code>) и автоматически определяемой группы сметных расценок на установку.
+                      Каталог марок и типоразмеров с расчетной массой 1 м кабеля, строительной длиной, закрепленной соединительной муфтой и <strong>шаблоном полного наименования</strong> для группы марок (с авто-подстановкой уникальных типоразмеров).
                     </p>
                   </div>
                 </div>
@@ -886,10 +886,10 @@
                 <div class="col-12 col-md-6">
                   <div class="p-3 rounded border h-100">
                     <div class="fw-bold mb-1 d-flex align-items-center gap-2">
-                      <i class='bx bx-cube text-warning fs-5'></i> 5. Оборудование
+                      <i class='bx bx-git-merge text-warning fs-5'></i> 5. Справочник муфт
                     </div>
                     <p class="small text-muted mb-0">
-                      Сметные нормы для напольных устройств (стрелочные электроприводы, светофоры, путевые коробки, разветвительные муфты) с разделением по способам установки (например, <code>«Не указано»</code>, <code>«Боковые пути»</code>).
+                      Каталог кабельных и оптических муфт с указанием полного наименования, предельного числа жил/волокон (<code>МаксЖил</code>) и динамически определяемых сметных ступеней на установку муфт.
                     </p>
                   </div>
                 </div>
@@ -897,10 +897,21 @@
                 <div class="col-12 col-md-6">
                   <div class="p-3 rounded border h-100">
                     <div class="fw-bold mb-1 d-flex align-items-center gap-2">
-                      <i class='bx bx-cog text-secondary fs-5'></i> 6. Настройки
+                      <i class='bx bx-cog text-primary fs-5'></i> 6. Настройки расчета
                     </div>
                     <p class="small text-muted mb-0">
-                      Выбор режима нумерации позиций (иерархическая <code>1, 1.1, 1.2</code> или сквозная <code>1, 2, 3</code>), точности округления работ и материалов, а также метаданных для заголовка XML-файла Главгосэкспертизы.
+                      Выбор режима нумерации позиций (иерархическая <code>1, 1.1, 1.2</code> или сквозная <code>1, 2, 3</code>), точности округления объемов работ и расхода материалов, а также метаданных для выгрузки в XML Главгосэкспертизы 3.01.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="p-3 rounded border bg-light-subtle">
+                    <div class="fw-bold mb-1 d-flex align-items-center gap-2">
+                      <i class='bx bx-code-curly text-warning fs-5'></i> 7. Исходный JSON
+                    </div>
+                    <p class="small text-muted mb-0">
+                      Легковесный просмотр активной конфигурации в блоке <code>&lt;pre&gt;&lt;code&gt;</code> со счетчиком строк, проверкой синтаксиса на лету, возможностью импорта стороннего файла <code>.json</code>, экспортом текущих правил кнопкой <strong>«Экспорт»</strong> и полным сбросом к заводским настройкам <strong>«По умолчанию»</strong>.
                     </p>
                   </div>
                 </div>

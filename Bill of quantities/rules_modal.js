@@ -4,25 +4,6 @@
  * JSON validation and quick-add actions.
  */
 
-// Universal debounce helper with cancel method
-function debounce(fn, delay = 180) {
-  let timer = null;
-  const debounced = function(...args) {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      timer = null;
-      fn.apply(this, args);
-    }, delay);
-  };
-  debounced.cancel = function() {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  };
-  return debounced;
-}
-
 // Get current JSON string from preview or draft object
 function getWorksJsonEditorValue() {
   const codeEl = document.getElementById('worksJsonPreviewCode');
@@ -91,8 +72,8 @@ if (window.rulesStore && typeof window.rulesStore.subscribe === 'function') {
 // ---------------------------------------------------------------------------
 // LOCALSTORAGE PERSISTENCE MECHANISM
 // ---------------------------------------------------------------------------
-const LOCAL_STORAGE_RULES_KEY = 'si_works_rules_v1';
-const LOCAL_STORAGE_RULES_META_KEY = 'si_works_rules_v1_meta';
+const LOCAL_STORAGE_RULES_KEY = window.rulesStore ? window.rulesStore.STORAGE_KEY : 'si_works_rules_v1';
+const LOCAL_STORAGE_RULES_META_KEY = window.rulesStore ? window.rulesStore.META_KEY : 'si_works_rules_v1_meta';
 
 function saveWorksRulesToLocalStorage(rules) {
   if (!rules || typeof rules !== 'object') return false;
@@ -626,7 +607,6 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
   const sections = getRulesSections(rules);
   const constContainer = document.getElementById('rulesConstructionListContainer');
   const instContainer = document.getElementById('rulesInstallationListContainer');
-  const legacyContainer = document.getElementById('rulesListContainer');
 
   const missingCable = (window.lastCableWorksCalc && window.lastCableWorksCalc.missingInRules) ? window.lastCableWorksCalc.missingInRules : [];
   const missingTrench = (window.lastTrenchWorksCalc && window.lastTrenchWorksCalc.missingInRules) ? window.lastTrenchWorksCalc.missingInRules : [];
@@ -673,17 +653,6 @@ function renderRulesModalContent(rulesObj = null, updateAllTabs = true) {
   const tabInstBadge = document.getElementById('tabWorksInstallationCountBadge');
   if (tabInstBadge) {
     tabInstBadge.textContent = instResult.totalCount;
-  }
-
-  // 3. Backward compatibility for legacyContainer
-  if (legacyContainer) {
-    let combinedHtml = '';
-    const query = getModalSearchQuery('rulesCardsSearchInput', 'rulesCardsClearSearchBtn');
-    sections.forEach(sec => {
-      const res = renderSingleRulesSectionHtml(sec, query);
-      combinedHtml += `<div class="mb-3"><h5 class="fw-bold border-bottom pb-1 text-primary">${escapeHtml(sec.name)}</h5>${res.html}</div>`;
-    });
-    legacyContainer.innerHTML = combinedHtml;
   }
 }
 
@@ -1279,7 +1248,7 @@ function validateWorksJsonInput() {
   const badge = document.getElementById('worksJsonValidationBadge');
   const errorAlert = document.getElementById('worksJsonErrorAlert');
   const errorMessage = document.getElementById('worksJsonErrorMessage');
-  const applyBtn = document.getElementById('applyWorksRulesBtn');
+  const saveBtn = document.getElementById('btnSaveRulesHeader');
   const statLines = document.getElementById('worksStatLines');
   const statChars = document.getElementById('worksStatChars');
 
@@ -1327,7 +1296,7 @@ function validateWorksJsonInput() {
       badge.classList.remove('d-inline-flex');
     }
     if (errorAlert) errorAlert.classList.add('d-none');
-    if (applyBtn) applyBtn.disabled = false;
+    if (saveBtn) saveBtn.disabled = false;
     return true;
   } catch (err) {
     if (badge) {
@@ -1348,7 +1317,7 @@ function validateWorksJsonInput() {
         errorMessage.textContent = err.message;
       }
     }
-    if (applyBtn) applyBtn.disabled = true;
+    if (saveBtn) saveBtn.disabled = true;
     return false;
   }
 }
@@ -2735,6 +2704,41 @@ function setupWorksRulesListeners() {
     cableGroupKeyInputEl.addEventListener('change', syncGroupNameFromKey);
   }
 
+  // Auto-generate full description using group template when typing mark in add mode
+  const addCableMarkInputEl = document.getElementById('addCableMark');
+  const addCableDescInputEl = document.getElementById('addCableDescription');
+  if (addCableDescInputEl) {
+    addCableDescInputEl.addEventListener('input', () => {
+      delete addCableDescInputEl.dataset.isAutofilled;
+    });
+  }
+  if (addCableMarkInputEl && !addCableMarkInputEl.dataset.autoDescBound) {
+    addCableMarkInputEl.dataset.autoDescBound = 'true';
+    addCableMarkInputEl.addEventListener('input', () => {
+      if (addCableEditContext && addCableEditContext.mode === 'edit') return;
+      const descInput = document.getElementById('addCableDescription');
+      if (!descInput) return;
+      if (descInput.value && !descInput.dataset.isAutofilled) return;
+
+      const groupKeyInput = document.getElementById('addCableGroupKey');
+      const groupNameInput = document.getElementById('addCableGroupName');
+      const gKey = groupKeyInput ? groupKeyInput.value.trim() : '';
+      const gName = groupNameInput ? groupNameInput.value.trim() : '';
+      const draft = getDraftRulesFromEditor();
+      const catalog = getCableCatalog(draft) || {};
+      const grp = catalog[gKey] || {};
+      const tpl = getCableGroupDescriptionTemplate(grp);
+      const markVal = addCableMarkInputEl.value.trim();
+      if (markVal && tpl) {
+        descInput.value = formatCableFullDescriptionFromTemplate(tpl, gName || grp["Название"] || gKey, markVal);
+        descInput.dataset.isAutofilled = 'true';
+      } else if (!markVal) {
+        descInput.value = '';
+        delete descInput.dataset.isAutofilled;
+      }
+    });
+  }
+
   // Ensure dynamic groups refresh whenever addCableModal opens
   const addCableModalEl = document.getElementById('addCableModal');
   if (addCableModalEl && !addCableModalEl.dataset.dynamicBound) {
@@ -3318,13 +3322,6 @@ function setupWorksRulesListeners() {
   // ТАБЫ, ПОИСК И НАСТРОЙКИ
   // =========================================================================
 
-  const cardsTabBtn = document.getElementById('tabWorksCardsBtn');
-  if (cardsTabBtn) {
-    cardsTabBtn.addEventListener('shown.bs.tab', () => {
-      renderRulesModalContent(getDraftRulesFromEditor(), false);
-    });
-  }
-
   const cablesTabBtn = document.getElementById('tabWorksCablesBtn');
   if (cablesTabBtn) {
     cablesTabBtn.addEventListener('shown.bs.tab', () => {
@@ -3415,62 +3412,6 @@ function setupWorksRulesListeners() {
   const rulesFileInput = document.getElementById('rulesFileInput');
   if (rulesFileInput) rulesFileInput.addEventListener('change', handleRulesFileInput);
 
-  const applyBtn = document.getElementById('applyWorksRulesBtn');
-  if (applyBtn) {
-    applyBtn.addEventListener('click', () => {
-      try {
-        const val = getWorksJsonEditorValue();
-        const parsed = JSON.parse(val);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-          showToast('JSON должен быть объектом со структурой разделов', 'error', 'Неверный формат');
-          return;
-        }
-
-        currentWorksRules = parsed;
-        window.currentWorksRules = currentWorksRules;
-        modalDraftRules = JSON.parse(JSON.stringify(parsed));
-
-        // Save committed rules to LocalStorage
-        saveWorksRulesToLocalStorage(currentWorksRules);
-
-        renderRulesModalContent(currentWorksRules);
-
-        if (typeof currentData !== 'undefined' && currentData && typeof calculateVolumes === 'function') {
-          calculateVolumes();
-        }
-
-        const modalEl = document.getElementById('worksRulesModal');
-        if (modalEl && window.bootstrap && bootstrap.Modal) {
-          bootstrap.Modal.getInstance(modalEl)?.hide();
-        }
-
-        const sections = getRulesSections(currentWorksRules);
-        let totalWays = 0;
-        sections.forEach(s => totalWays += s.rules.length);
-        showToast(`Сметные нормы обновлены и сохранены в LocalStorage (${totalWays} способов в ${sections.length} разд.). Выполнен авто-перерасчет работ.`, 'success', 'Сохранено в LocalStorage');
-      } catch (err) {
-        showToast('Ошибка синтаксиса JSON: ' + err.message, 'error', 'Ошибка');
-      }
-    });
-  }
-
-  // LocalStorage explicit actions in Settings tab
-  const saveStorageBtn = document.getElementById('saveLocalStorageRulesBtn');
-  if (saveStorageBtn) {
-    saveStorageBtn.addEventListener('click', () => {
-      const draft = getDraftRulesFromEditor();
-      if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
-        showToast('Не удалось сохранить: ошибка формата JSON в редакторе', 'error', 'Ошибка');
-        return;
-      }
-      currentWorksRules = JSON.parse(JSON.stringify(draft));
-      window.currentWorksRules = currentWorksRules;
-      saveWorksRulesToLocalStorage(currentWorksRules);
-      if (typeof currentData !== 'undefined' && currentData && typeof calculateVolumes === 'function') calculateVolumes();
-      showToast('Текущие правила из редактора успешно сохранены в LocalStorage браузера', 'success', 'LocalStorage обновлен');
-    });
-  }
-
   const clearStorageBtn = document.getElementById('clearLocalStorageRulesBtn');
   if (clearStorageBtn) {
     clearStorageBtn.addEventListener('click', () => {
@@ -3478,6 +3419,7 @@ function setupWorksRulesListeners() {
       showToast('Сохраненные правила удалены из LocalStorage. Нажмите кнопку «По умолчанию», если хотите загрузить стандартный шаблон works_rules.json.', 'info', 'LocalStorage очищен');
     });
   }
+
 
   // Delegated event listener for block Edit buttons
   document.addEventListener('click', (e) => {
@@ -3749,6 +3691,90 @@ function setupWorksRulesListeners() {
 
   let addCableGroupEditContext = null;
 
+  // Get description template for a group (only explicit template, no heuristic guessing from existing items)
+  function getCableGroupDescriptionTemplate(group) {
+    if (!group || typeof group !== 'object') return '';
+    if (group["Шаблон описания"] && typeof group["Шаблон описания"] === 'string') {
+      return group["Шаблон описания"].trim();
+    }
+    return '';
+  }
+
+  // Helper to format a single mark's full description using the group template and differing sizes
+  function formatCableFullDescriptionFromTemplate(template, brandName, markKey, existingDesc = '') {
+    const tpl = (template || '').trim();
+    const brand = (brandName || '').trim();
+    const key = (markKey || '').trim();
+
+    if (!tpl) {
+      return existingDesc || `${brand} ${key}`.trim();
+    }
+
+    // Determine the specific size/dimension for this mark
+    let sizePart = key;
+    if (existingDesc && typeof existingDesc === 'string') {
+      const descStr = existingDesc.trim();
+      if (brand && descStr.includes(brand)) {
+        const tail = descStr.slice(descStr.indexOf(brand) + brand.length).trim();
+        if (tail) {
+          sizePart = tail;
+        }
+      } else {
+        const words = descStr.split(/\s+/);
+        const lastWord = words[words.length - 1];
+        if (lastWord && (lastWord.startsWith(key) || lastWord.includes(key))) {
+          sizePart = lastWord;
+        }
+      }
+    }
+
+    let result = tpl;
+    if (result.includes('{МАРКА}')) {
+      result = result.split('{МАРКА}').join(brand);
+    }
+    if (result.includes('{ТИПОРАЗМЕР}')) {
+      result = result.split('{ТИПОРАЗМЕР}').join(sizePart);
+    } else if (result.includes('{ТИП}')) {
+      result = result.split('{ТИП}').join(sizePart);
+    } else if (result.includes('{РАЗМЕР}')) {
+      result = result.split('{РАЗМЕР}').join(sizePart);
+    } else {
+      result = `${result.trim()} ${sizePart}`;
+    }
+
+    return result.replace(/\s+/g, ' ').trim();
+  }
+
+  function updateCableGroupTemplatePreview() {
+    const nameInput = document.getElementById('editCableGroupName');
+    const tplInput = document.getElementById('editCableGroupDescriptionTemplate');
+    const previewEl = document.getElementById('editCableGroupDescPreview');
+    const previewLabel = document.getElementById('editCableGroupPreviewMarkLabel');
+    if (!previewEl) return;
+
+    const brand = (nameInput ? nameInput.value : '').trim() || 'СБВБПу';
+    const tpl = (tplInput ? tplInput.value : '').trim();
+
+    if (!tpl) {
+      previewEl.textContent = 'Шаблон не задан (полные наименования позиций сохраняются без изменений)';
+      return;
+    }
+
+    let sampleMark = '1х2';
+    let sampleDesc = '';
+    if (addCableGroupEditContext && addCableGroupEditContext.groupData && addCableGroupEditContext.groupData["Тип"]) {
+      const types = Object.entries(addCableGroupEditContext.groupData["Тип"]);
+      if (types.length > 0) {
+        sampleMark = types[0][0];
+        sampleDesc = types[0][1]?.["Полное описание"] || '';
+      }
+    }
+
+    if (previewLabel) previewLabel.textContent = sampleMark;
+    const formatted = formatCableFullDescriptionFromTemplate(tpl, brand, sampleMark, sampleDesc);
+    previewEl.textContent = formatted || 'Шаблон пока не заполнен';
+  }
+
   function resetCableGroupModalToAddMode() {
     addCableGroupEditContext = null;
     const titleEl = document.getElementById('editCableGroupModalTitle');
@@ -3765,9 +3791,12 @@ function setupWorksRulesListeners() {
     const keyInput = document.getElementById('editCableGroupKey');
     const nameInput = document.getElementById('editCableGroupName');
     const catSelect = document.getElementById('editCableGroupCategory');
+    const tplInput = document.getElementById('editCableGroupDescriptionTemplate');
     if (keyInput) keyInput.value = '';
     if (nameInput) nameInput.value = '';
     if (catSelect) catSelect.value = '';
+    if (tplInput) tplInput.value = '';
+    updateCableGroupTemplatePreview();
   }
 
   function openEditCableGroupModal(groupKey = null) {
@@ -3777,6 +3806,7 @@ function setupWorksRulesListeners() {
     const keyInput = document.getElementById('editCableGroupKey');
     const nameInput = document.getElementById('editCableGroupName');
     const catSelect = document.getElementById('editCableGroupCategory');
+    const tplInput = document.getElementById('editCableGroupDescriptionTemplate');
     const titleEl = document.getElementById('editCableGroupModalTitle');
     const btnSave = document.getElementById('btnSaveCableGroup');
     const btnDel = document.getElementById('btnDeleteCurrentCableGroupInModal');
@@ -3806,6 +3836,11 @@ function setupWorksRulesListeners() {
       if (keyInput) keyInput.value = groupKey;
       if (nameInput) nameInput.value = targetGroup["Название"] || '';
       if (catSelect) catSelect.value = targetGroup["Категория"] || '';
+
+      if (tplInput) {
+        tplInput.value = getCableGroupDescriptionTemplate(targetGroup);
+      }
+      updateCableGroupTemplatePreview();
     } else {
       resetCableGroupModalToAddMode();
     }
@@ -3820,6 +3855,7 @@ function setupWorksRulesListeners() {
     const keyInput = document.getElementById('editCableGroupKey');
     const nameInput = document.getElementById('editCableGroupName');
     const catSelect = document.getElementById('editCableGroupCategory');
+    const tplInput = document.getElementById('editCableGroupDescriptionTemplate');
     const updateDescCheck = document.getElementById('editCableGroupUpdateFullDesc');
 
     let newKey = keyInput ? keyInput.value.trim() : '';
@@ -3836,6 +3872,7 @@ function setupWorksRulesListeners() {
     }
 
     const newCat = catSelect ? catSelect.value.trim() : '';
+    const newTemplate = tplInput ? tplInput.value.trim() : '';
     const shouldUpdateDesc = updateDescCheck ? updateDescCheck.checked : true;
 
     const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
@@ -3846,7 +3883,6 @@ function setupWorksRulesListeners() {
 
     const isEdit = addCableGroupEditContext && addCableGroupEditContext.mode === 'edit';
     const oldKey = isEdit ? addCableGroupEditContext.originalKey : null;
-    const oldName = isEdit ? addCableGroupEditContext.originalName : '';
 
     if (isEdit && oldKey !== null) {
       // If key (conditional designation) changed
@@ -3887,11 +3923,18 @@ function setupWorksRulesListeners() {
       delete currentObj["Справочник кабелей"][newKey]["Категория"];
     }
 
-    // Optionally update mark name in full descriptions of all types in this group
-    if (shouldUpdateDesc && oldName && oldName !== newName && currentObj["Справочник кабелей"][newKey]["Тип"]) {
-      Object.values(currentObj["Справочник кабелей"][newKey]["Тип"]).forEach(tObj => {
-        if (tObj && typeof tObj === 'object' && tObj["Полное описание"]) {
-          tObj["Полное описание"] = tObj["Полное описание"].split(oldName).join(newName);
+    if (newTemplate) {
+      currentObj["Справочник кабелей"][newKey]["Шаблон описания"] = newTemplate;
+    } else {
+      delete currentObj["Справочник кабелей"][newKey]["Шаблон описания"];
+    }
+
+    // Format and update full descriptions of all types in this group using the template and specific sizes
+    if (shouldUpdateDesc && currentObj["Справочник кабелей"][newKey]["Тип"]) {
+      Object.entries(currentObj["Справочник кабелей"][newKey]["Тип"]).forEach(([tKey, tObj]) => {
+        if (tObj && typeof tObj === 'object') {
+          const oldDesc = tObj["Полное описание"] || '';
+          tObj["Полное описание"] = formatCableFullDescriptionFromTemplate(newTemplate, newName, tKey, oldDesc);
         }
       });
     }
@@ -4149,7 +4192,7 @@ function setupWorksRulesListeners() {
     });
   }
 
-  // Quick symbol buttons in editCableGroupModal
+  // Quick symbol buttons and template tag buttons in editCableGroupModal
   const editCableGroupModalEl = document.getElementById('editCableGroupModal');
   if (editCableGroupModalEl) {
     editCableGroupModalEl.addEventListener('click', (e) => {
@@ -4163,8 +4206,48 @@ function setupWorksRulesListeners() {
           keyInput.dispatchEvent(new Event('input', { bubbles: true }));
           keyInput.focus();
         }
+        return;
+      }
+
+      if (e.target.closest('#btnInsertTemplateBrandTag')) {
+        e.preventDefault();
+        const tplInput = document.getElementById('editCableGroupDescriptionTemplate');
+        if (tplInput) {
+          const start = tplInput.selectionStart ?? tplInput.value.length;
+          const end = tplInput.selectionEnd ?? tplInput.value.length;
+          const val = tplInput.value;
+          tplInput.value = val.substring(0, start) + '{МАРКА}' + val.substring(end);
+          tplInput.selectionStart = tplInput.selectionEnd = start + 7;
+          tplInput.focus();
+          updateCableGroupTemplatePreview();
+        }
+        return;
+      }
+
+      if (e.target.closest('#btnInsertTemplateSizeTag')) {
+        e.preventDefault();
+        const tplInput = document.getElementById('editCableGroupDescriptionTemplate');
+        if (tplInput) {
+          const start = tplInput.selectionStart ?? tplInput.value.length;
+          const end = tplInput.selectionEnd ?? tplInput.value.length;
+          const val = tplInput.value;
+          tplInput.value = val.substring(0, start) + '{ТИПОРАЗМЕР}' + val.substring(end);
+          tplInput.selectionStart = tplInput.selectionEnd = start + 12;
+          tplInput.focus();
+          updateCableGroupTemplatePreview();
+        }
+        return;
       }
     });
+
+    const groupNameInput = document.getElementById('editCableGroupName');
+    if (groupNameInput) {
+      groupNameInput.addEventListener('input', () => updateCableGroupTemplatePreview());
+    }
+    const groupTplInput = document.getElementById('editCableGroupDescriptionTemplate');
+    if (groupTplInput) {
+      groupTplInput.addEventListener('input', () => updateCableGroupTemplatePreview());
+    }
   }
 
   // Quick symbol buttons in addCableModal
@@ -4222,10 +4305,6 @@ function setupWorksRulesListeners() {
     if (el) {
       el.addEventListener('hidden.bs.modal', () => {
         resetFn();
-        const parentModal = document.getElementById('worksRulesModal');
-        if (parentModal && parentModal.classList.contains('show')) {
-          document.body.classList.add('modal-open');
-        }
       });
     }
   });
