@@ -68,46 +68,7 @@ function normalizeFormulaMathOperators(formulaStr) {
 // FORMULA VALIDATION & EVALUATION
 // --------------------------------------------------------------------------
 
-// Validate formula string: checks for unknown variables and syntax validity
-// Returns { valid: true, normalized: string } or { valid: false, reason: string, unknownVariables: string[] }
-function validateFormulaString(formulaStr, allowedVars = ['ДЛИНА', 'КОЛИЧЕСТВО']) {
-  if (formulaStr === null || formulaStr === undefined) {
-    return { valid: true, isDefault: true };
-  }
-  const rawStr = String(formulaStr).trim();
-  if (!rawStr) {
-    return { valid: true, isDefault: true };
-  }
 
-  // 1. Normalize math operator symbols
-  const normalized = normalizeFormulaMathOperators(rawStr);
-
-  // 2. Check for unknown variables
-  const allowedSet = new Set(allowedVars.map(v => v.toUpperCase().trim()));
-
-  // Extract all identifiers (words consisting of Latin/Cyrillic letters or underscores)
-  const rawIdentifiers = normalized.match(/[a-zA-Zа-яА-ЯёЁ_][a-zA-Zа-яА-ЯёЁ0-9_]*/g) || [];
-  const unknownVars = [];
-
-  rawIdentifiers.forEach(id => {
-    const idUpper = id.toUpperCase();
-    if (!allowedSet.has(idUpper)) {
-      unknownVars.push(id);
-    }
-  });
-
-  if (unknownVars.length > 0) {
-    const uniqueUnknown = Array.from(new Set(unknownVars));
-    return {
-      valid: false,
-      error: 'unknown_variable',
-      unknownVariables: uniqueUnknown,
-      reason: `Неизвестная переменная: «${uniqueUnknown.join(', ')}»`
-    };
-  }
-
-  return { valid: true, isDefault: false, normalized };
-}
 
 // Universal formula evaluator with strict validation and detailed error reporting
 // domain: 'cable' | 'coupling' | 'trench' | 'equipment'
@@ -129,12 +90,6 @@ function validateAndEvaluateFormula(formula, dataCtx, domain = 'cable', context 
   const clean = normalizeFormulaMathOperators(rawStr);
   let expr = clean.replace(/,/g, '.');
 
-  // Helper to safely replace identifier tokens without JS \b limitation on Cyrillic
-  function replaceToken(str, tokenName, val) {
-    const pattern = new RegExp('(^|[^a-zA-Z0-9а-яА-ЯёЁ_])' + tokenName + '([^a-zA-Z0-9а-яА-ЯёЁ_]|$)', 'gi');
-    return str.replace(pattern, (match, p1, p2) => p1 + ' ' + val + ' ' + p2);
-  }
-
   if (domain === 'trench') {
     const seg = (typeof dataCtx === 'object' && dataCtx !== null) ? dataCtx : {};
     const len = Number(seg.length !== undefined ? seg.length : baseValue) || 0;
@@ -144,36 +99,36 @@ function validateAndEvaluateFormula(formula, dataCtx, domain = 'cable', context 
     const countIntersections = Number(seg.countIntersections !== undefined ? seg.countIntersections : (countPipes > 0 ? 1 : 0)) || 0;
 
     // Intersections
-    expr = replaceToken(expr, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]', countIntersections);
-    expr = replaceToken(expr, 'ПЕРЕСЕЧЕНИ[ЙЯЕ]', countIntersections);
+    expr = replaceFormulaToken(expr, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]', countIntersections, true);
+    expr = replaceFormulaToken(expr, 'ПЕРЕСЕЧЕНИ[ЙЯЕ]', countIntersections, true);
     // Pipe count
-    expr = replaceToken(expr, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ТРУБ[АЫ]?', countPipes);
+    expr = replaceFormulaToken(expr, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ТРУБ[АЫ]?', countPipes, true);
     // Pipe length
-    expr = replaceToken(expr, 'ДЛИН[АЫ][_\\s]?ТРУБ[АЫ]?', lengthPipes);
+    expr = replaceFormulaToken(expr, 'ДЛИН[АЫ][_\\s]?ТРУБ[АЫ]?', lengthPipes, true);
     // Cable count
-    expr = replaceToken(expr, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ', cab);
-    expr = replaceToken(expr, 'КАБЕЛЕ[ЙЯИ]', cab);
+    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ', cab, true);
+    expr = replaceFormulaToken(expr, 'КАБЕЛЕ[ЙЯИ]', cab, true);
     // Generic
-    expr = replaceToken(expr, 'КОЛИЧЕСТВО', cab);
-    expr = replaceToken(expr, 'ДЛИНА', len);
+    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО', cab, true);
+    expr = replaceFormulaToken(expr, 'ДЛИНА', len, true);
   } else if (domain === 'equipment') {
     const count = Number(baseValue) || 0;
-    expr = replaceToken(expr, 'КОЛИЧЕСТВО', count);
-    expr = replaceToken(expr, 'ШТ', count);
-    expr = replaceToken(expr, 'ДЛИНА', count);
+    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО', count, true);
+    expr = replaceFormulaToken(expr, 'ШТ', count, true);
+    expr = replaceFormulaToken(expr, 'ДЛИНА', count, true);
   } else if (domain === 'coupling') {
     const count = Number(baseValue) || 0;
-    expr = replaceToken(expr, 'КОЛИЧЕСТВО_МУФТ', count);
-    expr = replaceToken(expr, 'КОЛИЧЕСТВО', count);
-    expr = replaceToken(expr, 'ШТ', count);
-    expr = replaceToken(expr, 'ДЛИНА', count);
+    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО_МУФТ', count, true);
+    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО', count, true);
+    expr = replaceFormulaToken(expr, 'ШТ', count, true);
+    expr = replaceFormulaToken(expr, 'ДЛИНА', count, true);
   } else {
     // domain === 'cable' (default)
     const num = Number(baseValue) || 0;
-    expr = replaceToken(expr, 'КОЛИЧЕСТВО_МУФТ', num);
-    expr = replaceToken(expr, 'КОЛИЧЕСТВО', num);
-    expr = replaceToken(expr, 'ШТ', num);
-    expr = replaceToken(expr, 'ДЛИНА', num);
+    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО_МУФТ', num, true);
+    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО', num, true);
+    expr = replaceFormulaToken(expr, 'ШТ', num, true);
+    expr = replaceFormulaToken(expr, 'ДЛИНА', num, true);
   }
 
   // Check for remaining unknown identifiers (variables)
@@ -997,30 +952,14 @@ function getActiveCouplingsSummary(rulesData) {
   });
 
   const tierGroups = [
-    ...Object.values(electricalTiers).filter(t => t.count > 0 || true),
-    ...Object.values(opticalTiers).filter(t => t.count > 0 || true)
+    ...Object.values(electricalTiers),
+    ...Object.values(opticalTiers)
   ];
-
-  // For compatibility with legacy code accessing .tiers directly:
-  const tiers = {};
-  Object.values(electricalTiers).forEach(t => {
-    tiers[t.tier] = t;
-  });
-  Object.values(opticalTiers).forEach(t => {
-    if (!tiers[t.tier]) {
-      tiers[t.tier] = t;
-    } else if (t.count > 0 && tiers[t.tier].count === 0) {
-      tiers[t.tier] = t;
-    } else {
-      tiers[`opt_${t.tier}`] = t;
-    }
-  });
 
   return {
     totalCouplingsCount,
     couplingsCount: couplingsMap.size,
     totalCablesWithCouplings,
-    tiers,
     electricalTiers,
     opticalTiers,
     tierGroups,
@@ -1101,6 +1040,65 @@ function hideRulesUpdatedBanner() {
 }
 window.hideRulesUpdatedBanner = hideRulesUpdatedBanner;
 
+// Format byte size in Russian units (Б, КБ, МБ)
+function formatBytesRu(bytes) {
+  if (bytes === 0 || !bytes) return '0 КБ';
+  if (bytes < 1024) return bytes + ' Б';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' МБ';
+}
+window.formatBytesRu = formatBytesRu;
+
+// Update the Rules LocalStorage status badge in the page navbar
+function updateIndexRulesStorageBadge() {
+  const badgeEl = document.getElementById('rulesStorageBadge');
+  if (!badgeEl) return;
+
+  const storageKey = window.rulesStore ? window.rulesStore.STORAGE_KEY : 'si_works_rules_v1';
+  const meta = window.rulesStore && typeof window.rulesStore.getStorageMeta === 'function'
+    ? window.rulesStore.getStorageMeta()
+    : null;
+  const rawRules = localStorage.getItem(storageKey);
+  const hasSaved = Boolean(rawRules);
+
+  let dateTimeStr = 'сохранено';
+  let sizeStr = '0 КБ';
+
+  if (hasSaved) {
+    const sizeBytes = meta && typeof meta.sizeBytes === 'number' && meta.sizeBytes > 0
+      ? meta.sizeBytes
+      : (rawRules ? (typeof Blob !== 'undefined' ? new Blob([rawRules]).size : rawRules.length) : 0);
+    sizeStr = formatBytesRu(sizeBytes);
+
+    const timestamp = (meta && meta.savedAt) ? meta.savedAt : null;
+    if (timestamp) {
+      const d = new Date(timestamp);
+      dateTimeStr = `${d.toLocaleDateString('ru-RU')}, ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+  }
+
+  if (hasSaved) {
+    badgeEl.className = 'badge bg-body-tertiary text-body-secondary border d-inline-flex align-items-center gap-1_5 py-1 px-2_5 text-decoration-none shadow-xs rounded-pill';
+    badgeEl.innerHTML = `
+      <i class='bx bx-slider-alt text-primary fs-6'></i>
+      <span class="text-secondary fw-normal">Правила:</span>
+      <span class="font-monospace text-body fw-semibold">${escapeHtml(dateTimeStr)}</span>
+      <span class="text-muted fw-light mx-0_5 opacity-50">•</span>
+      <span class="font-monospace text-muted">${escapeHtml(sizeStr)}</span>
+    `;
+    badgeEl.setAttribute('title', `Сметные правила (сохранено: ${dateTimeStr}, объем: ${sizeStr}).\nНажмите, чтобы открыть редактор правил.`);
+  } else {
+    badgeEl.className = 'badge bg-body-tertiary text-body-secondary border d-inline-flex align-items-center gap-1_5 py-1 px-2_5 text-decoration-none shadow-xs rounded-pill';
+    badgeEl.innerHTML = `
+      <i class='bx bx-slider-alt text-secondary fs-6'></i>
+      <span class="text-secondary fw-normal">Правила:</span>
+      <span class="font-monospace text-body fw-semibold">works_rules.json</span>
+    `;
+    badgeEl.setAttribute('title', 'Используются встроенные правила works_rules.json (по умолчанию).\nНажмите, чтобы открыть редактор сметных правил.');
+  }
+}
+window.updateIndexRulesStorageBadge = updateIndexRulesStorageBadge;
+
 // Load rules from store or file
 async function initWorksRules() {
   if (window.rulesStore) {
@@ -1109,6 +1107,7 @@ async function initWorksRules() {
       if (rules && typeof rules === 'object') {
         currentWorksRules = rules;
         window.currentWorksRules = currentWorksRules;
+        updateIndexRulesStorageBadge();
         if (currentData) {
           calculateVolumes({ refreshRawData: false });
         }
@@ -1125,6 +1124,7 @@ async function initWorksRules() {
       const data = await res.json();
       currentWorksRules = data;
       window.currentWorksRules = data;
+      updateIndexRulesStorageBadge();
       if (currentData) {
         calculateVolumes({ refreshRawData: false });
       }
@@ -1133,6 +1133,7 @@ async function initWorksRules() {
   } catch (err) {
     console.warn('[initWorksRules] Ошибка загрузки works_rules.json:', err);
   }
+  updateIndexRulesStorageBadge();
   return currentWorksRules;
 }
 window.initWorksRules = initWorksRules;
@@ -1144,6 +1145,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTooltips();
   setupEventListeners();
   setupDragAndDrop();
+  updateIndexRulesStorageBadge();
   initWorksRules();
 });
 
@@ -1229,6 +1231,7 @@ function setupEventListeners() {
         window.currentWorksRules = currentWorksRules;
       }
       hideRulesUpdatedBanner();
+      updateIndexRulesStorageBadge();
       if (currentData) {
         calculateVolumes({ refreshRawData: true });
         showToast('Проект успешно пересчитан по обновленным сметным правилам', 'success', 'Перерасчет выполнен');
@@ -1249,11 +1252,18 @@ function setupEventListeners() {
   window.addEventListener('storage', (e) => {
     if (e.key === 'si_works_rules_v1' || e.key === 'si_works_rules_v1_meta') {
       showRulesUpdatedBanner();
+      updateIndexRulesStorageBadge();
     }
+  });
+
+  // Re-check LocalStorage whenever user returns to the calculation tab
+  window.addEventListener('focus', () => {
+    updateIndexRulesStorageBadge();
   });
 
   if (window.rulesStore) {
     window.rulesStore.subscribe((event) => {
+      updateIndexRulesStorageBadge();
       if (event.type === 'external-storage-change') {
         showRulesUpdatedBanner();
       }
@@ -1412,9 +1422,6 @@ async function processFile(file) {
 
       if (isRulesFile) {
         currentWorksRules = json;
-        if (typeof setWorksJsonEditorValue === 'function') setWorksJsonEditorValue(JSON.stringify(currentWorksRules, null, 2));
-        if (typeof validateWorksJsonInput === 'function') validateWorksJsonInput();
-        if (typeof renderRulesModalContent === 'function') renderRulesModalContent();
         if (window.rulesStore && typeof window.rulesStore.saveRules === 'function') {
           try {
             window.rulesStore.saveRules(currentWorksRules);
@@ -1498,17 +1505,13 @@ function renderProcessedData(data, fileName, options = {}) {
     collapsedFileBadge.setAttribute('data-bs-original-title', fileName || 'Файл загружен');
   }
 
-  let totalCablesCount = 0;
   let totalCableLength = 0;
-  let totalRoutingCount = 0;
   let totalRoutingLength = 0;
 
   if (data.cables && Array.isArray(data.cables)) {
-    totalCablesCount = data.cables.length;
     totalCableLength = data.cables.reduce((acc, c) => acc + (Number(c.length) || 0), 0);
   }
   if (data.routingTypeBlocks && Array.isArray(data.routingTypeBlocks)) {
-    totalRoutingCount = data.routingTypeBlocks.length;
     totalRoutingLength = data.routingTypeBlocks.reduce((acc, r) => acc + (Number(r.length) || 0), 0);
   }
 
@@ -1604,7 +1607,6 @@ function createCablesAccordion(cables, totalLength) {
 
   // Count mismatches and missing couplings
   const mismatchCount = cables.filter(c => Boolean(c.lengthMismatch)).length;
-  let totalCouplingsCount = 0;
   const missingCouplingTypesSet = new Set();
   const catalog = getCableCatalog(currentWorksRules);
 
@@ -1639,7 +1641,6 @@ function createCablesAccordion(cables, totalLength) {
 
     // Formatting routing type: render each routing type as a multi-line badge
     let routingHtml = '<span class="text-muted">-</span>';
-    let routingSumLength = 0;
     const rawRouting = c['routing type'] || c.routingType;
     if (rawRouting && typeof rawRouting === 'object' && !Array.isArray(rawRouting)) {
       const entries = Object.entries(rawRouting);
@@ -1647,8 +1648,6 @@ function createCablesAccordion(cables, totalLength) {
         routingHtml = `<div class="d-flex flex-wrap gap-1 cell-wrap py-0_5">` + 
           entries.map(([rtype, lengths]) => {
             const arr = Array.isArray(lengths) ? lengths : [lengths];
-            const sumForType = arr.reduce((acc, val) => acc + (Number(val) || 0), 0);
-            routingSumLength += sumForType;
             const lenStr = arr.join(' + ');
             return `<span class="routing-tag">` +
               `<span class="fw-semibold">${escapeHtml(rtype)}:</span> <span>${escapeHtml(String(lenStr))} м</span>` +
@@ -1675,7 +1674,6 @@ function createCablesAccordion(cables, totalLength) {
     const buildLen = Number(info.buildingLength) || 0;
     // Couplings needed: 0 if length <= buildingLength; otherwise ceil(length / buildingLength) - 1
     const couplingCount = (buildLen > 0 && cableLen > buildLen) ? Math.ceil(cableLen / buildLen) - 1 : 0;
-    totalCouplingsCount += couplingCount;
 
     const couplingName = (info.coupling || '').trim();
     const hasCouplingInfo = Boolean(couplingName && couplingName.toLowerCase() !== 'уточнить' && couplingName.toLowerCase() !== '-');
@@ -3089,9 +3087,6 @@ function renderRoutingResult(summary, totalCount, totalLength) {
   const worksCalc = calculateWorksFromTrenches(trenchSummary, currentWorksRules);
   window.lastTrenchWorksCalc = worksCalc;
 
-  // Render "Строительные работы" into Column 3
-  renderConstructionWorks(worksCalc);
-
   return worksCalc;
 }
 
@@ -3323,13 +3318,6 @@ function renderCouplingsResult(couplingsSummary) {
     if (!tierData || tierData.count <= 0) return;
     tierData.couplings.forEach(c => allCouplings.push(c));
   });
-  if (allCouplings.length === 0) {
-    Object.keys(couplingsSummary.tiers || {}).forEach(tierKey => {
-      const tierData = couplingsSummary.tiers[tierKey];
-      if (!tierData || tierData.count <= 0) return;
-      tierData.couplings.forEach(c => allCouplings.push(c));
-    });
-  }
 
   allCouplings.forEach(coupling => {
     const missingWarning = !coupling.foundInCatalog
@@ -3541,11 +3529,6 @@ function getActiveTrenchSummary() {
 function formatSegmentFormulaWithTokens(formulaStr, seg, unitSuffix = 'м') {
   let disp = (formulaStr || 'ДЛИНА').replace(/,/g, '.').replace(/\*/g, ' * ');
 
-  function replaceTokenInDisp(str, tokenRegex, valStr) {
-    const pattern = new RegExp('(^|[^a-zA-Z0-9а-яА-ЯёЁ_])(?:' + tokenRegex + ')([^a-zA-Z0-9а-яА-ЯёЁ_]|$)', 'gi');
-    return str.replace(pattern, (match, p1, p2) => p1 + valStr + (p2 !== undefined ? p2 : ''));
-  }
-
   const countPipes = Number(seg.countPipes !== undefined ? seg.countPipes : 0) || 0;
   const lengthPipes = Number(seg.lengthPipes !== undefined ? seg.lengthPipes : 0) || 0;
   const countIntersections = Number(seg.countIntersections !== undefined ? seg.countIntersections : (countPipes > 0 ? 1 : 0)) || 0;
@@ -3553,28 +3536,20 @@ function formatSegmentFormulaWithTokens(formulaStr, seg, unitSuffix = 'м') {
   const cab = Number(seg.cablesCount !== undefined ? seg.cablesCount : (seg.count !== undefined ? seg.count : 0)) || 0;
 
   // Intersections
-  disp = replaceTokenInDisp(disp, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]|ПЕРЕСЕЧЕНИ[ЙЯЕ]', `${countIntersections} перес.`);
+  disp = replaceFormulaToken(disp, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ПЕРЕСЕЧЕНИ[ЙЯЕ]|ПЕРЕСЕЧЕНИ[ЙЯЕ]', `${countIntersections} перес.`, false);
   // Pipe length
-  disp = replaceTokenInDisp(disp, 'ДЛИН[АЫ][_\\s]?ТРУБ[АЫ]?', `${lengthPipes} м`);
+  disp = replaceFormulaToken(disp, 'ДЛИН[АЫ][_\\s]?ТРУБ[АЫ]?', `${lengthPipes} м`, false);
   // Pipe count
-  disp = replaceTokenInDisp(disp, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ТРУБ[АЫ]?', `${countPipes} шт.`);
+  disp = replaceFormulaToken(disp, '(?:КОЛИЧЕСТВО|ЧИСЛО)[_\\s]?ТРУБ[АЫ]?', `${countPipes} шт.`, false);
   // Cable count
-  disp = replaceTokenInDisp(disp, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ|КАБЕЛЕ[ЙЯИ]|КОЛИЧЕСТВО', `${cab} каб.`);
+  disp = replaceFormulaToken(disp, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ|КАБЕЛЕ[ЙЯИ]|КОЛИЧЕСТВО', `${cab} каб.`, false);
   // Generic length
-  disp = replaceTokenInDisp(disp, 'ДЛИНА', `${segLen} ${unitSuffix}`);
+  disp = replaceFormulaToken(disp, 'ДЛИНА', `${segLen} ${unitSuffix}`, false);
 
   return disp.replace(/\s+/g, ' ').trim();
 }
 
-// Evaluate formula for a single trench segment (supports both ДЛИНА and pipe/cable count variables)
-function evaluateTrenchSegmentFormula(formula, length, cablesCount, seg = null) {
-  const dataCtx = Object.assign({}, seg || {}, { length, cablesCount });
-  const res = validateAndEvaluateFormula(formula, dataCtx, 'trench');
-  if (!res.valid) {
-    return null;
-  }
-  return res.value;
-}
+
 
 // Calculate works based on trench summary and rules JSON
 // Trenches are always calculated from the "Строительные работы" section
@@ -4536,18 +4511,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 
 // (getEquipmentRulesDict, getEquipmentRulesList, and getEquipmentItemWorksObject are provided centrally by rules_store.js)
 
-function getEquipmentRules(rulesData) {
-  const rules = getEquipmentRulesList(rulesData);
-  return { sectionName: 'Оборудование', rules };
-}
 
-function evaluateEquipmentFormula(formula, count) {
-  const res = validateAndEvaluateFormula(formula, count, 'equipment');
-  if (!res.valid) {
-    return null;
-  }
-  return res.value;
-}
 
 function buildEquipmentFormulaDisplay(formula, count, unit) {
   const u = (unit || 'шт').trim();

@@ -5,15 +5,20 @@
  */
 
 // Get combined works and missing items from Trenches ("Строительные работы"), Cables ("Монтажные работы"), and Equipment ("Оборудование")
-function getAllCalculatedWorks() {
-  const trenchSummary = getActiveTrenchSummary();
-  const trenchCalc = calculateWorksFromTrenches(trenchSummary, currentWorksRules);
+// Get combined works and missing items from Trenches ("Строительные работы"), Cables ("Монтажные работы"), and Equipment ("Оборудование")
+// Reuses cached calculation results from calculateVolumes() if available to avoid duplicate calculation passes
+function getAllCalculatedWorks(forceRecalculate = false) {
+  const trenchCalc = (!forceRecalculate && window.lastTrenchWorksCalc)
+    ? window.lastTrenchWorksCalc
+    : calculateWorksFromTrenches(getActiveTrenchSummary(), currentWorksRules);
 
-  const cableData = getActiveCableSummary();
-  const cableCalc = calculateWorksFromCables(cableData.summary, currentWorksRules);
+  const cableCalc = (!forceRecalculate && window.lastCableWorksCalc)
+    ? window.lastCableWorksCalc
+    : calculateWorksFromCables(getActiveCableSummary().summary, currentWorksRules);
 
-  const equipmentData = getActiveEquipmentSummary();
-  const equipmentCalc = calculateWorksFromEquipment(equipmentData.summary, currentWorksRules);
+  const equipmentCalc = (!forceRecalculate && window.lastEquipmentWorksCalc)
+    ? window.lastEquipmentWorksCalc
+    : calculateWorksFromEquipment(getActiveEquipmentSummary().summary, currentWorksRules);
 
   const rawAllWorks = [ ...(trenchCalc.works || []), ...(cableCalc.works || []), ...(equipmentCalc.works || []) ];
   const allWorks = aggregateCalculatedWorks(rawAllWorks);
@@ -31,11 +36,11 @@ function getAllCalculatedWorks() {
     works: allWorks,
     trenchWorks: trenchWorks,
     cableWorks: cableWorks,
-    missingInRules: [ ...trenchCalc.missingInRules, ...cableCalc.missingInRules, ...equipmentCalc.missingInRules ],
+    missingInRules: [ ...(trenchCalc.missingInRules || []), ...(cableCalc.missingInRules || []), ...(equipmentCalc.missingInRules || []) ],
     formulaErrors: [ ...(trenchCalc.formulaErrors || []), ...(cableCalc.formulaErrors || []), ...(equipmentCalc.formulaErrors || []) ],
-    trenchMissing: trenchCalc.missingInRules,
-    cableMissing: cableCalc.missingInRules,
-    equipmentMissing: equipmentCalc.missingInRules,
+    trenchMissing: trenchCalc.missingInRules || [],
+    cableMissing: cableCalc.missingInRules || [],
+    equipmentMissing: equipmentCalc.missingInRules || [],
     cableMissingInCatalog: cableCalc.missingInCatalog || [],
     couplingsSummary: cableCalc.couplingsSummary
   };
@@ -845,13 +850,14 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
 }
 
 // Download GGE file with selected numbering mode (or read from settings)
-function downloadGgeFile(numberingMode) {
+function downloadGgeFile(numberingMode, existingCalcData = null) {
   if (!numberingMode) {
     const settings = getRulesSettings(currentWorksRules);
     numberingMode = settings.numberingMode === 'сквозная' ? 'sequential' : 'hierarchical';
   }
 
-  const { works } = getAllCalculatedWorks();
+  const calc = existingCalcData || getAllCalculatedWorks();
+  const works = calc.works || [];
 
   if (works.length === 0) {
     showToast('Не найдено подходящих сметных норм для выгрузки ВОР', 'error', 'Ошибка');
@@ -907,9 +913,9 @@ function exportCalculationResults(skipWarningsCheck = false) {
   const warnings = collectAllGgeWarnings(calcData);
 
   if (!skipWarningsCheck && warnings.hasWarnings) {
-    showGgeExportWarningsModal(warnings, () => downloadGgeFile(mode));
+    showGgeExportWarningsModal(warnings, () => downloadGgeFile(mode, calcData));
   } else {
-    downloadGgeFile(mode);
+    downloadGgeFile(mode, calcData);
   }
 }
 

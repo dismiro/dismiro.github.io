@@ -77,31 +77,19 @@ const LOCAL_STORAGE_RULES_META_KEY = window.rulesStore ? window.rulesStore.META_
 
 function saveWorksRulesToLocalStorage(rules) {
   if (!rules || typeof rules !== 'object') return false;
-  try {
-    if (window.rulesStore && typeof window.rulesStore.saveRules === 'function') {
-      window.rulesStore.saveRules(rules);
-    } else {
-      localStorage.setItem(LOCAL_STORAGE_RULES_KEY, JSON.stringify(rules));
-    }
+  if (window.rulesStore && typeof window.rulesStore.saveRules === 'function') {
+    window.rulesStore.saveRules(rules);
     updateStorageStatusUi();
     return true;
-  } catch (err) {
-    console.error('Ошибка сохранения правил:', err);
-    showToast('Не удалось сохранить правила: ' + (err.message || err), 'warning', 'Сохранение');
-    return false;
   }
+  return false;
 }
 
 function loadWorksRulesFromLocalStorage() {
   if (window.rulesStore && typeof window.rulesStore.loadFromLocalStorage === 'function') {
     return window.rulesStore.loadFromLocalStorage();
   }
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_RULES_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    return null;
-  }
+  return null;
 }
 
 function clearWorksRulesFromLocalStorage() {
@@ -124,158 +112,20 @@ function updateStorageStatusUi() {
   } catch (e) {}
 
   const hasSaved = Boolean(raw);
-  const settingsBadge = document.getElementById('settingsStorageStatusBadge');
   const sizeSpan = document.getElementById('storageSizeSpan');
   const dateSpan = document.getElementById('storageDateSpan');
-  const footerIcon = document.getElementById('footerStorageSavedIcon');
-  const footerText = document.getElementById('footerStorageText');
 
   const sizeKb = raw ? (raw.length / 1024).toFixed(1) + ' КБ' : '0 КБ';
   const dateStr = (meta && meta.savedAt) ? new Date(meta.savedAt).toLocaleString('ru-RU') : (hasSaved ? 'Сохранено' : '—');
 
-  if (settingsBadge) {
-    if (hasSaved) {
-      settingsBadge.className = 'badge bg-success-subtle text-success border border-success-subtle';
-      settingsBadge.textContent = 'Сохранено в LocalStorage';
-    } else {
-      settingsBadge.className = 'badge bg-secondary-subtle text-secondary-emphasis border';
-      settingsBadge.textContent = 'Используется works_rules.json';
-    }
-  }
-
   if (sizeSpan) sizeSpan.textContent = sizeKb;
   if (dateSpan) dateSpan.textContent = dateStr;
-
-  if (footerIcon) {
-    if (hasSaved) footerIcon.className = 'bx bx-check-circle text-success';
-    else footerIcon.className = 'bx bx-file text-secondary';
-  }
-  if (footerText) {
-    footerText.textContent = hasSaved ? `LocalStorage: ${sizeKb}` : 'works_rules.json (файл)';
-  }
 }
 
 window.saveWorksRulesToLocalStorage = saveWorksRulesToLocalStorage;
 window.loadWorksRulesFromLocalStorage = loadWorksRulesFromLocalStorage;
 window.clearWorksRulesFromLocalStorage = clearWorksRulesFromLocalStorage;
 window.updateStorageStatusUi = updateStorageStatusUi;
-
-// Initialize rules on page load from external works_rules.json or LocalStorage
-async function initWorksRules() {
-  let defaultData = null;
-  try {
-    const res = await fetch('./works_rules.json?t=' + Date.now());
-    if (res.ok) {
-      const data = await res.json();
-      if (data && typeof data === 'object') {
-        cachedDefaultRules = JSON.parse(JSON.stringify(data));
-        window.cachedDefaultRules = cachedDefaultRules;
-        defaultData = JSON.parse(JSON.stringify(data));
-      }
-    }
-  } catch (err) {
-    console.warn('Не удалось загрузить стандартный файл works_rules.json:', err);
-  }
-
-  // Check if custom rules are saved in LocalStorage
-  const localRules = loadWorksRulesFromLocalStorage();
-  if (localRules) {
-    currentWorksRules = JSON.parse(JSON.stringify(localRules));
-    window.currentWorksRules = currentWorksRules;
-    modalDraftRules = JSON.parse(JSON.stringify(localRules));
-    renderRulesModalContent(currentWorksRules);
-    updateStorageStatusUi();
-    if (typeof currentData !== 'undefined' && currentData && typeof calculateVolumes === 'function') {
-      calculateVolumes();
-    }
-    return currentWorksRules;
-  }
-
-  if (defaultData) {
-    currentWorksRules = JSON.parse(JSON.stringify(defaultData));
-    window.currentWorksRules = currentWorksRules;
-    modalDraftRules = JSON.parse(JSON.stringify(defaultData));
-    renderRulesModalContent(currentWorksRules);
-    updateStorageStatusUi();
-    if (typeof currentData !== 'undefined' && currentData && typeof calculateVolumes === 'function') {
-      calculateVolumes();
-    }
-    return currentWorksRules;
-  }
-}
-
-// Upload custom rules JSON into editor draft (requires clicking Apply & Recalculate to commit)
-async function handleRulesFileInput(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  try {
-    const fileText = await readFileAsTextWithEncoding(file);
-    const parsed = JSON.parse(fileText);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      showToast('Неверный формат JSON: ожидается JSON-объект со структурой разделов', 'error', 'Ошибка файла');
-      return;
-    }
-
-    modalDraftRules = parsed;
-
-    setWorksJsonEditorValue(JSON.stringify(parsed, null, 2));
-    validateWorksJsonInput();
-
-    renderRulesModalContent(parsed);
-    const sections = getRulesSections(parsed);
-    let totalWays = 0;
-    sections.forEach(s => totalWays += s.rules.length);
-    showToast(`Сметные нормы из «${file.name}» загружены в редактор (${totalWays} способов в ${sections.length} разд.). Нажмите «Применить и пересчитать», чтобы активировать их.`, 'info', 'Файл загружен в редактор');
-  } catch (err) {
-    showToast('Ошибка синтаксиса JSON: ' + err.message, 'error', 'Ошибка файла');
-  } finally {
-    e.target.value = '';
-  }
-}
-
-// Reset rules in editor draft to standard works_rules.json and clear LocalStorage
-async function resetWorksRules() {
-  let defaultData = null;
-  try {
-    const res = await fetch('./works_rules.json?t=' + Date.now());
-    if (res.ok) {
-      const data = await res.json();
-      cachedDefaultRules = JSON.parse(JSON.stringify(data));
-      defaultData = JSON.parse(JSON.stringify(data));
-    } else if (cachedDefaultRules) {
-      defaultData = JSON.parse(JSON.stringify(cachedDefaultRules));
-    }
-  } catch (err) {
-    if (cachedDefaultRules) {
-      defaultData = JSON.parse(JSON.stringify(cachedDefaultRules));
-    }
-  }
-
-  if (defaultData) {
-    modalDraftRules = JSON.parse(JSON.stringify(defaultData));
-    setWorksJsonEditorValue(JSON.stringify(defaultData, null, 2));
-    validateWorksJsonInput();
-    renderRulesModalContent(defaultData);
-    clearWorksRulesFromLocalStorage();
-    showToast('Стандартные нормы загружены в редактор, сохраненные правила удалены из LocalStorage. Нажмите «Применить и пересчитать», чтобы активировать их.', 'info', 'Сброс к заводским нормам');
-  }
-}
-
-// Download active rules as JSON
-function downloadWorksRules() {
-  const jsonStr = getWorksJsonEditorValue() || JSON.stringify(currentWorksRules, null, 2);
-  const blob = new Blob([jsonStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'works_rules.json';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('JSON файл сметных норм скачан', 'success', 'Скачивание');
-}
 
 // Standard search query extractor with clear-button toggle
 function getModalSearchQuery(inputId, clearBtnId) {
@@ -1222,23 +1072,23 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
 // WORKS RULES & NORMS JSON PREVIEW
 // --------------------------------------------------------------------------
 
-function renderJsonPreviewContent(rulesObj = null) {
-  const data = rulesObj || modalDraftRules || window.currentWorksRules || cachedDefaultRules || {};
-  setWorksJsonEditorValue(JSON.stringify(data, null, 2));
-}
+
 
 function openWorksRulesModal(activeTab = 'editor') {
-  let tabBtnId = 'tabWorksJsonBtn';
-  if (activeTab === 'construction') tabBtnId = 'tabWorksConstructionBtn';
-  else if (activeTab === 'installation') tabBtnId = 'tabWorksInstallationBtn';
-  else if (activeTab === 'cables') tabBtnId = 'tabWorksCablesBtn';
-  else if (activeTab === 'couplings') tabBtnId = 'tabWorksCouplingsBtn';
-  else if (activeTab === 'equipment') tabBtnId = 'tabWorksEquipmentBtn';
-  else if (activeTab === 'settings') tabBtnId = 'tabWorksSettingsBtn';
-
-  const tabBtn = document.getElementById(tabBtnId);
-  if (tabBtn) {
-    tabBtn.click();
+  const hashToPill = {
+    'construction': '#navPillConstruction',
+    'installation': '#navPillInstallation',
+    'equipment': '#navPillEquipment',
+    'cables': '#navPillCables',
+    'couplings': '#navPillCouplings',
+    'settings': '#navPillSettings',
+    'editor': '#navPillJson',
+    'json': '#navPillJson'
+  };
+  const pillSelector = hashToPill[activeTab] || '#navPillConstruction';
+  const pill = document.querySelector(pillSelector);
+  if (pill) {
+    pill.click();
   }
 }
 window.openWorksRulesModal = openWorksRulesModal;
@@ -1249,12 +1099,6 @@ function validateWorksJsonInput() {
   const errorAlert = document.getElementById('worksJsonErrorAlert');
   const errorMessage = document.getElementById('worksJsonErrorMessage');
   const saveBtn = document.getElementById('btnSaveRulesHeader');
-  const statLines = document.getElementById('worksStatLines');
-  const statChars = document.getElementById('worksStatChars');
-
-  const lines = val ? val.split('\n').length : 0;
-  if (statLines) statLines.textContent = lines.toLocaleString('ru-RU');
-  if (statChars) statChars.textContent = val.length.toLocaleString('ru-RU');
 
   try {
     const parsed = JSON.parse(val);
@@ -2485,10 +2329,7 @@ function setupWorksRulesListeners() {
     }
   }
 
-  const quickAddRuleInTabBtn = document.getElementById('quickAddRuleInTabBtn');
-  if (quickAddRuleInTabBtn) {
-    quickAddRuleInTabBtn.addEventListener('click', () => openAddRuleModalForSection('Строительные работы'));
-  }
+
 
   const quickAddConstructionRuleBtn = document.getElementById('quickAddConstructionRuleBtn');
   if (quickAddConstructionRuleBtn) {
@@ -2586,7 +2427,7 @@ function setupWorksRulesListeners() {
 
   bindModalSearchInput('rulesConstructionSearchInput', 'rulesConstructionClearSearchBtn');
   bindModalSearchInput('rulesInstallationSearchInput', 'rulesInstallationClearSearchBtn');
-  bindModalSearchInput('rulesCardsSearchInput', 'rulesCardsClearSearchBtn');
+
 
   // =========================================================================
   // ADD / EDIT CABLE MODAL
@@ -3322,33 +3163,7 @@ function setupWorksRulesListeners() {
   // ТАБЫ, ПОИСК И НАСТРОЙКИ
   // =========================================================================
 
-  const cablesTabBtn = document.getElementById('tabWorksCablesBtn');
-  if (cablesTabBtn) {
-    cablesTabBtn.addEventListener('shown.bs.tab', () => {
-      renderCableCatalogModalContent(getDraftRulesFromEditor());
-    });
-  }
 
-  const couplingsTabBtn = document.getElementById('tabWorksCouplingsBtn');
-  if (couplingsTabBtn) {
-    couplingsTabBtn.addEventListener('shown.bs.tab', () => {
-      renderCouplingCatalogModalContent(getDraftRulesFromEditor());
-    });
-  }
-
-  const equipmentTabBtn = document.getElementById('tabWorksEquipmentBtn');
-  if (equipmentTabBtn) {
-    equipmentTabBtn.addEventListener('shown.bs.tab', () => {
-      renderEquipmentCatalogModalContent(getDraftRulesFromEditor());
-    });
-  }
-
-  const settingsTabBtn = document.getElementById('tabWorksSettingsBtn');
-  if (settingsTabBtn) {
-    settingsTabBtn.addEventListener('shown.bs.tab', () => {
-      renderSettingsModalContent(getDraftRulesFromEditor());
-    });
-  }
 
   [
     ['settingNumberingMode', 'ТипНумерации', v => v],
@@ -3403,22 +3218,9 @@ function setupWorksRulesListeners() {
     }
   }
 
-  const resetBtn = document.getElementById('resetRulesBtn');
-  if (resetBtn) resetBtn.addEventListener('click', resetWorksRules);
-
-  const downloadBtn = document.getElementById('downloadRulesBtn');
-  if (downloadBtn) downloadBtn.addEventListener('click', downloadWorksRules);
-
-  const rulesFileInput = document.getElementById('rulesFileInput');
-  if (rulesFileInput) rulesFileInput.addEventListener('change', handleRulesFileInput);
-
-  const clearStorageBtn = document.getElementById('clearLocalStorageRulesBtn');
-  if (clearStorageBtn) {
-    clearStorageBtn.addEventListener('click', () => {
-      clearWorksRulesFromLocalStorage();
-      showToast('Сохраненные правила удалены из LocalStorage. Нажмите кнопку «По умолчанию», если хотите загрузить стандартный шаблон works_rules.json.', 'info', 'LocalStorage очищен');
-    });
-  }
+  // Note: Toolbar actions (#rulesFileInput, #downloadRulesBtn, #resetRulesBtn)
+  // are managed exclusively by the dedicated page controller (rules_page.js)
+  // to avoid double-triggers, unconfirmed resets, and race conditions.
 
 
   // Delegated event listener for block Edit buttons
@@ -3581,7 +3383,9 @@ function setupWorksRulesListeners() {
     validateWorksJsonInput();
 
     if (options.saveToStorage) {
-      saveWorksRulesToLocalStorage(modalDraftRules);
+      if (window.rulesStore && typeof window.rulesStore.saveRules === 'function') {
+        window.rulesStore.saveRules(modalDraftRules);
+      }
     }
     if (typeof options.renderFn === 'function') {
       options.renderFn(modalDraftRules);

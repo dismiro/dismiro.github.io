@@ -163,10 +163,13 @@
     },
 
     /**
-     * Downloads current rules as a JSON file.
+     * Downloads rules as a JSON file.
+     * @param {string} filename - Target file name (defaults to works_rules.json).
+     * @param {Object} [customRules] - Optional rules object to export (e.g. current modal/page draft).
+     *                                 If omitted, uses persisted rules from getRulesSync().
      */
-    exportRulesJson(filename = 'works_rules.json') {
-      const rules = this.getRulesSync();
+    exportRulesJson(filename = 'works_rules.json', customRules = null) {
+      const rules = (customRules && typeof customRules === 'object') ? customRules : this.getRulesSync();
       const jsonStr = JSON.stringify(rules, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);

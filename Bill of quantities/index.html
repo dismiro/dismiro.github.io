@@ -144,45 +144,7 @@
   .table-row-material > td:first-child {
     border-left: 3px solid transparent;
   }
-  /* Subtitle for cable works items */
 
-  .work-item-meta {
-    color: var(--si-secondary-color);
-  }
-  .work-item-meta .meta-label {
-    color: var(--si-body-color);
-  }
-  .work-item-meta .meta-method {
-    color: var(--si-heading-color, var(--si-body-color)) !important;
-    font-weight: 700;
-  }
-  .work-item-meta .meta-cable {
-    color: var(--si-primary);
-    font-weight: 600;
-  }
-
-  .work-material-row {
-    background-color: rgba(var(--si-body-color-rgb, 0, 0, 0), 0.02);
-  }
-
-  .badge-material {
-    display: inline-block;
-    padding: 0.2rem 0.45rem;
-    font-size: 0.68rem;
-    font-weight: 600;
-    line-height: 1;
-    border-radius: var(--si-border-radius-sm, 0.25rem);
-    background-color: var(--si-secondary-bg);
-    color: var(--si-body-color) !important;
-    border: 1px solid var(--si-border-color);
-  }
-
-  .material-description {
-    color: var(--si-heading-color, var(--si-body-color)) !important;
-    font-size: 0.81rem;
-    line-height: 1.4;
-    font-weight: 500;
-  }
   /* Ensure icon dropdown-toggle in btn-icon centers cleanly */
 
   .btn-icon.dropdown-toggle::after {
@@ -347,32 +309,7 @@
     border-top-right-radius: var(--si-border-radius-sm) !important;
     border-bottom-right-radius: var(--si-border-radius-sm) !important;
   }
-  /* Works JSON Editor styling */
 
-  #worksJsonEditorTextarea {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    font-size: 0.85rem;
-    line-height: 1.5;
-    tab-size: 2;
-    background-color: var(--si-card-bg, #ffffff);
-    color: var(--si-body-color, #1e293b);
-    border: 1px solid var(--si-border-color, #cbd5e1);
-    border-radius: 0.5rem;
-    outline: none;
-  }
-  #worksJsonEditorTextarea:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-  }
-  [data-bs-theme="dark"] #worksJsonEditorTextarea {
-    background-color: #0f172a;
-    color: #f1f5f9;
-    border-color: #334155;
-  }
-  [data-bs-theme="dark"] #worksJsonEditorTextarea:focus {
-    border-color: #60a5fa;
-    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
-  }
   /* Badge contrast fixes - prevent white text on light backgrounds */
 
   .badge.bg-secondary-subtle,
@@ -396,26 +333,7 @@
   [data-bs-theme="dark"] .badge.bg-body-tertiary {
     color: #e2e8f0 !important;
   }
-  /* Widened modal windows for comfortable editing and view */
 
-  #worksRulesModal .modal-dialog {
-    max-width: min(1520px, 94vw);
-    width: 94vw;
-  }
-  @media (max-width: 768px) {
-    #worksRulesModal .modal-dialog {
-      max-width: 98vw;
-      width: 98vw;
-      margin: 0.5rem auto;
-    }
-  }
-
-  #addRuleModal, #addCableModal, #addCouplingModal, #addEquipmentModal, #manageCableGroupsOverviewModal {
-    z-index: 1065 !important;
-  }
-  #editCableGroupModal {
-    z-index: 1075 !important;
-  }
   .modal-backdrop.show + .modal-backdrop.show {
     z-index: 1060 !important;
   }
@@ -467,7 +385,13 @@
           </ul>
         </div>
       </div>
-      <div class="form-check form-switch mode-switch pe-lg-1 ms-auto me-4" data-bs-toggle="mode">
+      <div class="d-flex align-items-center gap-2 ms-auto me-3">
+        <a href="rules.html" id="rulesStorageBadge" class="badge bg-body-tertiary text-body-secondary border d-inline-flex align-items-center gap-1_5 py-1_5 px-2_5 text-decoration-none rounded-pill shadow-xs" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Нажмите, чтобы открыть редактор сметных правил">
+          <i class='bx bx-slider-alt text-primary' id="rulesStorageBadgeIcon"></i>
+          <span id="rulesStorageBadgeText">Правила: загрузка...</span>
+        </a>
+      </div>
+      <div class="form-check form-switch mode-switch pe-lg-1 me-2" data-bs-toggle="mode">
         <input type="checkbox" class="form-check-input" id="theme-mode">
         <label class="form-check-label d-none d-sm-block" for="theme-mode">Светлая</label>
         <label class="form-check-label d-none d-sm-block" for="theme-mode">Темная</label>
@@ -537,7 +461,7 @@
                 </div>
               </div>
               <!-- Action Toolbar: all buttons unified in compact icon-button style -->
-              <div class="d-flex align-items-center ms-auto">
+              <div class="d-flex align-items-center gap-2 ms-auto">
                 <div class="btn-group btn-group-sm" role="group" aria-label="Панель действий">
                   <a href="rules.html" id='openWorksRulesBtn' class="btn btn-outline-secondary btn-icon" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Сметные нормы и правила: открыть редактор правил">
                     <i class="bx bx-slider-alt fs-5"></i>

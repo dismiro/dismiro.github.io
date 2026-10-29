@@ -48,14 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-function updateJsonLinesCount() {
-  const badge = document.getElementById('jsonLinesCountBadge');
-  const codeEl = document.getElementById('worksJsonPreviewCode');
-  if (badge && codeEl) {
-    const lines = (codeEl.textContent || '').split('\n').length;
-    badge.textContent = `${lines} строк`;
-  }
-}
+
 
 /**
  * Connects sidebar links to Bootstrap tab panes and URL hash.
@@ -171,7 +164,10 @@ function setupPageActions() {
   if (btnDownload) {
     btnDownload.addEventListener('click', () => {
       try {
-        window.rulesStore.exportRulesJson('works_rules.json');
+        const currentDraft = (typeof getDraftRulesFromEditor === 'function')
+          ? getDraftRulesFromEditor()
+          : (window.currentWorksRules || window.rulesStore.getRulesSync());
+        window.rulesStore.exportRulesJson('works_rules.json', currentDraft);
         showToast('Файл works_rules.json успешно экспортирован.', 'success', 'Экспорт');
       } catch (err) {
         showToast('Ошибка экспорта: ' + err.message, 'error', 'Ошибка');
