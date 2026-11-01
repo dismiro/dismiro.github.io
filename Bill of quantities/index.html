@@ -48,9 +48,7 @@
     scrollbar-width: thin;
   }
 
-  .table-responsive-full,
-  #result .custom-table-scroll,
-  #resultCouplings .custom-table-scroll {
+  .table-responsive-full {
     max-height: none !important;
     overflow-y: visible !important;
     overflow-x: auto;
@@ -386,9 +384,8 @@
         </div>
       </div>
       <div class="d-flex align-items-center gap-2 ms-auto me-3">
-        <a href="rules.html" id="rulesStorageBadge" class="badge bg-body-tertiary text-body-secondary border d-inline-flex align-items-center gap-1_5 py-1_5 px-2_5 text-decoration-none rounded-pill shadow-xs" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Нажмите, чтобы открыть редактор сметных правил">
-          <i class='bx bx-slider-alt text-primary' id="rulesStorageBadgeIcon"></i>
-          <span id="rulesStorageBadgeText">Правила: загрузка...</span>
+        <a href="rules.html" id="rulesStorageBadge" class="badge bg-body-tertiary text-body-secondary border d-inline-flex align-items-center gap-1_5 py-1_5 px-2_5 text-decoration-none shadow-xs" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Нажмите, чтобы открыть редактор сметных правил">
+          <span>Правила: загрузка...</span>
         </a>
       </div>
       <div class="form-check form-switch mode-switch pe-lg-1 me-2" data-bs-toggle="mode">
@@ -413,7 +410,7 @@
       </p>
     </div>
 
-    <input type="file" class="d-none form-control" id="input" accept=".json,application/json" multiple>
+    <input type="file" class="d-none form-control" id="input" accept=".json,application/json">
 
     <!-- Cross-tab Rules Updated Notification Banner -->
     <div id="rulesUpdatedBanner" class="alert alert-info py-2 px-3 small d-none align-items-center justify-content-between flex-wrap gap-2 mb-3 shadow-sm border-info" style="border-left: 4px solid #2563eb;">
@@ -476,58 +473,14 @@
                       <i class="bx bx-download fs-5"></i>
                     </button>
                     <div class="dropdown-menu dropdown-menu-end shadow-sm my-1" style="min-width: 290px;">
-                      <h6 class="dropdown-header small text-uppercase py-1 text-muted">Сметные нормы и правила (ВОР)</h6>
-                      <a id='menuOpenRulesConstruction' href="rules.html#construction" class="dropdown-item d-flex align-items-center gap-2 py-2">
-                        <i class='bx bx-hard-hat text-primary fs-5'></i>
-                        <div>
-                          <div class="fw-semibold">Строительные работы...</div>
-                          <small class="text-muted fs-xs">Траншеи, земляные работы, проколы</small>
-                        </div>
-                      </a>
-                      <a id='menuOpenRulesInstallation' href="rules.html#installation" class="dropdown-item d-flex align-items-center gap-2 py-2">
-                        <i class='bx bx-wrench text-info fs-5'></i>
-                        <div>
-                          <div class="fw-semibold">Монтажные работы...</div>
-                          <small class="text-muted fs-xs">Прокладка кабелей, лотки, конструкции</small>
-                        </div>
-                      </a>
-                      <a id='menuEditWorksJson' href="rules.html#json" class="dropdown-item d-flex align-items-center gap-2 py-2">
-                        <i class='bx bx-code-curly text-warning fs-5'></i>
-                        <div>
-                          <div class="fw-semibold">Редактировать JSON правил...</div>
-                          <small class="text-muted fs-xs">Корректировка норм, формул и перерасчет</small>
-                        </div>
-                      </a>
-                      <a id='menuViewCablesCatalog' href="rules.html#cables" class="dropdown-item d-flex align-items-center gap-2 py-2">
-                        <i class='bx bx-network-chart text-success fs-5'></i>
-                        <div>
-                          <div class="fw-semibold">Справочник кабелей...</div>
-                          <small class="text-muted fs-xs">Марки, строительные длины, вес и муфты</small>
-                        </div>
-                      </a>
-                      <a id='menuSettings' href="rules.html#settings" class="dropdown-item d-flex align-items-center gap-2 py-2">
-                        <i class='bx bx-cog text-secondary fs-5'></i>
-                        <div>
-                          <div class="fw-semibold">Настройки программы и правил...</div>
-                          <small class="text-muted fs-xs">Параметры расчетов, нумерация GGE, округление</small>
-                        </div>
-                      </a>
-                      <div class="dropdown-divider my-1"></div>
                       <h6 class="dropdown-header small text-uppercase py-1 text-muted">Экспорт ведомостей работ (ВОР)</h6>
-                      <a id='exportResult' href="#" class="dropdown-item d-flex align-items-center gap-2 py-2">
+                      <a id='exportResult' href="#" class="dropdown-item d-flex align-items-center gap-2 py-1_5">
                         <i class='bx bx-file text-success fs-5'></i>
-                        <div>
-                          <div class="fw-semibold">Экспорт ВОР в GGE (.gge)</div>
-                          <small class="text-muted fs-xs">Формат Главгосэкспертизы 3.01 (.gge)</small>
-                        </div>
+                        <span class="small">Экспорт ВОР в GGE (.gge)</span>
                       </a>
                       <a id='exportVorExcel' href="#" class="dropdown-item d-flex align-items-center gap-2 py-1_5">
                         <i class='bx bx-spreadsheet text-primary fs-5'></i>
                         <span class="small">Экспорт ВОР в Excel (.xlsx)</span>
-                      </a>
-                      <div class="dropdown-divider my-1"></div>
-                      <a id='menuUploadData' href="#" class="dropdown-item d-flex align-items-center gap-2">
-                        <i class='bx bx-file text-secondary fs-5'></i> Загрузить другой проект (.json)...
                       </a>
                     </div>
                   </div>

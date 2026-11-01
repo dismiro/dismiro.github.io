@@ -23,20 +23,8 @@ function getAllCalculatedWorks(forceRecalculate = false) {
   const rawAllWorks = [ ...(trenchCalc.works || []), ...(cableCalc.works || []), ...(equipmentCalc.works || []) ];
   const allWorks = aggregateCalculatedWorks(rawAllWorks);
 
-  // Group works by actual target section:
-  // Items with section "Строительные работы" (or containing "строительн") go to trenchWorks (Section 1)
-  // Items with other sections (such as "Монтажные работы") go to cableWorks (Section 2)
-  const trenchWorks = allWorks.filter(w => {
-    const s = (w.section || '').trim().toLowerCase();
-    return s === 'строительные работы' || s.includes('строительн');
-  });
-  const cableWorks = allWorks.filter(w => !trenchWorks.includes(w));
-
   return {
     works: allWorks,
-    trenchWorks: trenchWorks,
-    cableWorks: cableWorks,
-    missingInRules: [ ...(trenchCalc.missingInRules || []), ...(cableCalc.missingInRules || []), ...(equipmentCalc.missingInRules || []) ],
     formulaErrors: [ ...(trenchCalc.formulaErrors || []), ...(cableCalc.formulaErrors || []), ...(equipmentCalc.formulaErrors || []) ],
     trenchMissing: trenchCalc.missingInRules || [],
     cableMissing: cableCalc.missingInRules || [],
@@ -231,6 +219,7 @@ function generateVorWorkbook(worksData, currentFileName, numberingMode = 'hierar
   const merges = [];
   let secIndex = 1;
   const dataRowIndexes = [];
+  let secSequentialNum = 1;
 
   for (const [secName, works] of sectionsMap.entries()) {
     const secRowIndex = aoa.length;
@@ -241,7 +230,6 @@ function generateVorWorkbook(worksData, currentFileName, numberingMode = 'hierar
     merges.push({ s: { r: secRowIndex, c: 0 }, e: { r: secRowIndex, c: 8 } });
     secIndex++;
 
-    let secSequentialNum = 1;
     works.forEach((w, idx) => {
       dataRowIndexes.push({ rowIndex: aoa.length, unit: w.unit, work: w });
       const isMaterial = w.isSubItem || w.type === 'материал';
@@ -315,6 +303,11 @@ function generateVorWorkbook(worksData, currentFileName, numberingMode = 'hierar
   if (resCouplings) {
     const wsCouplings = XLSX.utils.table_to_sheet(resCouplings);
     XLSX.utils.book_append_sheet(wb, wsCouplings, 'Ведомость муфт');
+  }
+  const resEquipment = document.querySelector('#resultEquipmentStatement table');
+  if (resEquipment) {
+    const wsEquipment = XLSX.utils.table_to_sheet(resEquipment);
+    XLSX.utils.book_append_sheet(wb, wsEquipment, 'Ведомость оборудования');
   }
 
   return wb;
@@ -627,7 +620,7 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
         <tr>
           <td class="text-center text-muted small">${idx + 1}</td>
           <td class="fw-bold text-dark cell-wrap">${escapeHtml(cat.type || 'Марка')}</td>
-          <td class="text-center font-monospace">${cat.weight || 0.35} кг/м</td>
+          <td class="text-center font-monospace">${cat.fallbackWeight || cat.weight || 0.35} кг/м</td>
           <td class="text-end font-monospace fw-semibold">${lenStr}</td>
         </tr>
       `;

@@ -149,6 +149,7 @@ function setupPageActions() {
         setWorksJsonEditorValue(JSON.stringify(imported, null, 2));
         validateWorksJsonInput();
         renderRulesModalContent(imported);
+        if (typeof setDraftDirtyState === 'function') setDraftDirtyState(false);
         updateStorageStatusUi();
         showToast(`Сметные нормы из «${file.name}» успешно импортированы и сохранены.`, 'success', 'Импорт завершен');
       } catch (err) {
@@ -157,6 +158,14 @@ function setupPageActions() {
         e.target.value = '';
       }
     });
+
+    const btnImportDropdown = document.getElementById('btnImportRulesDropdown');
+    if (btnImportDropdown) {
+      btnImportDropdown.addEventListener('click', (e) => {
+        e.preventDefault();
+        fileInput.click();
+      });
+    }
   }
 
   // Export
@@ -189,6 +198,7 @@ function setupPageActions() {
         setWorksJsonEditorValue(JSON.stringify(defaultData, null, 2));
         validateWorksJsonInput();
         renderRulesModalContent(defaultData);
+        if (typeof setDraftDirtyState === 'function') setDraftDirtyState(false);
         updateStorageStatusUi();
         showToast('Сметные правила сброшены к заводским настройкам.', 'info', 'Сброс выполнен');
       } catch (err) {
@@ -250,6 +260,9 @@ function saveRulesFromPage() {
   try {
     window.rulesStore.saveRules(draft);
     hideSaveValidationError();
+    if (typeof setDraftDirtyState === 'function') {
+      setDraftDirtyState(false);
+    }
     if (typeof updateStorageStatusUi === 'function') {
       updateStorageStatusUi();
     }

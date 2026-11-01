@@ -3,19 +3,13 @@ let currentData = null;
 let currentFileName = '';
 let isRawColCollapsed = false;
 
-// (debounce and getRuleWorks are provided centrally by rules_store.js)
-
 // --------------------------------------------------------------------------
 // FORMULA MATH OPERATOR NORMALIZATION
-// Universal helper to replace identifier tokens (Cyrillic + Latin) without relying on JS \b limitation
+// Universal helper to replace identifier tokens (Cyrillic + Latin) using zero-width lookaround assertions
 function replaceFormulaToken(str, tokenRegex, valStr, addSpaces = false) {
   if (!str) return '';
-  const pattern = new RegExp('(^|[^a-zA-Z0-9а-яА-ЯёЁ_])(?:' + tokenRegex + ')([^a-zA-Z0-9а-яА-ЯёЁ_]|$)', 'gi');
-  return str.replace(pattern, (match, p1, p2) => {
-    const pre = p1 || '';
-    const post = p2 !== undefined ? p2 : '';
-    return addSpaces ? `${pre} ${valStr} ${post}` : `${pre}${valStr}${post}`;
-  });
+  const pattern = new RegExp('(?<![a-zA-Z0-9а-яА-ЯёЁ_])(?:' + tokenRegex + ')(?![a-zA-Z0-9а-яА-ЯёЁ_])', 'gi');
+  return str.replace(pattern, () => addSpaces ? ` ${valStr} ` : `${valStr}`);
 }
 
 // Normalize all mathematical operator symbols in formula strings to standard characters
@@ -222,18 +216,9 @@ function validateAndEvaluateFormula(formula, dataCtx, domain = 'cable', context 
   }
 }
 
-// Evaluate formula (e.g. "ДЛИНА", "0.36*ДЛИНА", "1.05*ДЛИНА", "КОЛИЧЕСТВО", "1*КОЛИЧЕСТВО") with a given base value
-// Returns evaluated number, or null if formula is invalid / has unknown variables (skips item and records reason if context provided)
-function evaluateWorkFormula(formula, baseValue, context = null) {
-  const res = validateAndEvaluateFormula(formula, baseValue, 'cable', context);
-  if (!res.valid) {
-    return null;
-  }
-  return res.value;
-}
 
 // Build display string for formula in VOR
-function buildWorkFormulaDisplay(formula, totalLength, itemsCount, unit) {
+function buildWorkFormulaDisplay(formula, totalLength, itemsCount) {
   const clean = (formula || 'ДЛИНА').trim();
   if (clean.toUpperCase() === 'ДЛИНА') {
     return `${totalLength.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} м кабеля${itemsCount > 1 ? ` (${itemsCount} мар.)` : ''}`;
@@ -242,8 +227,6 @@ function buildWorkFormulaDisplay(formula, totalLength, itemsCount, unit) {
   disp = disp.replace(/ДЛИНА/gi, `${totalLength.toLocaleString('ru-RU')} м кабеля`);
   return normalizeFormulaMathOperators(disp);
 }
-
-// (shouldShowFormula is provided centrally by rules_store.js)
 
 // Build display string for coupling installation work formula
 function buildCouplingWorkFormulaDisplay(formula, tierData, calculatedVolume, unit = 'шт') {
@@ -289,8 +272,6 @@ function buildCouplingSingleItemFormulaDisplay(formula, count, calculatedVolume,
   }
   return normalizeFormulaMathOperators(disp);
 }
-
-// (parseCableCountCondition is provided centrally by rules_store.js)
 
 // Parse and normalize rule's "Работы" object structure:
 // "Работы": { "1": [...], "2": [...], "3": [...], "оптический": [...] }
@@ -399,8 +380,6 @@ function parseRuleWorksAndMaterials(rule) {
 
   return { optical, tiers, allItems, isObjectStructure: true, rawObj: wmObj };
 }
-
-// (getRulesSections, getTrenchRules, getCableRules, and getCableCatalog are provided centrally by rules_store.js)
 
 // Helper to normalize cable names for flexible catalog lookup (ignoring quote styles and extra spaces)
 function normalizeCableLookupKey(s) {
@@ -624,8 +603,6 @@ function lookupCableInfo(rawType, catalog) {
 // --------------------------------------------------------------------------
 // COUPLING CATALOG & HELPER FUNCTIONS
 // --------------------------------------------------------------------------
-
-// (getCouplingCatalog and parseMaxCoresFromString are provided centrally by rules_store.js)
 
 // Lookup coupling metadata (full name, max cores, unit, foundInCatalog, isOptical)
 function lookupCouplingInfo(rawType, couplingCatalog, isCableOptical = false) {
@@ -1078,20 +1055,18 @@ function updateIndexRulesStorageBadge() {
   }
 
   if (hasSaved) {
-    badgeEl.className = 'badge bg-body-tertiary text-body-secondary border d-inline-flex align-items-center gap-1_5 py-1 px-2_5 text-decoration-none shadow-xs rounded-pill';
+    badgeEl.className = 'badge bg-body-tertiary text-body-secondary border d-inline-flex align-items-center gap-1_5 py-1 px-2_5 text-decoration-none shadow-xs';
     badgeEl.innerHTML = `
-      <i class='bx bx-slider-alt text-primary fs-6'></i>
-      <span class="text-secondary fw-normal">Правила:</span>
+      <span>Правила:</span>
       <span class="font-monospace text-body fw-semibold">${escapeHtml(dateTimeStr)}</span>
       <span class="text-muted fw-light mx-0_5 opacity-50">•</span>
       <span class="font-monospace text-muted">${escapeHtml(sizeStr)}</span>
     `;
     badgeEl.setAttribute('title', `Сметные правила (сохранено: ${dateTimeStr}, объем: ${sizeStr}).\nНажмите, чтобы открыть редактор правил.`);
   } else {
-    badgeEl.className = 'badge bg-body-tertiary text-body-secondary border d-inline-flex align-items-center gap-1_5 py-1 px-2_5 text-decoration-none shadow-xs rounded-pill';
+    badgeEl.className = 'badge bg-body-tertiary text-body-secondary border d-inline-flex align-items-center gap-1_5 py-1 px-2_5 text-decoration-none shadow-xs';
     badgeEl.innerHTML = `
-      <i class='bx bx-slider-alt text-secondary fs-6'></i>
-      <span class="text-secondary fw-normal">Правила:</span>
+      <span>Правила:</span>
       <span class="font-monospace text-body fw-semibold">works_rules.json</span>
     `;
     badgeEl.setAttribute('title', 'Используются встроенные правила works_rules.json (по умолчанию).\nНажмите, чтобы открыть редактор сметных правил.');
@@ -1137,8 +1112,6 @@ async function initWorksRules() {
   return currentWorksRules;
 }
 window.initWorksRules = initWorksRules;
-
-// (escapeHtml is provided centrally by rules_store.js)
 
 // Initialize tooltips and event listeners
 document.addEventListener('DOMContentLoaded', () => {
@@ -1195,8 +1168,6 @@ function initTooltips() {
   }
 }
 
-// (showToast is provided centrally by rules_store.js)
-
 function setupEventListeners() {
   const fileInput = document.getElementById('input');
   if (fileInput) {
@@ -1211,15 +1182,6 @@ function setupEventListeners() {
   const calculateBtn = document.getElementById('calculate');
   if (calculateBtn) {
     calculateBtn.addEventListener('click', calculateVolumes);
-  }
-
-  const menuUploadData = document.getElementById('menuUploadData');
-  if (menuUploadData) {
-    menuUploadData.addEventListener('click', (e) => {
-      e.preventDefault();
-      const fileInput = document.getElementById('input');
-      if (fileInput) fileInput.click();
-    });
   }
 
   // Banner recalculate and dismiss listeners
@@ -1248,18 +1210,6 @@ function setupEventListeners() {
     });
   }
 
-  // Cross-tab storage synchronization listener
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'si_works_rules_v1' || e.key === 'si_works_rules_v1_meta') {
-      showRulesUpdatedBanner();
-      updateIndexRulesStorageBadge();
-    }
-  });
-
-  // Re-check LocalStorage whenever user returns to the calculation tab
-  window.addEventListener('focus', () => {
-    updateIndexRulesStorageBadge();
-  });
 
   if (window.rulesStore) {
     window.rulesStore.subscribe((event) => {
@@ -1270,10 +1220,6 @@ function setupEventListeners() {
     });
   }
 
-  // Optional modal listeners if rules_modal.js is present
-  if (typeof setupWorksRulesListeners === 'function') {
-    setupWorksRulesListeners();
-  }
 
   // Header data search & expand/collapse listeners
   const searchInput = document.getElementById('tableFilterInput');
@@ -1374,7 +1320,7 @@ function setupDragAndDrop() {
       e.preventDefault();
       e.stopPropagation();
       const dropZone = document.getElementById('dropZone');
-      if (dropZone) dropZone.classList.add('border-primary', 'bg-light');
+      if (dropZone) dropZone.classList.add('drag-over', 'border-primary', 'bg-light');
     }, false);
   });
 
@@ -1383,7 +1329,7 @@ function setupDragAndDrop() {
       e.preventDefault();
       e.stopPropagation();
       const dropZone = document.getElementById('dropZone');
-      if (dropZone) dropZone.classList.remove('border-primary', 'bg-light');
+      if (dropZone) dropZone.classList.remove('drag-over', 'border-primary', 'bg-light');
     }, false);
   });
 
@@ -1402,8 +1348,6 @@ function handleFileInput(e) {
   processFile(files[0]);
   e.target.value = '';
 }
-
-// (readFileAsTextWithEncoding is provided centrally by rules_store.js)
 
 async function processFile(file) {
   const fileName = file.name;
@@ -2339,7 +2283,6 @@ function getActiveEquipmentSummary() {
   const summary = {};
   let totalCount = 0;
   let totalPositions = 0;
-  const list = [];
 
   if (currentData) {
     const rawList = (currentData.TracksideEquipment && Array.isArray(currentData.TracksideEquipment))
@@ -2363,11 +2306,10 @@ function getActiveEquipmentSummary() {
       handles.forEach(h => {
         if (!summary[key].handles.includes(h)) summary[key].handles.push(h);
       });
-      list.push({ mark, method, count, handles });
     });
   }
 
-  return { summary, totalPositions, totalCount, list };
+  return { summary, totalPositions, totalCount };
 }
 
 // Calculate Cable Volumes & Trench/Routing Volumes & Equipment
@@ -3418,8 +3360,6 @@ function extractItemDecimals(item) {
   return undefined;
 }
 
-// (getRulesSettings is provided centrally by rules_store.js)
-
 /**
  * Returns the decimal precision for a specific item, work, or material based on:
  * 1. Individual rule override (item["Округление"] or item.decimals)
@@ -3502,13 +3442,10 @@ function getActiveTrenchSummary() {
         cablesCount = b.contained.length;
       }
       if (!summary[type]) {
-        summary[type] = { totalLength: 0, count: 0, totalPipesCount: 0, totalPipesLength: 0, segments: [] };
+        summary[type] = { totalLength: 0, count: 0, segments: [] };
       }
       summary[type].totalLength += length;
       summary[type].count += 1;
-      summary[type].totalPipesCount += (countPipes * countIntersections);
-      // Суммарный метраж труб считается строго по формуле: countPipes * lengthPipes * countIntersections
-      summary[type].totalPipesLength += (countPipes * lengthPipes * countIntersections);
       summary[type].segments.push({
         handle: b.handle || '',
         length,
@@ -3620,13 +3557,7 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
         const formula = (work["Формула"] || "ДЛИНА").trim();
         const trenchWorkName = (work["Наименование"] || work.name || ruleName).trim();
         const targetSection = (work["Раздел"] || work.section || sectionName).trim();
-        const rawWorkType = (work["Тип"] || work.type || '').trim().toLowerCase();
-        let determinedWorkType = 'работа';
-        if (rawWorkType === 'оборудование' || rawWorkType === 'equipment') {
-          determinedWorkType = 'оборудование';
-        } else if (rawWorkType === 'материал' || rawWorkType === 'material') {
-          determinedWorkType = 'материал';
-        }
+        const determinedWorkType = normalizeItemType(work["Тип"] || work.type, 'работа');
 
         const trenchContext = {
           name: trenchWorkName,
@@ -3859,13 +3790,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
   const primaryWorkUnit = (primaryWork ? (primaryWork["Единицы измерения"] || primaryWork.unit || 'м') : 'м').trim();
 
   workItems.forEach(work => {
-    const rawWorkType = (work["Тип"] || work.type || '').trim().toLowerCase();
-    let determinedWorkType = 'работа';
-    if (rawWorkType === 'оборудование' || rawWorkType === 'equipment') {
-      determinedWorkType = 'оборудование';
-    } else if (rawWorkType === 'материал' || rawWorkType === 'material') {
-      determinedWorkType = 'материал';
-    }
+    const determinedWorkType = normalizeItemType(work["Тип"] || work.type, 'работа');
     const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
     const formula = work["Формула"] || work.formula || "ДЛИНА";
     const workTitle = (work["Наименование"] || work.name || primaryWorkTitle).trim();
@@ -3887,7 +3812,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
 
     const rawVal = evalRes.value;
     const unit = work["Единицы измерения"] || work.unit || 'м';
-    const rawFormulaDisp = buildWorkFormulaDisplay(formula, totalGroupLength, cablesList.length, unit);
+    const rawFormulaDisp = buildWorkFormulaDisplay(formula, totalGroupLength, cablesList.length);
     const formulaDisplay = workShowFormula ? rawFormulaDisp : '';
 
     calculatedWorks.push({
@@ -3920,13 +3845,8 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
     ];
 
     declaredSubItems.forEach(mat => {
-      const rawMatType = (mat["Тип"] || mat.type || (Array.isArray(work["Оборудование"]) && work["Оборудование"].includes(mat) ? 'оборудование' : 'материал')).trim().toLowerCase();
-      let determinedMatType = 'материал';
-      if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
-        determinedMatType = 'оборудование';
-      } else if (rawMatType === 'работа' || rawMatType === 'work') {
-        determinedMatType = 'работа';
-      }
+      const defaultSub = (Array.isArray(work["Оборудование"]) && work["Оборудование"].includes(mat)) ? 'оборудование' : 'материал';
+      const determinedMatType = normalizeItemType(mat["Тип"] || mat.type || defaultSub, 'материал');
       const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_КАБЕЛЯ}').trim();
       const matUnit = mat["Единицы измерения"] || mat.unit || 'км';
       const matFormula = mat["Формула"] || mat.formula || "ДЛИНА";
@@ -3948,14 +3868,14 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
         }
 
         cablesList.forEach(c => {
-          const cVol = evaluateWorkFormula(matFormula, c.length);
+          const cVol = validateAndEvaluateFormula(matFormula, c.length, 'cable').value;
           let formulaSuffix = '';
           if (isOptical) {
             formulaSuffix = ' (ВОЛС)';
           } else if (c.weight) {
             formulaSuffix = ` (масса 1 м: ${c.weight} кг)`;
           }
-          const rawCFormulaDisp = buildWorkFormulaDisplay(matFormula, c.length, 1, matUnit) + formulaSuffix;
+          const rawCFormulaDisp = buildWorkFormulaDisplay(matFormula, c.length, 1) + formulaSuffix;
           const cFormulaDisp = matShowFormula ? rawCFormulaDisp : '';
 
           calculatedWorks.push({
@@ -3996,7 +3916,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
           return; // Skip this material
         }
         const matRawVal = matEvalRes.value;
-        const rawMatFormulaDisp = buildWorkFormulaDisplay(matFormula, totalGroupLength, cablesList.length, matUnit);
+        const rawMatFormulaDisp = buildWorkFormulaDisplay(matFormula, totalGroupLength, cablesList.length);
         const matFormulaDisp = matShowFormula ? rawMatFormulaDisp : '';
         calculatedWorks.push({
           name: matNameTpl,
@@ -4086,7 +4006,6 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             name: workItem.name,
             unit: workItem.unit || 'шт',
             volume: rawVol,
-            volumeFormatted: String(rawVol),
             decimals: extractItemDecimals(workItem.rawItem || workItem),
             formula: formula,
             formulaDisplay: formulaDisplay,
@@ -4119,13 +4038,8 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 
           if (declaredSubItems.length > 0) {
             declaredSubItems.forEach(mat => {
-              const rawMatType = (mat["Тип"] || mat.type || (Array.isArray(workItem.rawItem?.["Оборудование"]) && workItem.rawItem["Оборудование"].includes(mat) ? 'оборудование' : 'материал')).trim().toLowerCase();
-              let determinedMatType = 'материал';
-              if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
-                determinedMatType = 'оборудование';
-              } else if (rawMatType === 'работа' || rawMatType === 'work') {
-                determinedMatType = 'работа';
-              }
+              const defaultSub = (Array.isArray(workItem.rawItem?.["Оборудование"]) && workItem.rawItem["Оборудование"].includes(mat)) ? 'оборудование' : 'материал';
+              const determinedMatType = normalizeItemType(mat["Тип"] || mat.type || defaultSub, 'материал');
 
               const matNameTpl = (mat["Наименование"] || mat.name || '{МАРКА_МУФТЫ}').trim();
               const matUnit = mat["Единицы измерения"] || mat.unit || 'шт';
@@ -4167,7 +4081,6 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                     name: finalMatName,
                     unit: couplingMatUnit,
                     volume: matRawVal,
-                    volumeFormatted: String(matRawVal),
                     decimals: extractItemDecimals(mat),
                     formula: matFormula,
                     formulaDisplay: matFormulaDisp,
@@ -4206,7 +4119,6 @@ function calculateWorksFromCables(cableSummary, rulesData) {
                   name: matNameTpl,
                   unit: matUnit,
                   volume: matRawVal,
-                  volumeFormatted: String(matRawVal),
                   decimals: extractItemDecimals(mat),
                   formula: matFormula,
                   formulaDisplay: matFormulaDisp,
@@ -4236,7 +4148,6 @@ function calculateWorksFromCables(cableSummary, rulesData) {
               name: coupling.fullName,
               unit: coupling.unit || 'шт',
               volume: coupling.count,
-              volumeFormatted: String(coupling.count),
               decimals: extractItemDecimals(coupling),
               formula: 'КОЛИЧЕСТВО',
               formulaDisplay: showFormula ? `${coupling.count} ${coupling.unit || 'шт'}` : '',
@@ -4509,8 +4420,6 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 // EQUIPMENT RULES & CALCULATION FUNCTIONS
 // --------------------------------------------------------------------------
 
-// (getEquipmentRulesDict, getEquipmentRulesList, and getEquipmentItemWorksObject are provided centrally by rules_store.js)
-
 
 
 function buildEquipmentFormulaDisplay(formula, count, unit) {
@@ -4587,7 +4496,6 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
             name: work.trim(),
             unit: 'шт',
             volume: count,
-            volumeFormatted: String(count),
             formula: 'КОЛИЧЕСТВО',
             formulaDisplay: `${count} шт`,
             showFormula: true,
@@ -4605,13 +4513,7 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           return;
         }
 
-        const rawWorkType = (work["Тип"] || work.type || '').trim().toLowerCase();
-        let determinedWorkType = 'работа';
-        if (rawWorkType === 'оборудование' || rawWorkType === 'equipment') {
-          determinedWorkType = 'оборудование';
-        } else if (rawWorkType === 'материал' || rawWorkType === 'material') {
-          determinedWorkType = 'материал';
-        }
+        const determinedWorkType = normalizeItemType(work["Тип"] || work.type, 'работа');
         const isWorkSub = determinedWorkType === 'материал' || determinedWorkType === 'оборудование';
         const unit = work["Единицы измерения"] || work.unit || 'шт';
         const formula = (work["Формула"] || work.formula || "КОЛИЧЕСТВО").trim();
@@ -4639,7 +4541,6 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
             name: workTitle,
             unit: unit,
             volume: rawVol,
-            volumeFormatted: String(rawVol),
             decimals: extractItemDecimals(work),
             formula: formula,
             formulaDisplay: formulaDisplay,
@@ -4673,7 +4574,6 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
               name: mat.trim(),
               unit: 'шт',
               volume: count,
-              volumeFormatted: String(count),
               formula: 'КОЛИЧЕСТВО',
               formulaDisplay: `${count} шт`,
               showFormula: true,
@@ -4693,13 +4593,8 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
           }
 
           const isDirectEquip = Array.isArray(work["Оборудование"]) && work["Оборудование"].includes(mat);
-          const rawMatType = (mat["Тип"] || mat.type || (isDirectEquip ? 'оборудование' : 'материал')).trim().toLowerCase();
-          let determinedMatType = 'материал';
-          if (rawMatType === 'оборудование' || rawMatType === 'equipment') {
-            determinedMatType = 'оборудование';
-          } else if (rawMatType === 'работа' || rawMatType === 'work') {
-            determinedMatType = 'работа';
-          }
+          const defaultSub = isDirectEquip ? 'оборудование' : 'материал';
+          const determinedMatType = normalizeItemType(mat["Тип"] || mat.type || defaultSub, defaultSub);
           const matUnit = mat["Единицы измерения"] || mat.unit || 'шт';
           const matFormula = (mat["Формула"] || mat.formula || "КОЛИЧЕСТВО").trim();
           const matName = (mat["Наименование"] || mat.name || itemMark).trim();
@@ -4727,7 +4622,6 @@ function calculateWorksFromEquipment(equipmentSummary, rulesData) {
             name: matName,
             unit: matUnit,
             volume: matRawVol,
-            volumeFormatted: String(matRawVol),
             decimals: extractItemDecimals(mat),
             formula: matFormula,
             formulaDisplay: matFormulaDisp,
@@ -4935,9 +4829,7 @@ function aggregateCalculatedWorks(rawWorksList) {
     }
 
     if (targetGroup) {
-      const rawMatType = (item.type || '').trim().toLowerCase();
-      const isEquip = rawMatType === 'оборудование' || rawMatType === 'equipment';
-      const determinedType = isEquip ? 'оборудование' : (rawMatType === 'работа' ? 'работа' : 'материал');
+      const determinedType = normalizeItemType(item.type, 'материал');
       const matKey = `${matName.toLowerCase()}__${matUnit.toLowerCase()}__${determinedType}`;
       const itemShowFormula = (item.showFormula !== undefined) ? item.showFormula : (targetGroup.showFormula !== false && Boolean(item.formulaDisplay && item.formulaDisplay.trim()));
 
@@ -5014,7 +4906,6 @@ function aggregateCalculatedWorks(rawWorksList) {
       name: work.name,
       unit: work.unit,
       volume: roundedWorkVol,
-      volumeFormatted: String(roundedWorkVol),
       decimals: work.decimals,
       formulaDisplay: finalWorkFormula,
       showFormula: Boolean(finalWorkFormula),
@@ -5048,7 +4939,6 @@ function aggregateCalculatedWorks(rawWorksList) {
         name: mat.name,
         unit: mat.unit,
         volume: roundedMatVol,
-        volumeFormatted: String(roundedMatVol),
         decimals: mat.decimals,
         formulaDisplay: finalMatFormula,
         showFormula: Boolean(finalMatFormula),
@@ -5085,7 +4975,6 @@ function aggregateCalculatedWorks(rawWorksList) {
       name: orphan.name,
       unit: orphan.unit,
       volume: orphanVol,
-      volumeFormatted: String(orphanVol),
       decimals: orphan.decimals,
       formulaDisplay: isShowFormula ? normalizeFormulaMathOperators(orphan.formulaDisplay || '') : '',
       showFormula: isShowFormula,

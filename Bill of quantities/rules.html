@@ -5,11 +5,11 @@
   <title>Сметные правила и справочники — ВОР | Signaling & Interlocking</title>
   <meta name="description" content="Полноэкранный редактор сметных норм, справочника кабелей, способов прокладки и оборудования для модуля Ведомости объемов работ (ВОР).">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
+  <link rel="icon" type="image/svg+xml" href="../assets/logo.svg">
 
   <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-  <link href="/assets/theme.min.css" rel="stylesheet">
-  <link href="/assets/bootstrap-icons.css" rel="stylesheet">
+  <link href="../assets/theme.min.css" rel="stylesheet">
+  <link href="../assets/bootstrap-icons.css" rel="stylesheet">
   
   <style>
   :root {
@@ -50,16 +50,16 @@
     border-color: rgba(37, 99, 235, 0.2);
   }
 
-  .table-responsive-full {
-    max-height: 640px;
-    overflow-y: auto;
+  .card-header {
+    width: 100% !important;
   }
-  .table-sticky-header th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background-color: var(--si-tertiary-bg, #f1f5f9) !important;
+
+  #rulesActionsDropdownMenu {
+    top: 100% !important;
+    bottom: auto !important;
+    transform: none !important;
   }
+
 
   /* Silicon theme fixes: prevent invisible white text on light backgrounds */
   .text-secondary,
@@ -109,7 +109,7 @@
           <span class="d-none d-sm-inline">К расчету</span>
         </a>
         <div class="d-flex align-items-center gap-2">
-          <img src="/assets/logo.svg" width="32" alt="S & I">
+          <img src="../assets/logo.svg" width="32" alt="S & I">
           <span class="fw-bold fs-6 text-dark d-none d-md-inline">ВОР · Нормативная база</span>
         </div>
       </div>
@@ -138,9 +138,9 @@
       
       <!-- Left Sidebar Navigation: Sections -->
       <div class="col-12 col-md-3 col-xl-2">
-        <div class="card border shadow-sm sticky-top" style="top: 80px;">
-          <div class="card-header bg-body-tertiary py-2 px-3 w-100">
-            <div class="fw-bold small text-uppercase text-muted">Разделы правил</div>
+        <div class="card border shadow-sm sticky-top" style="top: 80px; container-type: inline-size;">
+          <div class="card-header bg-body-tertiary py-2 px-3 w-100 text-center">
+            <div class="fw-bold small text-uppercase text-muted text-center">Разделы правил</div>
           </div>
           <div class="card-body p-2 d-flex flex-column gap-1" id="rulesNavList">
             <a href="#construction" class="rules-nav-pill active" id="navPillConstruction" data-pane="tabWorksConstructionPane">
@@ -178,29 +178,38 @@
             </a>
           </div>
 
-          <!-- Actions Block: Save, Import, Export, Reset -->
-          <div class="p-2 border-top bg-body-tertiary d-flex flex-column gap-2">
-            <button type="button" id="btnSaveRulesHeader" class="btn btn-sm btn-primary w-100 d-flex align-items-center justify-content-center gap-1_5 fw-semibold shadow-sm" title="Сохранить правила в LocalStorage для синхронизации с калькулятором (Ctrl+S)">
-              <i class='bx bx-save fs-5'></i>
-              <span>Сохранить</span>
-            </button>
-
+          <!-- Actions Block: Save with Dropdown on the right -->
+          <div class="p-2 border-top bg-body-tertiary">
             <div class="btn-group btn-group-sm w-100" role="group">
-              <label for="rulesFileInput" class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center gap-1 mb-0 py-1" style="cursor: pointer;" title="Импортировать свой JSON с правилами">
-                <i class='bx bx-upload'></i>
-                <span>Импорт</span>
-              </label>
-              <input type="file" id="rulesFileInput" class="d-none" accept=".json,application/json">
-
-              <button type="button" id="downloadRulesBtn" class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center gap-1 py-1" title="Скачать активные правила в файл works_rules.json">
-                <i class='bx bx-download'></i>
-                <span>Экспорт</span>
+              <button type="button" id="btnSaveRulesHeader" class="btn btn-outline-secondary d-flex align-items-center justify-content-center gap-1_5 fw-semibold flex-grow-1" title="Сохранить правила в LocalStorage для синхронизации с калькулятором (Ctrl+S)">
+                <span>Сохранить</span>
               </button>
-
-              <button type="button" id="resetRulesBtn" class="btn btn-outline-danger d-inline-flex align-items-center justify-content-center py-1 px-2" title="Сбросить правила к заводским works_rules.json">
-                <i class='bx bx-reset'></i>
+              <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split px-1" id="rulesActionsDropdownBtn" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="flex: 0 0 28px; width: 28px;" title="Дополнительные действия (импорт, экспорт, сброс)">
+                <span class="visually-hidden">Меню действий</span>
               </button>
+              <ul class="dropdown-menu dropdown-menu-end shadow-sm my-1" id="rulesActionsDropdownMenu" style="min-width: 210px;" aria-labelledby="rulesActionsDropdownBtn">
+                <li>
+                  <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-1_5" id="btnImportRulesDropdown">
+                    <i class='bx bx-upload text-primary fs-5'></i>
+                    <span>Импорт правил (.json)</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" id="downloadRulesBtn" class="dropdown-item d-flex align-items-center gap-2 py-1_5" title="Скачать активные правила в файл works_rules.json">
+                    <i class='bx bx-download text-success fs-5'></i>
+                    <span>Экспорт правил (.json)</span>
+                  </button>
+                </li>
+                <li><hr class="dropdown-divider my-1"></li>
+                <li>
+                  <button type="button" id="resetRulesBtn" class="dropdown-item d-flex align-items-center gap-2 py-1_5 text-danger" title="Сбросить правила к заводским works_rules.json">
+                    <i class='bx bx-reset fs-5 text-danger'></i>
+                    <span>Сбросить к заводским</span>
+                  </button>
+                </li>
+              </ul>
             </div>
+            <input type="file" id="rulesFileInput" class="d-none" accept=".json,application/json">
           </div>
 
           <!-- Storage Status & Metadata Info under buttons -->
@@ -220,7 +229,7 @@
           <!-- Pane 1: Строительные работы -->
           <div class="tab-pane fade show active" id="tabWorksConstructionPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
-              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2 w-100">
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-hard-hat fs-5 text-primary'></i>
                   <h2 class="fs-6 fw-bold mb-0">Строительные работы (траншеи, земляные работы, проколы)</h2>
@@ -250,7 +259,7 @@
           <!-- Pane 2: Монтажные работы -->
           <div class="tab-pane fade" id="tabWorksInstallationPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
-              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2 w-100">
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-wrench fs-5 text-info'></i>
                   <h2 class="fs-6 fw-bold mb-0">Монтажные работы (прокладка кабелей, лотки, конструкции)</h2>
@@ -280,7 +289,7 @@
           <!-- Pane 3: Оборудование -->
           <div class="tab-pane fade" id="tabWorksEquipmentPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
-              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2 w-100">
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-cube fs-5 text-info'></i>
                   <h2 class="fs-6 fw-bold mb-0">Справочник оборудования и способов монтажа</h2>
@@ -310,7 +319,7 @@
           <!-- Pane 4: Справочник кабелей -->
           <div class="tab-pane fade" id="tabWorksCablesPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
-              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2 w-100">
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-network-chart fs-5 text-success'></i>
                   <h2 class="fs-6 fw-bold mb-0">Справочник кабельной продукции, строительных длин и соответствия обозначений</h2>
@@ -354,7 +363,7 @@
           <!-- Pane 5: Справочник муфт -->
           <div class="tab-pane fade" id="tabWorksCouplingsPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
-              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="card-header py-2 px-3 bg-body-tertiary d-flex flex-wrap align-items-center justify-content-between gap-2 w-100">
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-git-merge fs-5 text-warning'></i>
                   <h2 class="fs-6 fw-bold mb-0">Справочник соединительных муфт</h2>
@@ -384,7 +393,7 @@
           <!-- Pane 6: Настройки расчета -->
           <div class="tab-pane fade" id="tabWorksSettingsPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
-              <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between flex-wrap gap-2 w-100">
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-cog fs-5 text-primary'></i>
                   <h2 class="fs-6 fw-bold mb-0">Параметры расчетов, экспорта GGE и округления</h2>
@@ -438,7 +447,7 @@
           <!-- Pane 7: Исходный JSON (Легковесный просмотр) -->
           <div class="tab-pane fade" id="tabWorksJsonPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
-              <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between">
+              <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between w-100">
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-code-curly fs-5 text-warning'></i>
                   <h2 class="fs-6 fw-bold mb-0">Исходный JSON правил и нормативной базы</h2>
@@ -919,8 +928,8 @@
   </div>
 
   <!-- Scripts -->
-  <script src="/assets/theme.min.js"></script>
-  <script src="/assets/theme-switcher.js"></script>
+  <script src="../assets/theme.min.js"></script>
+  <script src="../assets/theme-switcher.js"></script>
 
   <script src="./rules_store.js"></script>
   <script src="./rules_modal.js"></script>

@@ -821,6 +821,17 @@
   }
   window.getEquipmentItemWorksObject = getEquipmentItemWorksObject;
 
+  // Universal helper to normalize item/work/material/equipment type string
+  function normalizeItemType(typeStr, defaultType = 'работа') {
+    if (!typeStr || typeof typeStr !== 'string') return defaultType;
+    const t = typeStr.trim().toLowerCase();
+    if (t === 'оборудование' || t === 'equipment') return 'оборудование';
+    if (t === 'материал' || t === 'material') return 'материал';
+    if (t === 'работа' || t === 'work') return 'работа';
+    return defaultType;
+  }
+  window.normalizeItemType = normalizeItemType;
+
   // Single Source of Truth exports on rulesStore namespace
   if (window.rulesStore) {
     window.rulesStore.escapeHtml = escapeHtml;
@@ -842,5 +853,6 @@
     window.rulesStore.getEquipmentRulesDict = getEquipmentRulesDict;
     window.rulesStore.getEquipmentRulesList = getEquipmentRulesList;
     window.rulesStore.getEquipmentItemWorksObject = getEquipmentItemWorksObject;
+    window.rulesStore.normalizeItemType = normalizeItemType;
   }
 

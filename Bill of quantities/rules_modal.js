@@ -75,33 +75,34 @@ if (window.rulesStore && typeof window.rulesStore.subscribe === 'function') {
 const LOCAL_STORAGE_RULES_KEY = window.rulesStore ? window.rulesStore.STORAGE_KEY : 'si_works_rules_v1';
 const LOCAL_STORAGE_RULES_META_KEY = window.rulesStore ? window.rulesStore.META_KEY : 'si_works_rules_v1_meta';
 
-function saveWorksRulesToLocalStorage(rules) {
-  if (!rules || typeof rules !== 'object') return false;
-  if (window.rulesStore && typeof window.rulesStore.saveRules === 'function') {
-    window.rulesStore.saveRules(rules);
-    updateStorageStatusUi();
-    return true;
-  }
-  return false;
-}
+let isDraftDirty = false;
 
-function loadWorksRulesFromLocalStorage() {
-  if (window.rulesStore && typeof window.rulesStore.loadFromLocalStorage === 'function') {
-    return window.rulesStore.loadFromLocalStorage();
+function setDraftDirtyState(dirty) {
+  isDraftDirty = Boolean(dirty);
+  const saveBtn = document.getElementById('btnSaveRulesHeader');
+  const dateSpan = document.getElementById('storageDateSpan');
+  if (saveBtn) {
+    if (isDraftDirty) {
+      saveBtn.classList.remove('btn-outline-secondary', 'btn-outline-success', 'btn-primary');
+      saveBtn.classList.add('btn-warning');
+      saveBtn.title = 'Есть несохраненные изменения в черновике! Нажмите для сохранения в LocalStorage (Ctrl+S)';
+      saveBtn.innerHTML = `<span>Сохранить *</span>`;
+    } else {
+      saveBtn.classList.remove('btn-warning', 'btn-outline-success', 'btn-primary');
+      saveBtn.classList.add('btn-outline-secondary');
+      saveBtn.title = 'Сохранить правила в LocalStorage для синхронизации с калькулятором (Ctrl+S)';
+      saveBtn.innerHTML = `<span>Сохранить</span>`;
+    }
   }
-  return null;
-}
-
-function clearWorksRulesFromLocalStorage() {
-  if (window.rulesStore && typeof window.rulesStore.clearStorage === 'function') {
-    window.rulesStore.clearStorage();
-  } else {
-    localStorage.removeItem(LOCAL_STORAGE_RULES_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_RULES_META_KEY);
+  if (dateSpan) {
+    if (isDraftDirty) {
+      dateSpan.innerHTML = `<span class="badge bg-warning text-dark font-monospace py-0 px-1" style="font-size: 0.65rem;" title="Есть несохраненные правки в черновике">Черновик *</span>`;
+    } else {
+      updateStorageStatusUi();
+    }
   }
-  updateStorageStatusUi();
-  return true;
 }
+window.setDraftDirtyState = setDraftDirtyState;
 
 function updateStorageStatusUi() {
   const raw = localStorage.getItem(LOCAL_STORAGE_RULES_KEY);
@@ -119,13 +120,17 @@ function updateStorageStatusUi() {
   const dateStr = (meta && meta.savedAt) ? new Date(meta.savedAt).toLocaleString('ru-RU') : (hasSaved ? 'Сохранено' : '—');
 
   if (sizeSpan) sizeSpan.textContent = sizeKb;
-  if (dateSpan) dateSpan.textContent = dateStr;
+  if (dateSpan && !isDraftDirty) dateSpan.textContent = dateStr;
 }
 
-window.saveWorksRulesToLocalStorage = saveWorksRulesToLocalStorage;
-window.loadWorksRulesFromLocalStorage = loadWorksRulesFromLocalStorage;
-window.clearWorksRulesFromLocalStorage = clearWorksRulesFromLocalStorage;
 window.updateStorageStatusUi = updateStorageStatusUi;
+
+window.addEventListener('beforeunload', (e) => {
+  if (isDraftDirty) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
 // Standard search query extractor with clear-button toggle
 function getModalSearchQuery(inputId, clearBtnId) {
@@ -412,7 +417,7 @@ function renderSingleRulesSectionHtml(sec, query) {
 
     html += `
       <div class="card border shadow-sm">
-        <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2 w-100">
           <div class="fw-bold d-flex align-items-center gap-2">
             <i class="bx bx-git-commit text-primary"></i>
             <span>${rIdx + 1}. ${escapeHtml(rName)}</span>
@@ -727,7 +732,7 @@ function renderCableCatalogModalContent(rulesObj = null) {
 
     html += `
       <div class="card border shadow-sm mb-3">
-        <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2 w-100">
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <i class="bx ${isOptGroup ? 'bx-broadcast text-info' : 'bx-network-chart text-primary'} fs-5"></i>
             <div class="d-flex align-items-center gap-2">
@@ -907,7 +912,7 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
 
     return `
       <div class="card border shadow-sm mb-3">
-        <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="card-header py-2 px-3 bg-body-tertiary d-flex justify-content-between align-items-center flex-wrap gap-2 w-100">
           <div class="fw-bold d-flex align-items-center gap-2 flex-wrap">
             <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-monospace">${idx + 1}</span>
             <i class="bx bx-cube text-warning fs-5"></i>
@@ -1074,24 +1079,6 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
 
 
 
-function openWorksRulesModal(activeTab = 'editor') {
-  const hashToPill = {
-    'construction': '#navPillConstruction',
-    'installation': '#navPillInstallation',
-    'equipment': '#navPillEquipment',
-    'cables': '#navPillCables',
-    'couplings': '#navPillCouplings',
-    'settings': '#navPillSettings',
-    'editor': '#navPillJson',
-    'json': '#navPillJson'
-  };
-  const pillSelector = hashToPill[activeTab] || '#navPillConstruction';
-  const pill = document.querySelector(pillSelector);
-  if (pill) {
-    pill.click();
-  }
-}
-window.openWorksRulesModal = openWorksRulesModal;
 
 function validateWorksJsonInput() {
   const val = getWorksJsonEditorValue();
@@ -1194,7 +1181,7 @@ function setupWorksRulesListeners() {
     if (tplInput) tplInput.value = '';
     const instTiers = document.getElementById('addRuleInstallationTiersContainer');
     if (instTiers) {
-      applyInstallationPreset('standard', '');
+      applyDefaultStandardTiers('');
     }
   }
 
@@ -1474,10 +1461,10 @@ function setupWorksRulesListeners() {
   function setupUnifiedWorkCardsContainerEvents(container, defaultCardOptions = {}, defaultRowOptions = {}) {
     if (!container) return;
     container.addEventListener('click', (e) => {
-      const addNestedBtn = e.target.closest('.btn-add-nested-row, .btn-add-work-material, .btn-add-equip-nested-item');
+      const addNestedBtn = e.target.closest('.btn-add-nested-row');
       if (addNestedBtn) {
-        const card = addNestedBtn.closest('.unified-work-card, .rule-work-card, .equip-work-card');
-        const tbody = card ? (card.querySelector('.unified-nested-tbody') || card.querySelector('.rule-work-materials-tbody') || card.querySelector('.equip-work-nested-tbody')) : null;
+        const card = addNestedBtn.closest('.unified-work-card');
+        const tbody = card ? card.querySelector('.unified-nested-tbody') : null;
         if (tbody) {
           appendUnifiedNestedItemRow(
             tbody,
@@ -1485,23 +1472,23 @@ function setupWorksRulesListeners() {
             defaultRowOptions.type || 'материал',
             defaultRowOptions.unit || 'шт',
             defaultRowOptions.formula || defaultCardOptions.defaultFormula || 'ДЛИНА',
-            defaultRowOptions.allowSectionSelect || false,
+            defaultRowOptions.show !== undefined ? defaultRowOptions.show : (defaultCardOptions.defaultShowFormula !== undefined ? defaultCardOptions.defaultShowFormula : true),
             defaultRowOptions.defaultSection || defaultCardOptions.defaultSection || ''
           );
         }
         return;
       }
 
-      const removeRowBtn = e.target.closest('.btn-remove-nested-row, .btn-remove-mat-row, .btn-remove-equip-item-row');
+      const removeRowBtn = e.target.closest('.btn-remove-nested-row');
       if (removeRowBtn) {
         const tr = removeRowBtn.closest('tr');
         if (tr) tr.remove();
         return;
       }
 
-      const removeCardBtn = e.target.closest('.btn-remove-unified-work-card, .btn-remove-work-card, .btn-remove-equip-work-card');
+      const removeCardBtn = e.target.closest('.btn-remove-unified-work-card');
       if (removeCardBtn) {
-        const card = removeCardBtn.closest('.unified-work-card, .rule-work-card, .equip-work-card');
+        const card = removeCardBtn.closest('.unified-work-card');
         if (card) {
           card.remove();
           refreshUnifiedWorkCardBadges(container);
@@ -1858,9 +1845,6 @@ function setupWorksRulesListeners() {
     refreshInstallationTiersBadges(container);
   }
 
-  function applyInstallationPreset(presetType, wayName = '') {
-    applyDefaultStandardTiers(wayName);
-  }
 
   function collectInstallationTiersData() {
     const container = document.getElementById('addRuleInstallationTiersContainer');
@@ -2063,10 +2047,10 @@ function setupWorksRulesListeners() {
             });
             refreshInstallationTiersBadges(instContainer);
           } else {
-            applyInstallationPreset('standard', ruleName);
+            applyDefaultStandardTiers(ruleName);
           }
         } else {
-          applyInstallationPreset('standard', ruleName);
+          applyDefaultStandardTiers(ruleName);
         }
       }
     } else {
@@ -2119,7 +2103,7 @@ function setupWorksRulesListeners() {
       if (instContainer) instContainer.classList.remove('d-none');
       const instTiers = document.getElementById('addRuleInstallationTiersContainer');
       if (instTiers && instTiers.children.length === 0) {
-        applyInstallationPreset('standard');
+        applyDefaultStandardTiers('');
       }
     } else {
       if (constrContainer) constrContainer.classList.remove('d-none');
@@ -2172,7 +2156,7 @@ function setupWorksRulesListeners() {
       }
 
       // Remove material row in tier
-      const removeMatBtn = e.target.closest('.btn-remove-nested-row, .btn-remove-nested-item, .btn-remove-mat-row');
+      const removeMatBtn = e.target.closest('.btn-remove-nested-row');
       if (removeMatBtn) {
         const tr = removeMatBtn.closest('tr');
         const card = removeMatBtn.closest('.tier-card');
@@ -2734,7 +2718,6 @@ function setupWorksRulesListeners() {
       const isEdit = addCableEditContext && addCableEditContext.mode === 'edit';
       const displayGroup = groupKey === '' ? 'Основная группа ("")' : `группа "${groupKey}"`;
       commitDraftRulesMutation(currentObj, {
-        saveToStorage: true,
         renderFn: (obj) => {
           renderCableCatalogModalContent(obj);
           renderCableGroupsOverviewModalContent(obj);
@@ -3017,13 +3000,13 @@ function setupWorksRulesListeners() {
   if (addEquipMarkInput) {
     addEquipMarkInput.addEventListener('input', () => {
       const mark = addEquipMarkInput.value.trim();
-      const firstWorkTitle = document.querySelector('#addEquipWorksContainer .unified-work-card:first-child .unified-work-title, #addEquipWorksContainer .equip-work-card:first-child .equip-work-title');
+      const firstWorkTitle = document.querySelector('#addEquipWorksContainer .unified-work-card:first-child .unified-work-title');
       if (firstWorkTitle && (!firstWorkTitle.value.trim() || firstWorkTitle.dataset.autoFilled === 'true')) {
         firstWorkTitle.value = mark ? `Монтаж оборудования типа ${mark}` : '';
         firstWorkTitle.dataset.autoFilled = 'true';
       }
-      const firstItemName = document.querySelector('#addEquipWorksContainer .unified-work-card:first-child .unified-nested-name, #addEquipWorksContainer .equip-work-card:first-child .equip-item-name');
-      const firstItemType = document.querySelector('#addEquipWorksContainer .unified-work-card:first-child .unified-nested-type, #addEquipWorksContainer .equip-work-card:first-child .equip-item-type');
+      const firstItemName = document.querySelector('#addEquipWorksContainer .unified-work-card:first-child .unified-nested-name');
+      const firstItemType = document.querySelector('#addEquipWorksContainer .unified-work-card:first-child .unified-nested-type');
       if (firstItemName && firstItemType && firstItemType.value === 'оборудование' && (!firstItemName.value.trim() || firstItemName.dataset.autoFilled === 'true')) {
         firstItemName.value = mark;
         firstItemName.dataset.autoFilled = 'true';
@@ -3182,6 +3165,7 @@ function setupWorksRulesListeners() {
         currentDraft["Настройки"][key] = transform(el.value);
         modalDraftRules = currentDraft;
         setWorksJsonEditorValue(JSON.stringify(currentDraft, null, 2));
+        setDraftDirtyState(true);
       });
     }
   });
@@ -3382,11 +3366,6 @@ function setupWorksRulesListeners() {
     setWorksJsonEditorValue(JSON.stringify(newObj, null, 2));
     validateWorksJsonInput();
 
-    if (options.saveToStorage) {
-      if (window.rulesStore && typeof window.rulesStore.saveRules === 'function') {
-        window.rulesStore.saveRules(modalDraftRules);
-      }
-    }
     if (typeof options.renderFn === 'function') {
       options.renderFn(modalDraftRules);
     } else {
@@ -3400,7 +3379,10 @@ function setupWorksRulesListeners() {
       }
     }
     if (typeof options.resetFn === 'function') options.resetFn();
-    if (options.toast) showToast(options.toast, options.toastType || 'success', options.toastTitle || 'Удалено');
+    if (options.toast) showToast(options.toast, options.toastType || 'success', options.toastTitle || 'Черновик обновлен');
+
+    // Mark draft as modified so user clearly sees unsaved changes
+    setDraftDirtyState(true);
   }
 
   function deleteRuleItem(sectionName, ruleName) {
@@ -3730,7 +3712,6 @@ function setupWorksRulesListeners() {
 
     populateDynamicCableGroups(currentObj);
     commitDraftRulesMutation(currentObj, {
-      saveToStorage: true,
       renderFn: (obj) => {
         renderCableCatalogModalContent(obj);
         renderCableGroupsOverviewModalContent(obj);
@@ -3756,7 +3737,6 @@ function setupWorksRulesListeners() {
     populateDynamicCableGroups(currentObj);
 
     commitDraftRulesMutation(currentObj, {
-      saveToStorage: true,
       renderFn: (obj) => {
         renderCableCatalogModalContent(obj);
         renderCableGroupsOverviewModalContent(obj);
