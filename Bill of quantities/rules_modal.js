@@ -423,7 +423,7 @@ function renderSingleRulesSectionHtml(sec, query) {
             <span>${rIdx + 1}. ${escapeHtml(rName)}</span>
           </div>
           <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
-            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Редактировать этот способ прокладки">
+            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-3 btn-edit-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Редактировать этот способ прокладки">
               <i class='bx bx-edit-alt'></i>
             </button>
             <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-rule" data-rule-section="${escapeHtml(sec.name)}" data-rule-name="${escapeHtml(rName)}" title="Удалить этот способ прокладки из правил">
@@ -717,7 +717,7 @@ function renderCableCatalogModalContent(rulesObj = null) {
             <td>${couplingFormatted}</td>
             <td class="text-end pe-3 text-nowrap">
               <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
-                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Редактировать параметры марки кабеля">
+                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-3 btn-edit-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Редактировать параметры марки кабеля">
                   <i class='bx bx-edit-alt'></i>
                 </button>
                 <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-cable" data-cable-group="${escapeHtml(m.groupName)}" data-cable-mark="${escapeHtml(m.mark)}" title="Удалить эту марку кабеля из справочника">
@@ -896,7 +896,7 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             <div class="d-flex align-items-center gap-1">
               <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace fs-xs">${worksList.length} поз.</span>
               <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
-                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Редактировать сметные нормы для способа «${escapeHtml(methodName)}»">
+                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-3 btn-edit-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Редактировать сметные нормы для способа «${escapeHtml(methodName)}»">
                   <i class='bx bx-edit-alt'></i>
                 </button>
                 <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-equipment-method" data-equipment-mark="${escapeHtml(mark)}" data-method-name="${escapeHtml(methodName)}" title="Удалить этот способ установки">
@@ -921,7 +921,7 @@ function renderEquipmentCatalogModalContent(rulesObj = null) {
             ${unitTop ? `<span class="badge bg-body text-body border font-monospace ms-1" style="font-size: 0.72rem;">${escapeHtml(unitTop)}</span>` : ''}
           </div>
           <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
-            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Редактировать позицию оборудования">
+            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-3 btn-edit-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Редактировать позицию оборудования">
               <i class='bx bx-edit-alt'></i>
             </button>
             <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-equipment" data-equipment-mark="${escapeHtml(mark)}" title="Удалить всё оборудование «${escapeHtml(mark)}»">
@@ -1036,7 +1036,7 @@ function renderCouplingCatalogModalContent(rulesObj = null) {
         <td class="text-center font-monospace text-muted small">${escapeHtml(unit)}</td>
         <td class="text-end pe-3 text-nowrap">
           <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
-            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Редактировать муфту">
+            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-3 btn-edit-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Редактировать муфту">
               <i class='bx bx-edit-alt'></i>
             </button>
             <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-coupling" data-coupling-mark="${escapeHtml(mark)}" title="Удалить эту муфту из справочника">
@@ -1173,7 +1173,7 @@ function setupWorksRulesListeners() {
     }
     const btnSave = document.getElementById('btnSaveNewRule');
     if (btnSave) {
-      btnSave.innerHTML = `<i class='bx bx-check'></i> Добавить способ в правила`;
+      btnSave.innerHTML = `<i class='bx bx-check'></i> Сохранить`;
     }
     const btnDel = document.getElementById('btnDeleteCurrentRuleInModal');
     if (btnDel) btnDel.classList.add('d-none');
@@ -1361,12 +1361,12 @@ function setupWorksRulesListeners() {
             <table class="table table-sm table-hover align-middle mb-0">
               <thead class="table-light" style="font-size: 0.72rem;">
                 <tr>
-                  <th style="width: 32%;">Наименование</th>
+                  <th style="width: 30%;">Наименование</th>
                   <th style="width: 16%;">Тип</th>
                   <th style="width: 10%;">Ед. изм.</th>
                   <th style="width: 16%;">Формула</th>
                   <th style="width: 15%;">Раздел</th>
-                  <th style="width: 6%;" class="text-center" title="Показывать формулу">ВОР</th>
+                  <th style="width: 8%;" class="text-center" title="Показывать формулу">Формула</th>
                   <th style="width: 5%;" class="text-center"></th>
                 </tr>
               </thead>
@@ -1506,6 +1506,149 @@ function setupWorksRulesListeners() {
 
   let tierDomCounter = 0;
 
+  function createTierWorkItemCard(work = {}, options = {}) {
+    const workIndex = options.index || 1;
+    const isPrimary = workIndex === 1;
+    const workEl = document.createElement('div');
+    workEl.className = 'card p-2 bg-body rounded border mb-2 tier-work-item shadow-2xs';
+
+    const titleVal = work["Наименование"] || work.name || work.title || (isPrimary ? (options.defaultTitle || '') : '');
+    const unitVal = work["Единицы измерения"] || work.unit || 'м';
+    const formulaVal = work["Формула"] || work.formula || 'ДЛИНА';
+    const showFormula = work["ОтображатьФормулу"] !== undefined
+      ? Boolean(work["ОтображатьФормулу"])
+      : (work.showFormula !== undefined ? Boolean(work.showFormula) : true);
+
+    const materials = Array.isArray(work["Материалы"])
+      ? work["Материалы"]
+      : (Array.isArray(work.materials)
+          ? work.materials
+          : (isPrimary && options.defaultMaterials ? options.defaultMaterials : []));
+
+    const workItemId = `twork_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    workEl.innerHTML = `
+      <div class="d-flex align-items-center justify-content-between mb-2 pb-1 border-bottom flex-wrap gap-1">
+        <div class="d-flex align-items-center gap-1_5">
+          <span class="badge ${isPrimary ? 'bg-primary-subtle text-primary border' : 'bg-secondary-subtle text-secondary-emphasis border'} tier-work-index-badge">
+            ${isPrimary ? 'Основная работа' : `Работа ${workIndex}`}
+          </span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="form-check form-check-inline small mb-0 me-1">
+            <input class="form-check-input tier-work-show-formula" type="checkbox" ${showFormula ? 'checked' : ''} id="sh_${workItemId}">
+            <label class="form-check-label fs-xs user-select-none" for="sh_${workItemId}">Показ формулы</label>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1_5 btn-remove-tier-work" title="Удалить работу из этой ступени">
+            <i class='bx bx-trash fs-xs'></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-md-6">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Наименование сметной работы <span class="text-danger">*</span></label>
+          <input type="text" class="form-control form-control-sm tier-work-title" placeholder="Наименование сметной работы" value="${escapeHtml(titleVal)}" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Ед. изм.</label>
+          <input type="text" class="form-control form-control-sm tier-work-unit" placeholder="м" value="${escapeHtml(unitVal)}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Формула работы</label>
+          <input type="text" class="form-control form-control-sm font-monospace tier-work-formula" placeholder="ДЛИНА" value="${escapeHtml(formulaVal)}" required>
+        </div>
+      </div>
+
+      <!-- Materials for this work -->
+      <div class="p-2 rounded border bg-body-tertiary mt-2">
+        <div class="d-flex align-items-center justify-content-between mb-1_5">
+          <div class="d-flex align-items-center gap-1_5">
+            <i class='bx bx-layer text-success fs-6'></i>
+            <span class="fs-xs fw-semibold text-dark">Материалы работы:</span>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-success py-0 px-2 btn-add-tier-mat d-inline-flex align-items-center gap-1" title="Добавить дополнительный материал или сопутствующий ресурс">
+            <i class='bx bx-plus'></i> Добавить материал
+          </button>
+        </div>
+        <div class="table-responsive border rounded bg-body">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light" style="font-size: 0.72rem;">
+              <tr>
+                <th style="width: 30%;">Наименование ресурса</th>
+                <th style="width: 16%;">Тип</th>
+                <th style="width: 10%;">Ед. изм.</th>
+                <th style="width: 16%;">Формула</th>
+                <th style="width: 15%;">Раздел</th>
+                <th style="width: 8%;" class="text-center" title="Показывать формулу">Формула</th>
+                <th style="width: 5%;" class="text-center"></th>
+              </tr>
+            </thead>
+            <tbody class="tier-materials-tbody unified-nested-tbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    // Populate materials directly into editable table rows
+    const matsTbody = workEl.querySelector('.tier-materials-tbody');
+    if (matsTbody && materials.length > 0) {
+      materials.forEach(m => {
+        if (!m) return;
+        if (typeof m === 'string') {
+          appendUnifiedNestedItemRow(matsTbody, m, 'материал', 'м', 'ДЛИНА', true, 'Монтажные работы');
+        } else {
+          const mType = (m["Тип"] || m.type || 'материал').toLowerCase() === 'оборудование' ? 'оборудование' : 'материал';
+          appendUnifiedNestedItemRow(
+            matsTbody,
+            m["Наименование"] || m.name || '',
+            mType,
+            m["Единицы измерения"] || m.unit || (mType === 'оборудование' ? 'шт' : 'км'),
+            m["Формула"] || m.formula || 'ДЛИНА/1000',
+            m["ОтображатьФормулу"] !== undefined ? Boolean(m["ОтображатьФормулу"]) : true,
+            m["Раздел"] || m.section || ''
+          );
+        }
+      });
+    }
+
+    // Attach handler for adding material row on this work
+    const addTierMatBtn = workEl.querySelector('.btn-add-tier-mat');
+    if (addTierMatBtn && matsTbody) {
+      addTierMatBtn.addEventListener('click', () => {
+        appendUnifiedNestedItemRow(matsTbody, '', 'материал', 'м', 'ДЛИНА', true, '');
+        const cnt = workEl.querySelector('.tier-materials-count');
+        if (cnt) cnt.textContent = matsTbody.children.length;
+      });
+    }
+
+    return workEl;
+  }
+
+  function refreshTierWorksBadges(card) {
+    if (!card) return;
+    const workItems = Array.from(card.querySelectorAll('.tier-work-item'));
+    const total = workItems.length;
+    const countBadge = card.querySelector('.tier-works-count-badge');
+    if (countBadge) {
+      countBadge.textContent = `${total} ${total === 1 ? 'работа' : (total >= 2 && total <= 4 ? 'работы' : 'работ')}`;
+    }
+    workItems.forEach((wEl, idx) => {
+      const isPrimary = idx === 0;
+      const badge = wEl.querySelector('.tier-work-index-badge');
+      if (badge) {
+        badge.className = `badge ${isPrimary ? 'bg-primary-subtle text-primary border' : 'bg-secondary-subtle text-secondary-emphasis border'} tier-work-index-badge`;
+        badge.textContent = isPrimary ? 'Основная работа' : `Работа ${idx + 1}`;
+      }
+      const removeBtn = wEl.querySelector('.btn-remove-tier-work');
+      if (removeBtn) {
+        removeBtn.disabled = total <= 1;
+        removeBtn.title = total <= 1 ? 'В ступени должна оставаться хотя бы одна работа' : 'Удалить работу из этой ступени';
+      }
+    });
+  }
+
   function createInstallationTierCard(data = {}, options = {}) {
     tierDomCounter++;
     const tierId = `tier_${Date.now()}_${tierDomCounter}`;
@@ -1563,40 +1706,47 @@ function setupWorksRulesListeners() {
               ? (wayName ? `Прокладка кабеля массой 1 м свыше ${initialThreshold || 3} кг (${wayName})` : `Прокладка кабеля массой 1 м свыше ${initialThreshold || 3} кг`)
               : (wayName ? `Прокладка кабеля массой 1 м, кг, до: ${initialThreshold || 1} (${wayName})` : `Прокладка кабеля массой 1 м, кг, до: ${initialThreshold || 1}`)));
 
-    const titleVal = data.title !== undefined ? data.title : defaultTitle;
-    const unitVal = data.unit !== undefined ? data.unit : 'м';
-    const formulaVal = data.formula !== undefined ? data.formula : 'ДЛИНА';
-    const showFormula = data.showFormula !== undefined ? Boolean(data.showFormula) : true;
+    const defaultCableMat = [
+      {
+        "Наименование": "{МАРКА_КАБЕЛЯ}",
+        "Тип": "материал",
+        "Единицы измерения": "км",
+        "Формула": "ДЛИНА/1000",
+        "ОтображатьФормулу": true,
+        "Раздел": "Монтажные работы"
+      }
+    ];
 
-    // Materials: if explicit array is passed, use it; otherwise default to {МАРКА_КАБЕЛЯ}
-    const initialMaterials = Array.isArray(data.materials)
-      ? data.materials
-      : (data.includeCableMaterial === false
-          ? (Array.isArray(data.extraMaterials) ? data.extraMaterials : [])
-          : [
-              {
-                "Наименование": "{МАРКА_КАБЕЛЯ}",
-                "Тип": "материал",
-                "Единицы измерения": "км",
-                "Формула": "ДЛИНА/1000",
-                "ОтображатьФормулу": true,
-                "Раздел": "Монтажные работы"
-              },
-              ...(Array.isArray(data.extraMaterials) ? data.extraMaterials : [])
-            ]);
+    let worksList = [];
+    if (Array.isArray(data.works) && data.works.length > 0) {
+      worksList = data.works;
+    } else {
+      const initialMaterials = Array.isArray(data.materials)
+        ? data.materials
+        : (data.includeCableMaterial === false
+            ? (Array.isArray(data.extraMaterials) ? data.extraMaterials : [])
+            : [
+                ...defaultCableMat,
+                ...(Array.isArray(data.extraMaterials) ? data.extraMaterials : [])
+              ]);
+      worksList = [
+        {
+          "Наименование": data.title !== undefined ? data.title : defaultTitle,
+          "Единицы измерения": data.unit !== undefined ? data.unit : 'м',
+          "Формула": data.formula !== undefined ? data.formula : 'ДЛИНА',
+          "ОтображатьФормулу": data.showFormula !== undefined ? Boolean(data.showFormula) : true,
+          "Материалы": initialMaterials
+        }
+      ];
+    }
 
     card.innerHTML = `
       <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2 pb-1_5 border-bottom">
         <div class="d-flex align-items-center gap-2">
           <span class="badge bg-secondary-subtle text-secondary-emphasis border tier-index-badge">Ступень</span>
           <span class="badge bg-primary-subtle text-primary border tier-condition-badge">вес ≤ 1 кг/м</span>
-          <span class="fs-xs text-muted font-monospace tier-key-preview">ключ: "${escapeHtml(initialKey)}"</span>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <div class="form-check form-check-inline small mb-0 me-1">
-            <input class="form-check-input tier-work-show-formula" type="checkbox" ${showFormula ? 'checked' : ''} id="sh_${tierId}">
-            <label class="form-check-label fs-xs user-select-none" for="sh_${tierId}">Показ формулы</label>
-          </div>
           <div class="btn-group btn-group-sm">
             <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 btn-move-tier-up" title="Поднять выше"><i class='bx bx-chevron-up'></i></button>
             <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1_5 btn-move-tier-down" title="Опустить ниже"><i class='bx bx-chevron-down'></i></button>
@@ -1606,7 +1756,7 @@ function setupWorksRulesListeners() {
       </div>
 
       <div class="row g-2 align-items-end mb-2">
-        <div class="col-md-4">
+        <div class="${initialType === 'custom' ? 'col-md-4' : (initialType === 'optical' ? 'col-12' : 'col-md-6')} tier-type-col">
           <label class="form-label fs-xs fw-semibold mb-0 text-muted">Тип категории</label>
           <select class="form-select form-select-sm tier-type-select">
             <option value="up_to" ${initialType === 'up_to' ? 'selected' : ''}>Масса 1 м до X кг (≤)</option>
@@ -1615,103 +1765,49 @@ function setupWorksRulesListeners() {
             <option value="custom" ${initialType === 'custom' ? 'selected' : ''}>Пользовательский ключ</option>
           </select>
         </div>
-        <div class="col-md-3 tier-threshold-col" style="${initialType === 'optical' ? 'display: none;' : ''}">
+        <div class="${initialType === 'custom' ? 'col-md-3' : 'col-md-6'} tier-threshold-col" style="${initialType === 'optical' ? 'display: none;' : ''}">
           <label class="form-label fs-xs fw-semibold mb-0 text-muted">Порог (кг/м)</label>
           <input type="number" step="0.1" min="0" class="form-control form-control-sm tier-threshold-input font-monospace" placeholder="1" value="${initialThreshold !== null && initialThreshold !== undefined ? initialThreshold : ''}">
         </div>
-        <div class="col-md-5 tier-key-col">
+        <div class="col-md-5 tier-key-col" style="${initialType === 'custom' ? '' : 'display: none;'}">
           <label class="form-label fs-xs fw-semibold mb-0 text-muted">JSON ключ</label>
           <input type="text" class="form-control form-control-sm tier-key-input font-monospace" placeholder="1" value="${escapeHtml(initialKey)}" required>
         </div>
       </div>
 
-      <div class="row g-2 align-items-end mb-2">
-        <div class="col-md-6">
-          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Наименование сметной работы <span class="text-danger">*</span></label>
-          <input type="text" class="form-control form-control-sm tier-work-title" placeholder="Наименование сметной работы" value="${escapeHtml(titleVal)}" required>
-        </div>
-        <div class="col-md-2">
-          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Ед. изм.</label>
-          <input type="text" class="form-control form-control-sm tier-work-unit" placeholder="м" value="${escapeHtml(unitVal)}" required>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Формула работы</label>
-          <input type="text" class="form-control form-control-sm font-monospace tier-work-formula" placeholder="ДЛИНА" value="${escapeHtml(formulaVal)}" required>
-        </div>
-      </div>
+      <!-- Container for works in this tier -->
+      <div class="tier-works-container d-flex flex-column gap-1 mb-2"></div>
 
-      <!-- Materials and associated resources section (open & editable) -->
-      <div class="p-2 rounded border bg-body mt-2">
-        <div class="d-flex align-items-center justify-content-between mb-1_5">
-          <div class="d-flex align-items-center gap-1_5">
-            <i class='bx bx-layer text-success fs-6'></i>
-            <span class="fs-xs fw-semibold text-dark">Материалы монтажной работы (ключ «Материалы»):</span>
-            <span class="badge bg-secondary-subtle text-secondary-emphasis border tier-materials-count" style="font-size: 0.68rem;">${initialMaterials.length}</span>
-          </div>
-          <button type="button" class="btn btn-xs btn-outline-success py-0 px-2 btn-add-tier-mat d-inline-flex align-items-center gap-1" title="Добавить дополнительный материал или сопутствующий ресурс">
-            <i class='bx bx-plus'></i> Добавить материал
-          </button>
-        </div>
-        <div class="table-responsive border rounded bg-body">
-          <table class="table table-sm table-hover align-middle mb-0">
-            <thead class="table-light" style="font-size: 0.72rem;">
-              <tr>
-                <th style="width: 32%;">Наименование ресурса</th>
-                <th style="width: 16%;">Тип</th>
-                <th style="width: 10%;">Ед. изм.</th>
-                <th style="width: 16%;">Формула</th>
-                <th style="width: 15%;">Раздел</th>
-                <th style="width: 6%;" class="text-center" title="Показывать формулу">ВОР</th>
-                <th style="width: 5%;" class="text-center"></th>
-              </tr>
-            </thead>
-            <tbody class="tier-materials-tbody unified-nested-tbody">
-            </tbody>
-          </table>
-        </div>
+      <!-- Footer to add additional works to this tier -->
+      <div class="d-flex align-items-center justify-content-between pt-1_5 border-top">
+        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-add-work-to-tier d-inline-flex align-items-center gap-1" title="Добавить сопутствующую сметную работу в эту весовую категорию">
+          <i class='bx bx-plus'></i> Добавить работу в ступень
+        </button>
+        <span class="fs-xs text-muted">Работы и материалы рассчитываются для кабелей данной ступени</span>
       </div>
     `;
 
-    // Populate materials directly into editable table rows
-    const matsTbody = card.querySelector('.tier-materials-tbody');
-    if (matsTbody && initialMaterials.length > 0) {
-      initialMaterials.forEach(m => {
-        if (!m) return;
-        if (typeof m === 'string') {
-          appendUnifiedNestedItemRow(matsTbody, m, 'материал', 'м', 'ДЛИНА', true, 'Монтажные работы');
-        } else {
-          const mType = (m["Тип"] || m.type || 'материал').toLowerCase() === 'оборудование' ? 'оборудование' : 'материал';
-          appendUnifiedNestedItemRow(
-            matsTbody,
-            m["Наименование"] || m.name || '',
-            mType,
-            m["Единицы измерения"] || m.unit || (mType === 'оборудование' ? 'шт' : 'км'),
-            m["Формула"] || m.formula || 'ДЛИНА/1000',
-            m["ОтображатьФормулу"] !== undefined ? Boolean(m["ОтображатьФормулу"]) : true,
-            m["Раздел"] || m.section || ''
-          );
-        }
+    const worksContainer = card.querySelector('.tier-works-container');
+    worksList.forEach((w, idx) => {
+      const workEl = createTierWorkItemCard(w, {
+        index: idx + 1,
+        defaultTitle: defaultTitle,
+        defaultMaterials: defaultCableMat
       });
-    }
+      worksContainer.appendChild(workEl);
+    });
 
-    // Attach handler for adding material row on this card
-    const addTierMatBtn = card.querySelector('.btn-add-tier-mat');
-    if (addTierMatBtn && matsTbody) {
-      addTierMatBtn.addEventListener('click', () => {
-        appendUnifiedNestedItemRow(matsTbody, '', 'материал', 'м', 'ДЛИНА', true, '');
-        const cnt = card.querySelector('.tier-materials-count');
-        if (cnt) cnt.textContent = matsTbody.children.length;
-      });
-    }
+    refreshTierWorksBadges(card);
 
     // Attach internal sync handlers
     const typeSelect = card.querySelector('.tier-type-select');
+    const typeCol = card.querySelector('.tier-type-col');
     const thresholdCol = card.querySelector('.tier-threshold-col');
     const thresholdInput = card.querySelector('.tier-threshold-input');
+    const keyCol = card.querySelector('.tier-key-col');
     const keyInput = card.querySelector('.tier-key-input');
     const condBadge = card.querySelector('.tier-condition-badge');
     const keyPreview = card.querySelector('.tier-key-preview');
-    const titleInput = card.querySelector('.tier-work-title');
 
     const updateCardConditionAndKey = (isUserManualKey = false) => {
       const type = typeSelect.value;
@@ -1719,32 +1815,56 @@ function setupWorksRulesListeners() {
       const numT = parseFloat(tVal);
 
       if (type === 'optical') {
-        thresholdCol.style.display = 'none';
+        if (typeCol) typeCol.className = 'col-12 tier-type-col';
+        if (thresholdCol) thresholdCol.style.display = 'none';
+        if (keyCol) keyCol.style.display = 'none';
         condBadge.className = 'badge bg-info-subtle text-info border tier-condition-badge';
         condBadge.innerHTML = 'ВОЛС (оптика)';
         if (!isUserManualKey) keyInput.value = 'оптический';
       } else if (type === 'over') {
-        thresholdCol.style.display = '';
+        if (typeCol) typeCol.className = 'col-md-6 tier-type-col';
+        if (thresholdCol) {
+          thresholdCol.className = 'col-md-6 tier-threshold-col';
+          thresholdCol.style.display = '';
+        }
+        if (keyCol) keyCol.style.display = 'none';
         condBadge.className = 'badge bg-warning-subtle text-warning-emphasis border tier-condition-badge';
         condBadge.innerHTML = !isNaN(numT) ? `вес &gt; ${numT} кг/м` : 'вес &gt; X кг/м';
         if (!isUserManualKey) keyInput.value = !isNaN(numT) ? `свыше ${numT}` : 'свыше 3';
       } else if (type === 'up_to') {
-        thresholdCol.style.display = '';
+        if (typeCol) typeCol.className = 'col-md-6 tier-type-col';
+        if (thresholdCol) {
+          thresholdCol.className = 'col-md-6 tier-threshold-col';
+          thresholdCol.style.display = '';
+        }
+        if (keyCol) keyCol.style.display = 'none';
         condBadge.className = 'badge bg-primary-subtle text-primary border tier-condition-badge';
         condBadge.innerHTML = !isNaN(numT) ? `вес &le; ${numT} кг/м` : 'вес &le; X кг/м';
         if (!isUserManualKey) keyInput.value = !isNaN(numT) ? String(numT) : '1';
       } else {
-        thresholdCol.style.display = '';
+        if (typeCol) typeCol.className = 'col-md-4 tier-type-col';
+        if (thresholdCol) {
+          thresholdCol.className = 'col-md-3 tier-threshold-col';
+          thresholdCol.style.display = '';
+        }
+        if (keyCol) {
+          keyCol.className = 'col-md-5 tier-key-col';
+          keyCol.style.display = '';
+        }
         condBadge.className = 'badge bg-secondary-subtle text-secondary-emphasis border tier-condition-badge';
         condBadge.innerHTML = 'Кастомный ключ';
       }
 
-      keyPreview.textContent = `ключ: "${keyInput.value.trim()}"`;
+      if (keyPreview) {
+        keyPreview.textContent = `ключ: "${keyInput.value.trim()}"`;
+      }
     };
 
     typeSelect.addEventListener('change', () => {
       updateCardConditionAndKey(false);
-      const currTitle = titleInput.value.trim();
+      const firstTitleInput = card.querySelector('.tier-work-title');
+      if (!firstTitleInput) return;
+      const currTitle = firstTitleInput.value.trim();
       const currentWay = document.getElementById('addRuleWayName')?.value?.trim() || '';
       const currentTpl = document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
       const type = typeSelect.value;
@@ -1752,13 +1872,13 @@ function setupWorksRulesListeners() {
 
       if (!currTitle || currTitle.startsWith('Прокладка кабеля') || currTitle.startsWith('Прокладка оптического')) {
         if (type === 'optical') {
-          titleInput.value = currentWay ? `Прокладка оптического кабеля (${currentWay})` : 'Прокладка оптического кабеля';
+          firstTitleInput.value = currentWay ? `Прокладка оптического кабеля (${currentWay})` : 'Прокладка оптического кабеля';
         } else if (currentTpl && (currentTpl.includes('{масса}') || currentTpl.includes('{вес}'))) {
-          titleInput.value = currentTpl.replace(/\{масса\}|\{вес\}/gi, tVal || '1').trim();
+          firstTitleInput.value = currentTpl.replace(/\{масса\}|\{вес\}/gi, tVal || '1').trim();
         } else if (type === 'over') {
-          titleInput.value = currentWay ? `Прокладка кабеля массой 1 м свыше ${tVal || 3} кг (${currentWay})` : `Прокладка кабеля массой 1 м свыше ${tVal || 3} кг`;
+          firstTitleInput.value = currentWay ? `Прокладка кабеля массой 1 м свыше ${tVal || 3} кг (${currentWay})` : `Прокладка кабеля массой 1 м свыше ${tVal || 3} кг`;
         } else {
-          titleInput.value = currentWay ? `Прокладка кабеля массой 1 м, кг, до: ${tVal || 1} (${currentWay})` : `Прокладка кабеля массой 1 м, кг, до: ${tVal || 1}`;
+          firstTitleInput.value = currentWay ? `Прокладка кабеля массой 1 м, кг, до: ${tVal || 1} (${currentWay})` : `Прокладка кабеля массой 1 м, кг, до: ${tVal || 1}`;
         }
       }
     });
@@ -1768,7 +1888,9 @@ function setupWorksRulesListeners() {
     });
 
     keyInput.addEventListener('input', () => {
-      keyPreview.textContent = `ключ: "${keyInput.value.trim()}"`;
+      if (keyPreview) {
+        keyPreview.textContent = `ключ: "${keyInput.value.trim()}"`;
+      }
     });
 
     updateCardConditionAndKey(data.key !== undefined);
@@ -1861,10 +1983,6 @@ function setupWorksRulesListeners() {
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i];
       const key = card.querySelector('.tier-key-input')?.value?.trim();
-      const title = card.querySelector('.tier-work-title')?.value?.trim();
-      const unit = card.querySelector('.tier-work-unit')?.value?.trim() || 'м';
-      const formula = card.querySelector('.tier-work-formula')?.value?.trim() || 'ДЛИНА';
-      const showFormula = Boolean(card.querySelector('.tier-work-show-formula')?.checked);
       const type = card.querySelector('.tier-type-select')?.value || 'up_to';
       const rawThreshold = card.querySelector('.tier-threshold-input')?.value?.trim();
 
@@ -1880,57 +1998,80 @@ function setupWorksRulesListeners() {
       }
       usedKeys.add(key);
 
-      if (!title) {
-        showToast(`Укажите наименование сметной работы для ступени «${key}»`, 'warning', 'Проверка данных');
-        card.querySelector('.tier-work-title')?.focus();
-        return null;
-      }
-
       let parsedThreshold = null;
       if (rawThreshold !== undefined && rawThreshold !== '') {
         const num = parseFloat(rawThreshold.replace(',', '.'));
         if (!isNaN(num)) parsedThreshold = num;
       }
 
-      const workItem = {
-        "Наименование": title,
-        "Единицы измерения": unit,
-        "Формула": formula,
-        "Тип": "работа",
-        "ОтображатьФормулу": showFormula
-      };
-
-      if (type === 'optical') {
-        workItem["Категория"] = "Оптический кабель";
-      } else if (parsedThreshold !== null) {
-        workItem["МаксВес"] = parsedThreshold;
+      const workCards = card.querySelectorAll('.tier-work-item');
+      if (workCards.length === 0) {
+        showToast(`В ступени «${key}» должна быть хотя бы одна работа`, 'warning', 'Проверка данных');
+        return null;
       }
 
-      // Collect all materials directly from this tier's editable materials table
-      const materials = [];
-      const matRows = card.querySelectorAll('.tier-materials-tbody tr');
-      matRows.forEach(nr => {
-        const nName = nr.querySelector('.unified-nested-name')?.value?.trim();
-        if (!nName) return;
-        const nType = nr.querySelector('.unified-nested-type')?.value?.trim() || 'материал';
-        const nUnit = nr.querySelector('.unified-nested-unit')?.value?.trim() || 'км';
-        const nFormula = nr.querySelector('.unified-nested-formula')?.value?.trim() || 'ДЛИНА/1000';
-        const nSection = nr.querySelector('.unified-nested-section')?.value?.trim() || '';
-        const nShow = Boolean(nr.querySelector('.unified-nested-show')?.checked);
+      const tierWorksList = [];
 
-        const matItem = {
-          "Наименование": nName,
-          "Тип": nType,
-          "Единицы измерения": nUnit,
-          "Формула": nFormula,
-          "ОтображатьФормулу": nShow
+      for (let wIdx = 0; wIdx < workCards.length; wIdx++) {
+        const wCard = workCards[wIdx];
+        const title = wCard.querySelector('.tier-work-title')?.value?.trim();
+        const unit = wCard.querySelector('.tier-work-unit')?.value?.trim() || 'м';
+        const formula = wCard.querySelector('.tier-work-formula')?.value?.trim() || 'ДЛИНА';
+        const showFormula = Boolean(wCard.querySelector('.tier-work-show-formula')?.checked);
+
+        if (!title) {
+          showToast(`Укажите наименование работы ${wIdx + 1} для ступени «${key}»`, 'warning', 'Проверка данных');
+          wCard.querySelector('.tier-work-title')?.focus();
+          return null;
+        }
+
+        const workItem = {
+          "Наименование": title,
+          "Единицы измерения": unit,
+          "Формула": formula,
+          "Тип": "работа",
+          "ОтображатьФормулу": showFormula
         };
-        if (nSection) matItem["Раздел"] = nSection;
-        materials.push(matItem);
-      });
 
-      workItem["Материалы"] = materials;
-      tiersDict[key] = [workItem];
+        if (wIdx === 0) {
+          if (type === 'optical') {
+            workItem["Категория"] = "Оптический кабель";
+          } else if (parsedThreshold !== null) {
+            workItem["МаксВес"] = parsedThreshold;
+          }
+        }
+
+        // Collect all materials directly from this work's editable materials table
+        const materials = [];
+        const matRows = wCard.querySelectorAll('.tier-materials-tbody tr');
+        matRows.forEach(nr => {
+          const nName = nr.querySelector('.unified-nested-name')?.value?.trim();
+          if (!nName) return;
+          const nType = nr.querySelector('.unified-nested-type')?.value?.trim() || 'материал';
+          const nUnit = nr.querySelector('.unified-nested-unit')?.value?.trim() || 'км';
+          const nFormula = nr.querySelector('.unified-nested-formula')?.value?.trim() || 'ДЛИНА/1000';
+          const nSection = nr.querySelector('.unified-nested-section')?.value?.trim() || '';
+          const nShow = Boolean(nr.querySelector('.unified-nested-show')?.checked);
+
+          const matItem = {
+            "Наименование": nName,
+            "Тип": nType,
+            "Единицы измерения": nUnit,
+            "Формула": nFormula,
+            "ОтображатьФормулу": nShow
+          };
+          if (nSection) matItem["Раздел"] = nSection;
+          materials.push(matItem);
+        });
+
+        if (materials.length > 0 || wIdx === 0) {
+          workItem["Материалы"] = materials;
+        }
+
+        tierWorksList.push(workItem);
+      }
+
+      tiersDict[key] = tierWorksList;
     }
 
     return tiersDict;
@@ -1966,7 +2107,7 @@ function setupWorksRulesListeners() {
     }
     const btnSave = document.getElementById('btnSaveNewRule');
     if (btnSave) {
-      btnSave.innerHTML = `<i class='bx bx-check-double'></i> Сохранить изменения`;
+      btnSave.innerHTML = `<i class='bx bx-check'></i> Сохранить`;
     }
     const btnDel = document.getElementById('btnDeleteCurrentRuleInModal');
     if (btnDel) {
@@ -2002,13 +2143,13 @@ function setupWorksRulesListeners() {
             keys.forEach(key => {
               const val = rawWorks[key];
               const items = Array.isArray(val) ? val : (val ? [val] : []);
-              const firstItem = items[0] || {};
+              const primaryItem = items.find(it => (it["Тип"] || it.type) !== 'материал') || items[0] || {};
               const lowerKey = String(key).toLowerCase();
 
               let type = 'up_to';
               let threshold = null;
 
-              if (lowerKey.includes('оптич') || lowerKey.includes('волс') || (firstItem["Категория"] || '').toLowerCase().includes('оптич')) {
+              if (lowerKey.includes('оптич') || lowerKey.includes('волс') || (primaryItem["Категория"] || '').toLowerCase().includes('оптич')) {
                 type = 'optical';
               } else if (lowerKey.includes('свыше') || lowerKey.includes('более') || lowerKey.includes('от') || lowerKey.includes('>')) {
                 type = 'over';
@@ -2026,21 +2167,15 @@ function setupWorksRulesListeners() {
                 const m = cleanKey.match(/(?:до|макс(?:имум)?|свыше|более|от|>)[_\s]*[:;]?[_\s]*(\d+(?:[.,]\d+)?)/i);
                 if (m) threshold = parseFloat(m[1].replace(',', '.'));
               }
-              if (threshold === null && firstItem["МаксВес"] !== undefined) {
-                threshold = parseFloat(String(firstItem["МаксВес"]).replace(',', '.'));
+              if (threshold === null && primaryItem["МаксВес"] !== undefined) {
+                threshold = parseFloat(String(primaryItem["МаксВес"]).replace(',', '.'));
               }
-
-              const allMats = Array.isArray(firstItem["Материалы"]) ? firstItem["Материалы"] : [];
 
               const card = createInstallationTierCard({
                 key: key,
                 type: type,
                 threshold: threshold,
-                title: firstItem["Наименование"] || firstItem.name || '',
-                unit: firstItem["Единицы измерения"] || firstItem.unit || 'м',
-                formula: firstItem["Формула"] || firstItem.formula || 'ДЛИНА',
-                showFormula: firstItem["ОтображатьФормулу"] !== undefined ? Boolean(firstItem["ОтображатьФормулу"]) : true,
-                materials: allMats
+                works: items
               }, { ruleName: ruleName, template: ruleObj["Шаблон"] || '' });
 
               instContainer.appendChild(card);
@@ -2155,15 +2290,51 @@ function setupWorksRulesListeners() {
         return;
       }
 
-      // Remove material row in tier
+      // Add work to tier
+      const addWorkBtn = e.target.closest('.btn-add-work-to-tier');
+      if (addWorkBtn) {
+        const card = addWorkBtn.closest('.tier-card');
+        const worksContainer = card ? card.querySelector('.tier-works-container') : null;
+        if (worksContainer) {
+          const newWorkEl = createTierWorkItemCard({}, { index: worksContainer.children.length + 1 });
+          worksContainer.appendChild(newWorkEl);
+          refreshTierWorksBadges(card);
+          newWorkEl.querySelector('.tier-work-title')?.focus();
+        }
+        return;
+      }
+
+      // Remove work from tier
+      const removeWorkBtn = e.target.closest('.btn-remove-tier-work');
+      if (removeWorkBtn) {
+        const workItem = removeWorkBtn.closest('.tier-work-item');
+        const card = removeWorkBtn.closest('.tier-card');
+        if (workItem && card) {
+          const allWorks = card.querySelectorAll('.tier-work-item');
+          if (allWorks.length <= 1) {
+            showToast('В ступени должна оставаться хотя бы одна работа', 'warning', 'Предупреждение');
+            return;
+          }
+          workItem.remove();
+          refreshTierWorksBadges(card);
+        }
+        return;
+      }
+
+      // Remove material row in tier work
       const removeMatBtn = e.target.closest('.btn-remove-nested-row');
       if (removeMatBtn) {
         const tr = removeMatBtn.closest('tr');
+        const workItem = removeMatBtn.closest('.tier-work-item');
         const card = removeMatBtn.closest('.tier-card');
         if (tr) tr.remove();
-        if (card) {
-          const tbody = card.querySelector('.tier-materials-tbody') || card.querySelector('.tier-extra-mats-tbody');
-          const countSpan = card.querySelector('.tier-materials-count') || card.querySelector('.tier-extra-mats-count');
+        if (workItem) {
+          const tbody = workItem.querySelector('.tier-materials-tbody');
+          const countSpan = workItem.querySelector('.tier-materials-count');
+          if (tbody && countSpan) countSpan.textContent = tbody.children.length;
+        } else if (card) {
+          const tbody = card.querySelector('.tier-materials-tbody');
+          const countSpan = card.querySelector('.tier-materials-count');
           if (tbody && countSpan) countSpan.textContent = tbody.children.length;
         }
         return;
@@ -3838,7 +4009,7 @@ function setupWorksRulesListeners() {
           <td class="text-center font-monospace fw-semibold">${count}</td>
           <td class="text-end pe-3 text-nowrap">
             <div class="btn-group btn-group-sm" role="group" aria-label="Действия">
-              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-cable-group" data-group-key="${escapeHtml(grpKey)}" title="Изменить соответствие марки и условного обозначения">
+              <button type="button" class="btn btn-xs btn-outline-primary py-0 px-3 btn-edit-cable-group" data-group-key="${escapeHtml(grpKey)}" title="Изменить соответствие марки и условного обозначения">
                 <i class='bx bx-edit-alt me-0_5'></i>Изменить
               </button>
               <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-delete-cable-group" data-group-key="${escapeHtml(grpKey)}" data-group-name="${escapeHtml(brandName)}" title="Удалить эту группу кабелей">

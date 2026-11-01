@@ -538,16 +538,31 @@
                   <span class="fw-bold small text-dark"><i class='bx bx-slider text-primary me-1'></i>Весовые категории прокладки кабеля</span>
                   <span id="addRuleTiersCountBadge" class="badge bg-secondary-subtle text-secondary-emphasis border fs-xs">0 категорий</span>
                 </div>
-                <div class="d-flex align-items-center gap-1 flex-wrap">
-                  <button type="button" class="btn btn-xs btn-outline-secondary py-1 px-2" id="btnApplyDefaultStandardTiers">
-                    <i class='bx bx-reset'></i> Заполнить стандартные (1, 2, 3, >3, ВОЛС)
+                <div class="dropdown">
+                  <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 dropdown-toggle d-inline-flex align-items-center gap-1" id="addRuleTiersDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class='bx bx-plus'></i> Добавить категорию
                   </button>
-                  <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2" id="btnAddRuleCableTierBtn">
-                    <i class='bx bx-plus'></i> Добавить ступень
-                  </button>
-                  <button type="button" class="btn btn-xs btn-outline-success py-1 px-2" id="btnAddRuleOpticalTierBtn">
-                    <i class='bx bx-plus'></i> Добавить ВОЛС
-                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="addRuleTiersDropdownBtn" style="font-size: 0.8125rem;">
+                    <li>
+                      <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-1_5" id="btnAddRuleCableTierBtn">
+                        <i class='bx bx-plus text-primary fs-6'></i>
+                        <span>Добавить весовую ступень</span>
+                      </button>
+                    </li>
+                    <li>
+                      <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-1_5" id="btnAddRuleOpticalTierBtn">
+                        <i class='bx bx-plus text-success fs-6'></i>
+                        <span>Добавить ВОЛС (оптика)</span>
+                      </button>
+                    </li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li>
+                      <button type="button" class="dropdown-item d-flex align-items-center gap-2 py-1_5 text-secondary" id="btnApplyDefaultStandardTiers">
+                        <i class='bx bx-reset fs-6'></i>
+                        <span>Заполнить стандартные (1, 2, 3, &gt;3, ВОЛС)</span>
+                      </button>
+                    </li>
+                  </ul>
                 </div>
               </div>
               <div id="addRuleInstallationTiersContainer" class="d-flex flex-column gap-2" style="max-height: 480px; overflow-y: auto;"></div>
@@ -561,7 +576,7 @@
           <div class="d-flex align-items-center gap-2 ms-auto">
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
             <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnSaveNewRule">
-              <i class='bx bx-check'></i> Добавить способ
+              <i class='bx bx-check'></i> Сохранить
             </button>
           </div>
         </div>
