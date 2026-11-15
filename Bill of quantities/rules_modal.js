@@ -10,7 +10,8 @@ function getWorksJsonEditorValue() {
   if (codeEl && codeEl.textContent && codeEl.textContent.trim() !== '{}') {
     return codeEl.textContent;
   }
-  const draft = modalDraftRules || window.currentWorksRules || cachedDefaultRules || {};
+  const hasSaved = window.rulesStore && typeof window.rulesStore.hasSavedRules === 'function' && window.rulesStore.hasSavedRules();
+  const draft = modalDraftRules || window.currentWorksRules || (window.rulesStore ? window.rulesStore.getRulesSync() : null) || (!hasSaved ? window.cachedDefaultRules : null) || {};
   return JSON.stringify(draft, null, 2);
 }
 
@@ -49,7 +50,15 @@ function getDraftRulesFromEditor() {
     modalDraftRules = window.currentWorksRules;
     return modalDraftRules;
   }
-  return cachedDefaultRules || {};
+  if (window.rulesStore && typeof window.rulesStore.getRulesSync === 'function') {
+    const syncRules = window.rulesStore.getRulesSync();
+    if (syncRules && typeof syncRules === 'object') {
+      modalDraftRules = syncRules;
+      return modalDraftRules;
+    }
+  }
+  const hasSaved = window.rulesStore && typeof window.rulesStore.hasSavedRules === 'function' && window.rulesStore.hasSavedRules();
+  return (!hasSaved && window.cachedDefaultRules) ? window.cachedDefaultRules : {};
 }
 
 // Safely resolve rules object, rejecting DOM Event objects or invalid inputs
@@ -117,10 +126,17 @@ function updateStorageStatusUi() {
   const dateSpan = document.getElementById('storageDateSpan');
 
   const sizeKb = raw ? (raw.length / 1024).toFixed(1) + ' КБ' : '0 КБ';
-  const dateStr = (meta && meta.savedAt) ? new Date(meta.savedAt).toLocaleString('ru-RU') : (hasSaved ? 'Сохранено' : '—');
+  const dateStr = (meta && meta.savedAt)
+    ? new Date(meta.savedAt).toLocaleString('ru-RU')
+    : (hasSaved ? 'Сохранено' : 'По умолчанию');
 
   if (sizeSpan) sizeSpan.textContent = sizeKb;
-  if (dateSpan && !isDraftDirty) dateSpan.textContent = dateStr;
+  if (dateSpan && !isDraftDirty) {
+    dateSpan.textContent = dateStr;
+    dateSpan.title = hasSaved
+      ? 'Время последнего сохранения в LocalStorage'
+      : 'Используются заводские правила (works_rules.json)';
+  }
 }
 
 window.updateStorageStatusUi = updateStorageStatusUi;
@@ -344,10 +360,13 @@ function renderSingleRulesSectionHtml(sec, query) {
         let tierThreshold = null;
         let tierIsOver = false;
 
+        const rRuleType = rule["ТипПравила"] || '';
+        const isCouplingRule = rRuleType === 'муфты' || rRuleType === 'оптические_муфты';
+        const isRuleOpt = rRuleType === 'оптические_муфты';
+
         if (isEquipSec) {
           groupTitle = `Способ установки: «${escapeHtml(key)}»`;
-        } else if (rName.toLowerCase().includes('муфт')) {
-          const isRuleOpt = rName.toLowerCase().includes('оптич') || rName.toLowerCase().includes('волс');
+        } else if (isCouplingRule) {
           const unitLabel = isRuleOpt ? 'волокон' : 'жил';
           const cleanKey = String(key).trim().replace(',', '.');
           const numK = parseFloat(cleanKey);
@@ -1089,29 +1108,6 @@ function validateWorksJsonInput() {
 
   try {
     const parsed = JSON.parse(val);
-    const sections = getRulesSections(parsed);
-
-    let totalWaysCount = 0;
-    let totalWorksCount = 0;
-    sections.forEach(sec => {
-      totalWaysCount += sec.rules.length;
-      sec.rules.forEach(t => {
-        const works = getRuleWorks(t);
-        if (Array.isArray(works)) totalWorksCount += works.length;
-      });
-    });
-
-    const catalog = getCableCatalog(parsed) || {};
-    let totalCablesCount = 0;
-    if (catalog && typeof catalog === 'object') {
-      Object.keys(catalog).forEach(gk => {
-        const g = catalog[gk];
-        if (g && typeof g === 'object' && g["Тип"] && typeof g["Тип"] === 'object') {
-          totalCablesCount += Object.keys(g["Тип"]).length;
-        }
-      });
-    }
-
     const couplingCatalog = getCouplingCatalog(parsed) || {};
     const totalCouplingsCount = (couplingCatalog && typeof couplingCatalog === 'object') ? Object.keys(couplingCatalog).length : 0;
 
@@ -1165,6 +1161,54 @@ function setupWorksRulesListeners() {
   let addCouplingEditContext = null;  // { mode: 'create'|'edit', originalMark: '', couplingData: null }
   let addEquipEditContext = null;     // { mode: 'create'|'edit', originalMark: '', originalMethod: '', eqData: null }
 
+  function updateInstallationRuleTypeOptions(editingRuleName = null) {
+    const selRuleType = document.getElementById('addRuleInstallationRuleType');
+    if (!selRuleType) return;
+
+    const rules = (typeof getDraftRulesFromEditor === 'function' ? getDraftRulesFromEditor() : null) || {};
+    const installRules = rules["Монтажные работы"] || {};
+
+    let existingCouplingName = null;
+    let existingOptCouplingName = null;
+
+    for (const [rName, rObj] of Object.entries(installRules)) {
+      if (rName === editingRuleName) continue;
+      const type = rObj && rObj["ТипПравила"];
+      if (type === 'муфты' && !existingCouplingName) {
+        existingCouplingName = rName;
+      } else if (type === 'оптические_муфты' && !existingOptCouplingName) {
+        existingOptCouplingName = rName;
+      }
+    }
+
+    const optCoupling = selRuleType.querySelector('option[value="муфты"]');
+    const optOptCoupling = selRuleType.querySelector('option[value="оптические_муфты"]');
+
+    if (optCoupling) {
+      if (existingCouplingName) {
+        optCoupling.disabled = true;
+        optCoupling.textContent = `Установка соединительных муфт (уже создано: «${existingCouplingName}»)`;
+        optCoupling.title = `Правило данного типа уже создано («${existingCouplingName}»). В разделе «Монтажные работы» разрешено только одно правило для соединительных муфт.`;
+      } else {
+        optCoupling.disabled = false;
+        optCoupling.textContent = 'Установка соединительных муфт (по жилам)';
+        optCoupling.removeAttribute('title');
+      }
+    }
+
+    if (optOptCoupling) {
+      if (existingOptCouplingName) {
+        optOptCoupling.disabled = true;
+        optOptCoupling.textContent = `Установка оптических муфт (уже создано: «${existingOptCouplingName}»)`;
+        optOptCoupling.title = `Правило данного типа уже создано («${existingOptCouplingName}»). В разделе «Монтажные работы» разрешено только одно правило для оптических муфт.`;
+      } else {
+        optOptCoupling.disabled = false;
+        optOptCoupling.textContent = 'Установка оптических муфт (по волокнам)';
+        optOptCoupling.removeAttribute('title');
+      }
+    }
+  }
+
   function resetRuleModalToAddMode() {
     addRuleEditContext = null;
     const titleEl = document.getElementById('addRuleModalTitle');
@@ -1179,6 +1223,13 @@ function setupWorksRulesListeners() {
     if (btnDel) btnDel.classList.add('d-none');
     const tplInput = document.getElementById('addRuleInstTemplate');
     if (tplInput) tplInput.value = '';
+    const selRuleType = document.getElementById('addRuleInstallationRuleType');
+    if (selRuleType) selRuleType.value = 'кабель';
+    updateInstallationRuleTypeOptions(null);
+    const tplLabel = document.getElementById('addRuleInstTemplateLabel');
+    if (tplLabel) tplLabel.textContent = 'Шаблон наименования сметной работы (с маркером {масса})';
+    const secTitle = document.getElementById('addRuleTiersSectionTitle');
+    if (secTitle) secTitle.innerHTML = `<i class='bx bx-slider text-primary me-1'></i>Весовые категории прокладки кабеля`;
     const instTiers = document.getElementById('addRuleInstallationTiersContainer');
     if (instTiers) {
       applyDefaultStandardTiers('');
@@ -1230,33 +1281,40 @@ function setupWorksRulesListeners() {
     if (btnDelAll) btnDelAll.classList.add('d-none');
   }
 
-  function appendUnifiedNestedItemRow(tbody, name = '', type = 'материал', unit = 'шт', formula = 'КОЛИЧЕСТВО', show = true, section = '') {
+  function appendUnifiedNestedItemRow(tbody, name = '', type = 'материал', unit = 'шт', formula = 'КОЛИЧЕСТВО', show = true, section = '', rounding = '', comment = '') {
     if (!tbody) return;
+    const roundingStr = (rounding !== undefined && rounding !== null && rounding !== '') ? String(rounding) : '';
     const tr = document.createElement('tr');
     tr.className = 'unified-nested-item-row';
     tr.innerHTML = `
       <td>
         <input type="text" class="form-control form-control-sm unified-nested-name" placeholder="Наименование позиции" value="${escapeHtml(name)}" required>
       </td>
-      <td style="width: 16%;">
+      <td style="width: 13%;">
         <select class="form-select form-select-sm unified-nested-type">
           <option value="материал" ${type === 'материал' ? 'selected' : ''}>материал</option>
           <option value="оборудование" ${type === 'оборудование' ? 'selected' : ''}>оборудование</option>
         </select>
       </td>
-      <td style="width: 10%;">
+      <td style="width: 8%;">
         <input type="text" class="form-control form-control-sm unified-nested-unit" value="${escapeHtml(unit)}" placeholder="шт/м" required>
       </td>
-      <td style="width: 16%;">
+      <td style="width: 14%;">
         <input type="text" class="form-control form-control-sm font-monospace unified-nested-formula" value="${escapeHtml(formula)}" placeholder="Формула" required>
       </td>
-      <td style="width: 15%;">
+      <td style="width: 13%;">
         <input type="text" class="form-control form-control-sm unified-nested-section" value="${escapeHtml(section)}" placeholder="По умолч.">
       </td>
-      <td style="width: 6%;" class="text-center">
-        <input class="form-check-input unified-nested-show" type="checkbox" ${show ? 'checked' : ''} title="Показывать формулу">
+      <td style="width: 7%;">
+        <input type="number" min="0" max="10" step="1" class="form-control form-control-sm font-monospace unified-nested-rounding" value="${escapeHtml(roundingStr)}" placeholder="Ум.">
+      </td>
+      <td style="width: 12%;">
+        <input type="text" class="form-control form-control-sm unified-nested-comment" value="${escapeHtml(comment || '')}" placeholder="Комментарий">
       </td>
       <td style="width: 5%;" class="text-center">
+        <input class="form-check-input unified-nested-show" type="checkbox" ${show ? 'checked' : ''} title="Показывать формулу">
+      </td>
+      <td style="width: 4%;" class="text-center">
         <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1 btn-remove-nested-row" title="Удалить позицию">
           <i class='bx bx-x fs-6'></i>
         </button>
@@ -1289,6 +1347,7 @@ function setupWorksRulesListeners() {
     const condition = work["Условие"] || work.condition || '';
     const section = work["Раздел"] || work.section || (options.defaultSection || '');
     const rounding = (work["Округление"] !== undefined && work["Округление"] !== null) ? work["Округление"] : '';
+    const comment = work["Комментарий"] || work.comment || '';
 
     const nestedResources = getWorkItemNestedResources(work);
 
@@ -1334,24 +1393,28 @@ function setupWorksRulesListeners() {
         </div>
 
         <div class="row g-2 mb-2">
-          <div class="col-md-5">
+          <div class="col-md-4">
             <label class="form-label fs-xs fw-semibold mb-0 text-muted">Раздел сметы (опционально)</label>
             <input type="text" class="form-control form-control-sm unified-work-section" placeholder="${escapeHtml(options.defaultSection || 'По умолчанию')}" value="${escapeHtml(section)}">
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label fs-xs fw-semibold mb-0 text-muted">Условие применения</label>
-            <input type="text" class="form-control form-control-sm font-monospace unified-work-condition" placeholder="Введите условие" value="${escapeHtml(condition)}">
+            <input type="text" class="form-control form-control-sm font-monospace unified-work-condition" placeholder="Напр.: кабелей > 4" value="${escapeHtml(condition)}">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Округление (зн.)</label>
+            <input type="number" min="0" max="10" step="1" class="form-control form-control-sm font-monospace unified-work-rounding" placeholder="По умолч." value="${escapeHtml(String(rounding))}">
           </div>
           <div class="col-md-3">
-            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Округление (зн.)</label>
-            <input type="number" min="0" max="6" class="form-control form-control-sm font-monospace unified-work-rounding" placeholder="По умолч." value="${escapeHtml(String(rounding))}">
+            <label class="form-label fs-xs fw-semibold mb-0 text-muted">Комментарий</label>
+            <input type="text" class="form-control form-control-sm unified-work-comment" placeholder="Комментарий (опц.)" value="${escapeHtml(comment)}">
           </div>
         </div>
 
         <div class="p-2 rounded border bg-body-tertiary">
           <div class="d-flex align-items-center justify-content-between mb-1_5">
             <span class="fs-xs fw-semibold text-secondary d-flex align-items-center gap-1">
-              <i class='bx bx-package text-success'></i> Вложенные материалы и оборудование (ключ «Материалы»):
+              <i class='bx bx-package text-success'></i> Вложенные материалы и оборудование:
             </span>
             <button type="button" class="btn btn-xs btn-outline-success py-0 px-1_5 btn-add-nested-row">
               <i class='bx bx-plus me-0_5'></i>Добавить позицию
@@ -1361,13 +1424,15 @@ function setupWorksRulesListeners() {
             <table class="table table-sm table-hover align-middle mb-0">
               <thead class="table-light" style="font-size: 0.72rem;">
                 <tr>
-                  <th style="width: 30%;">Наименование</th>
-                  <th style="width: 16%;">Тип</th>
-                  <th style="width: 10%;">Ед. изм.</th>
-                  <th style="width: 16%;">Формула</th>
-                  <th style="width: 15%;">Раздел</th>
-                  <th style="width: 8%;" class="text-center" title="Показывать формулу">Формула</th>
-                  <th style="width: 5%;" class="text-center"></th>
+                  <th style="width: 24%;">Наименование</th>
+                  <th style="width: 13%;">Тип</th>
+                  <th style="width: 8%;">Ед. изм.</th>
+                  <th style="width: 14%;">Формула</th>
+                  <th style="width: 13%;">Раздел</th>
+                  <th style="width: 7%;">Округл.</th>
+                  <th style="width: 12%;">Комментарий</th>
+                  <th style="width: 5%;" class="text-center" title="Показывать формулу">Форм.</th>
+                  <th style="width: 4%;" class="text-center"></th>
                 </tr>
               </thead>
               <tbody class="unified-nested-tbody"></tbody>
@@ -1391,7 +1456,9 @@ function setupWorksRulesListeners() {
             res["Единицы измерения"] || res.unit || (resType === 'оборудование' ? 'шт' : 'м'),
             res["Формула"] || res.formula || formula,
             res["ОтображатьФормулу"] !== undefined ? Boolean(res["ОтображатьФормулу"]) : false,
-            res["Раздел"] || res.section || ''
+            res["Раздел"] || res.section || '',
+            (res["Округление"] !== undefined && res["Округление"] !== null) ? res["Округление"] : '',
+            res["Комментарий"] || res.comment || ''
           );
         }
       });
@@ -1415,7 +1482,8 @@ function setupWorksRulesListeners() {
       const show = Boolean(card.querySelector('.unified-work-show')?.checked);
       const condition = card.querySelector('.unified-work-condition')?.value?.trim() || '';
       const roundingVal = card.querySelector('.unified-work-rounding')?.value?.trim();
-      const rounding = roundingVal !== '' && !isNaN(Number(roundingVal)) ? Number(roundingVal) : null;
+      const rounding = roundingVal !== undefined && roundingVal !== '' && !isNaN(Number(roundingVal)) ? Number(roundingVal) : null;
+      const comment = card.querySelector('.unified-work-comment')?.value?.trim() || '';
 
       const nestedItems = [];
       const nestedRows = card.querySelectorAll('.unified-nested-tbody tr');
@@ -1425,7 +1493,10 @@ function setupWorksRulesListeners() {
         const nType = nr.querySelector('.unified-nested-type')?.value?.trim() || 'материал';
         const nUnit = nr.querySelector('.unified-nested-unit')?.value?.trim() || 'шт';
         const nFormula = nr.querySelector('.unified-nested-formula')?.value?.trim() || formula;
-        const nSection = nr.querySelector('.unified-nested-section')?.value?.trim() || section;
+        const nSection = nr.querySelector('.unified-nested-section')?.value?.trim() || '';
+        const nRoundingVal = nr.querySelector('.unified-nested-rounding')?.value?.trim();
+        const nRounding = nRoundingVal !== undefined && nRoundingVal !== '' && !isNaN(Number(nRoundingVal)) ? Number(nRoundingVal) : null;
+        const nComment = nr.querySelector('.unified-nested-comment')?.value?.trim() || '';
         const nShow = Boolean(nr.querySelector('.unified-nested-show')?.checked);
 
         const nItem = {
@@ -1436,6 +1507,8 @@ function setupWorksRulesListeners() {
           "ОтображатьФормулу": nShow
         };
         if (nSection) nItem["Раздел"] = nSection;
+        if (nRounding !== null) nItem["Округление"] = nRounding;
+        if (nComment) nItem["Комментарий"] = nComment;
         nestedItems.push(nItem);
       });
 
@@ -1449,6 +1522,7 @@ function setupWorksRulesListeners() {
       if (section) workObj["Раздел"] = section;
       if (condition) workObj["Условие"] = condition;
       if (rounding !== null) workObj["Округление"] = rounding;
+      if (comment) workObj["Комментарий"] = comment;
       if (nestedItems.length > 0) {
         workObj["Материалы"] = nestedItems;
       }
@@ -1473,7 +1547,9 @@ function setupWorksRulesListeners() {
             defaultRowOptions.unit || 'шт',
             defaultRowOptions.formula || defaultCardOptions.defaultFormula || 'ДЛИНА',
             defaultRowOptions.show !== undefined ? defaultRowOptions.show : (defaultCardOptions.defaultShowFormula !== undefined ? defaultCardOptions.defaultShowFormula : true),
-            defaultRowOptions.defaultSection || defaultCardOptions.defaultSection || ''
+            defaultRowOptions.defaultSection || defaultCardOptions.defaultSection || '',
+            defaultRowOptions.rounding !== undefined ? defaultRowOptions.rounding : '',
+            defaultRowOptions.comment || ''
           );
         }
         return;
@@ -1513,17 +1589,22 @@ function setupWorksRulesListeners() {
     workEl.className = 'card p-2 bg-body rounded border mb-2 tier-work-item shadow-2xs';
 
     const titleVal = work["Наименование"] || work.name || work.title || (isPrimary ? (options.defaultTitle || '') : '');
+    const rawTypeVal = (work["Тип"] || work.type || 'работа').toLowerCase();
+    const typeVal = rawTypeVal === 'оборудование' ? 'оборудование' : (rawTypeVal === 'материал' ? 'материал' : 'работа');
     const unitVal = work["Единицы измерения"] || work.unit || 'м';
     const formulaVal = work["Формула"] || work.formula || 'ДЛИНА';
+    const sectionVal = work["Раздел"] || work.section || '';
+    const conditionVal = work["Условие"] || work.condition || '';
+    const roundingVal = (work["Округление"] !== undefined && work["Округление"] !== null) ? work["Округление"] : '';
+    const commentVal = work["Комментарий"] || work.comment || '';
     const showFormula = work["ОтображатьФормулу"] !== undefined
       ? Boolean(work["ОтображатьФормулу"])
       : (work.showFormula !== undefined ? Boolean(work.showFormula) : true);
 
-    const materials = Array.isArray(work["Материалы"])
-      ? work["Материалы"]
-      : (Array.isArray(work.materials)
-          ? work.materials
-          : (isPrimary && options.defaultMaterials ? options.defaultMaterials : []));
+    const extractedNested = getWorkItemNestedResources(work);
+    const materials = extractedNested.length > 0
+      ? extractedNested
+      : (isPrimary && options.defaultMaterials ? options.defaultMaterials : []);
 
     const workItemId = `twork_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
@@ -1546,17 +1627,44 @@ function setupWorksRulesListeners() {
       </div>
 
       <div class="row g-2 align-items-end mb-2">
-        <div class="col-md-6">
+        <div class="col-md-5">
           <label class="form-label fs-xs fw-semibold mb-0 text-muted">Наименование сметной работы <span class="text-danger">*</span></label>
           <input type="text" class="form-control form-control-sm tier-work-title" placeholder="Наименование сметной работы" value="${escapeHtml(titleVal)}" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Тип позиции</label>
+          <select class="form-select form-select-sm tier-work-type">
+            <option value="работа" ${typeVal === 'работа' ? 'selected' : ''}>работа</option>
+            <option value="материал" ${typeVal === 'материал' ? 'selected' : ''}>материал</option>
+            <option value="оборудование" ${typeVal === 'оборудование' ? 'selected' : ''}>оборудование</option>
+          </select>
         </div>
         <div class="col-md-2">
           <label class="form-label fs-xs fw-semibold mb-0 text-muted">Ед. изм.</label>
           <input type="text" class="form-control form-control-sm tier-work-unit" placeholder="м" value="${escapeHtml(unitVal)}" required>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label fs-xs fw-semibold mb-0 text-muted">Формула работы</label>
           <input type="text" class="form-control form-control-sm font-monospace tier-work-formula" placeholder="ДЛИНА" value="${escapeHtml(formulaVal)}" required>
+        </div>
+      </div>
+
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-md-4">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Раздел сметы (опционально)</label>
+          <input type="text" class="form-control form-control-sm tier-work-section" placeholder="По умолчанию (Монтажные работы)" value="${escapeHtml(sectionVal)}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Условие применения</label>
+          <input type="text" class="form-control form-control-sm font-monospace tier-work-condition" placeholder="Напр.: кабелей > 4" value="${escapeHtml(conditionVal)}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Округление (зн.)</label>
+          <input type="number" min="0" max="10" step="1" class="form-control form-control-sm font-monospace tier-work-rounding" placeholder="По умолч." value="${escapeHtml(String(roundingVal))}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Комментарий</label>
+          <input type="text" class="form-control form-control-sm tier-work-comment" placeholder="Комментарий (опц.)" value="${escapeHtml(commentVal)}">
         </div>
       </div>
 
@@ -1575,13 +1683,15 @@ function setupWorksRulesListeners() {
           <table class="table table-sm table-hover align-middle mb-0">
             <thead class="table-light" style="font-size: 0.72rem;">
               <tr>
-                <th style="width: 30%;">Наименование ресурса</th>
-                <th style="width: 16%;">Тип</th>
-                <th style="width: 10%;">Ед. изм.</th>
-                <th style="width: 16%;">Формула</th>
-                <th style="width: 15%;">Раздел</th>
-                <th style="width: 8%;" class="text-center" title="Показывать формулу">Формула</th>
-                <th style="width: 5%;" class="text-center"></th>
+                <th style="width: 24%;">Наименование ресурса</th>
+                <th style="width: 13%;">Тип</th>
+                <th style="width: 8%;">Ед. изм.</th>
+                <th style="width: 14%;">Формула</th>
+                <th style="width: 13%;">Раздел</th>
+                <th style="width: 7%;">Округл.</th>
+                <th style="width: 12%;">Комментарий</th>
+                <th style="width: 5%;" class="text-center" title="Показывать формулу">Форм.</th>
+                <th style="width: 4%;" class="text-center"></th>
               </tr>
             </thead>
             <tbody class="tier-materials-tbody unified-nested-tbody">
@@ -1607,7 +1717,9 @@ function setupWorksRulesListeners() {
             m["Единицы измерения"] || m.unit || (mType === 'оборудование' ? 'шт' : 'км'),
             m["Формула"] || m.formula || 'ДЛИНА/1000',
             m["ОтображатьФормулу"] !== undefined ? Boolean(m["ОтображатьФормулу"]) : true,
-            m["Раздел"] || m.section || ''
+            m["Раздел"] || m.section || '',
+            (m["Округление"] !== undefined && m["Округление"] !== null) ? m["Округление"] : '',
+            m["Комментарий"] || m.comment || ''
           );
         }
       });
@@ -1617,7 +1729,7 @@ function setupWorksRulesListeners() {
     const addTierMatBtn = workEl.querySelector('.btn-add-tier-mat');
     if (addTierMatBtn && matsTbody) {
       addTierMatBtn.addEventListener('click', () => {
-        appendUnifiedNestedItemRow(matsTbody, '', 'материал', 'м', 'ДЛИНА', true, '');
+        appendUnifiedNestedItemRow(matsTbody, '', 'материал', 'м', 'ДЛИНА', true, '', '', '');
         const cnt = workEl.querySelector('.tier-materials-count');
         if (cnt) cnt.textContent = matsTbody.children.length;
       });
@@ -1658,64 +1770,108 @@ function setupWorksRulesListeners() {
 
     const wayName = options.ruleName || document.getElementById('addRuleWayName')?.value?.trim() || '';
     const template = options.template || document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
+    const ruleType = options.ruleType || document.getElementById('addRuleInstallationRuleType')?.value || 'кабель';
+    const isCoupling = ruleType === 'муфты' || ruleType === 'оптические_муфты';
+    const isOpticalCoupling = ruleType === 'оптические_муфты';
+    card.setAttribute('data-rule-type', ruleType);
 
     // Determine initial type, key and threshold
-    let initialKey = String(data.key !== undefined ? data.key : (data.threshold !== undefined && data.threshold !== null ? data.threshold : '1')).trim();
+    let initialKey = String(data.key !== undefined ? data.key : (data.threshold !== undefined && data.threshold !== null ? data.threshold : (isCoupling ? (isOpticalCoupling ? '8' : '12') : '1'))).trim();
     let initialType = data.type;
     let initialThreshold = data.threshold !== undefined ? data.threshold : null;
 
-    if (!initialType) {
-      const lowerKey = initialKey.toLowerCase();
-      if (lowerKey.includes('оптич') || lowerKey.includes('волс') || data.isOptical) {
-        initialType = 'optical';
-      } else if (lowerKey.includes('свыше') || lowerKey.includes('более') || lowerKey.includes('от') || lowerKey.includes('>') || data.isOver) {
-        initialType = 'over';
-      } else if (!isNaN(parseFloat(initialKey.replace(',', '.'))) || lowerKey.includes('до')) {
-        initialType = 'up_to';
+    if (isCoupling) {
+      if (!initialType) {
+        initialType = 'cores_up_to';
+      }
+      if (initialThreshold === null) {
+        if (data.maxCores !== undefined && data.maxCores !== null) {
+          initialThreshold = data.maxCores;
+        } else {
+          const cleanK = initialKey.replace(',', '.');
+          const numK = parseFloat(cleanK);
+          if (!isNaN(numK)) initialThreshold = Math.round(numK);
+        }
+      }
+      if (initialThreshold === null) {
+        initialThreshold = isOpticalCoupling ? 8 : 12;
+      }
+    } else {
+      if (!initialType) {
+        const lowerKey = initialKey.toLowerCase();
+        if (lowerKey.includes('оптич') || lowerKey.includes('волс') || data.isOptical) {
+          initialType = 'optical';
+        } else if (lowerKey.includes('свыше') || lowerKey.includes('более') || lowerKey.includes('от') || lowerKey.includes('>') || data.isOver) {
+          initialType = 'over';
+        } else if (!isNaN(parseFloat(initialKey.replace(',', '.'))) || lowerKey.includes('до')) {
+          initialType = 'up_to';
+        } else {
+          initialType = 'custom';
+        }
+      }
+
+      if (initialThreshold === null) {
+        const cleanKey = initialKey.replace(',', '.');
+        const numK = parseFloat(cleanKey);
+        if (!isNaN(numK) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
+          initialThreshold = numK;
+        } else {
+          const m = cleanKey.match(/(?:до|макс(?:имум)?|свыше|более|от|>)[_\s]*[:;]?[_\s]*(\d+(?:[.,]\d+)?)/i);
+          if (m) initialThreshold = parseFloat(m[1].replace(',', '.'));
+        }
+        if (initialThreshold === null && data.maxWeight !== undefined) {
+          initialThreshold = data.maxWeight;
+        }
+      }
+
+      if (initialType === 'up_to' && initialThreshold === null) initialThreshold = 1;
+      if (initialType === 'over' && initialThreshold === null) initialThreshold = 3;
+      if (initialType === 'optical') {
+        initialKey = 'оптический';
+        initialThreshold = '';
+      }
+    }
+
+    let defaultTitle = '';
+    if (isCoupling) {
+      if (template && template.includes('{жилы}')) {
+        defaultTitle = template.replace(/\{жилы\}/gi, String(initialThreshold || '')).trim();
+      } else if (isOpticalCoupling) {
+        defaultTitle = wayName ? `Установка оптической соединительной тупиковой муфты с количеством волокон до: ${initialThreshold || 8} (${wayName})` : `Установка оптической соединительной тупиковой муфты с количеством волокон до: ${initialThreshold || 8}`;
       } else {
-        initialType = 'custom';
+        defaultTitle = wayName ? `Установка муфты кабельной соединительной подземной для кабеля с количеством жил до: ${initialThreshold || 12} (${wayName})` : `Установка муфты кабельной соединительной подземной для кабеля с количеством жил до: ${initialThreshold || 12}`;
       }
+    } else {
+      defaultTitle = initialType === 'optical'
+        ? (wayName ? `Прокладка оптического кабеля (${wayName})` : 'Прокладка оптического кабеля')
+        : (template && (template.includes('{масса}') || template.includes('{вес}'))
+            ? template.replace(/\{масса\}|\{вес\}/gi, String(initialThreshold || '')).trim()
+            : (initialType === 'over'
+                ? (wayName ? `Прокладка кабеля массой 1 м свыше ${initialThreshold || 3} кг (${wayName})` : `Прокладка кабеля массой 1 м свыше ${initialThreshold || 3} кг`)
+                : (wayName ? `Прокладка кабеля массой 1 м, кг, до: ${initialThreshold || 1} (${wayName})` : `Прокладка кабеля массой 1 м, кг, до: ${initialThreshold || 1}`)));
     }
 
-    if (initialThreshold === null) {
-      const cleanKey = initialKey.replace(',', '.');
-      const numK = parseFloat(cleanKey);
-      if (!isNaN(numK) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
-        initialThreshold = numK;
-      } else {
-        const m = cleanKey.match(/(?:до|макс(?:имум)?|свыше|более|от|>)[_\s]*[:;]?[_\s]*(\d+(?:[.,]\d+)?)/i);
-        if (m) initialThreshold = parseFloat(m[1].replace(',', '.'));
-      }
-      if (initialThreshold === null && data.maxWeight !== undefined) {
-        initialThreshold = data.maxWeight;
-      }
-    }
-
-    if (initialType === 'up_to' && initialThreshold === null) initialThreshold = 1;
-    if (initialType === 'over' && initialThreshold === null) initialThreshold = 3;
-    if (initialType === 'optical') {
-      initialKey = 'оптический';
-      initialThreshold = '';
-    }
-
-    const defaultTitle = initialType === 'optical'
-      ? (wayName ? `Прокладка оптического кабеля (${wayName})` : 'Прокладка оптического кабеля')
-      : (template && (template.includes('{масса}') || template.includes('{вес}'))
-          ? template.replace(/\{масса\}|\{вес\}/gi, String(initialThreshold || '')).trim()
-          : (initialType === 'over'
-              ? (wayName ? `Прокладка кабеля массой 1 м свыше ${initialThreshold || 3} кг (${wayName})` : `Прокладка кабеля массой 1 м свыше ${initialThreshold || 3} кг`)
-              : (wayName ? `Прокладка кабеля массой 1 м, кг, до: ${initialThreshold || 1} (${wayName})` : `Прокладка кабеля массой 1 м, кг, до: ${initialThreshold || 1}`)));
-
-    const defaultCableMat = [
-      {
-        "Наименование": "{МАРКА_КАБЕЛЯ}",
-        "Тип": "материал",
-        "Единицы измерения": "км",
-        "Формула": "ДЛИНА/1000",
-        "ОтображатьФормулу": true,
-        "Раздел": "Монтажные работы"
-      }
-    ];
+    const defaultMaterials = isCoupling
+      ? [
+          {
+            "Наименование": "{МАРКА_МУФТЫ}",
+            "Тип": "материал",
+            "Единицы измерения": "шт",
+            "Формула": "КОЛИЧЕСТВО",
+            "ОтображатьФормулу": true,
+            "Раздел": "Монтажные работы"
+          }
+        ]
+      : [
+          {
+            "Наименование": "{МАРКА_КАБЕЛЯ}",
+            "Тип": "материал",
+            "Единицы измерения": "км",
+            "Формула": "ДЛИНА/1000",
+            "ОтображатьФормулу": true,
+            "Раздел": "Монтажные работы"
+          }
+        ];
 
     let worksList = [];
     if (Array.isArray(data.works) && data.works.length > 0) {
@@ -1726,14 +1882,14 @@ function setupWorksRulesListeners() {
         : (data.includeCableMaterial === false
             ? (Array.isArray(data.extraMaterials) ? data.extraMaterials : [])
             : [
-                ...defaultCableMat,
+                ...defaultMaterials,
                 ...(Array.isArray(data.extraMaterials) ? data.extraMaterials : [])
               ]);
       worksList = [
         {
           "Наименование": data.title !== undefined ? data.title : defaultTitle,
-          "Единицы измерения": data.unit !== undefined ? data.unit : 'м',
-          "Формула": data.formula !== undefined ? data.formula : 'ДЛИНА',
+          "Единицы измерения": data.unit !== undefined ? data.unit : (isCoupling ? 'шт' : 'м'),
+          "Формула": data.formula !== undefined ? data.formula : (isCoupling ? 'КОЛИЧЕСТВО' : 'ДЛИНА'),
           "ОтображатьФормулу": data.showFormula !== undefined ? Boolean(data.showFormula) : true,
           "Материалы": initialMaterials
         }
@@ -1744,7 +1900,7 @@ function setupWorksRulesListeners() {
       <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2 pb-1_5 border-bottom">
         <div class="d-flex align-items-center gap-2">
           <span class="badge bg-secondary-subtle text-secondary-emphasis border tier-index-badge">Ступень</span>
-          <span class="badge bg-primary-subtle text-primary border tier-condition-badge">вес ≤ 1 кг/м</span>
+          <span class="badge bg-primary-subtle text-primary border tier-condition-badge">${isCoupling ? (isOpticalCoupling ? `до ${initialThreshold || 8} волокон` : `до ${initialThreshold || 12} жил`) : 'вес ≤ 1 кг/м'}</span>
         </div>
         <div class="d-flex align-items-center gap-2">
           <div class="btn-group btn-group-sm">
@@ -1758,20 +1914,27 @@ function setupWorksRulesListeners() {
       <div class="row g-2 align-items-end mb-2">
         <div class="${initialType === 'custom' ? 'col-md-4' : (initialType === 'optical' ? 'col-12' : 'col-md-6')} tier-type-col">
           <label class="form-label fs-xs fw-semibold mb-0 text-muted">Тип категории</label>
-          <select class="form-select form-select-sm tier-type-select">
-            <option value="up_to" ${initialType === 'up_to' ? 'selected' : ''}>Масса 1 м до X кг (≤)</option>
-            <option value="over" ${initialType === 'over' ? 'selected' : ''}>Масса 1 м свыше X кг (>)</option>
-            <option value="optical" ${initialType === 'optical' ? 'selected' : ''}>Оптический кабель (ВОЛС)</option>
-            <option value="custom" ${initialType === 'custom' ? 'selected' : ''}>Пользовательский ключ</option>
-          </select>
+          ${isCoupling ? `
+            <select class="form-select form-select-sm tier-type-select">
+              <option value="cores_up_to" ${initialType !== 'custom' ? 'selected' : ''}>${isOpticalCoupling ? 'Количество волокон до X (≤)' : 'Количество жил до X (≤)'}</option>
+              <option value="custom" ${initialType === 'custom' ? 'selected' : ''}>Пользовательский ключ</option>
+            </select>
+          ` : `
+            <select class="form-select form-select-sm tier-type-select">
+              <option value="up_to" ${initialType === 'up_to' ? 'selected' : ''}>Масса 1 м до X кг (≤)</option>
+              <option value="over" ${initialType === 'over' ? 'selected' : ''}>Масса 1 м свыше X кг (>)</option>
+              <option value="optical" ${initialType === 'optical' ? 'selected' : ''}>Оптический кабель (ВОЛС)</option>
+              <option value="custom" ${initialType === 'custom' ? 'selected' : ''}>Пользовательский ключ</option>
+            </select>
+          `}
         </div>
         <div class="${initialType === 'custom' ? 'col-md-3' : 'col-md-6'} tier-threshold-col" style="${initialType === 'optical' ? 'display: none;' : ''}">
-          <label class="form-label fs-xs fw-semibold mb-0 text-muted">Порог (кг/м)</label>
-          <input type="number" step="0.1" min="0" class="form-control form-control-sm tier-threshold-input font-monospace" placeholder="1" value="${initialThreshold !== null && initialThreshold !== undefined ? initialThreshold : ''}">
+          <label class="form-label fs-xs fw-semibold mb-0 text-muted">${isCoupling ? (isOpticalCoupling ? 'Порог (волокон)' : 'Порог (жил)') : 'Порог (кг/м)'}</label>
+          <input type="number" step="${isCoupling ? '1' : '0.1'}" min="1" class="form-control form-control-sm tier-threshold-input font-monospace" placeholder="${isCoupling ? (isOpticalCoupling ? '8' : '12') : '1'}" value="${initialThreshold !== null && initialThreshold !== undefined ? initialThreshold : ''}">
         </div>
         <div class="col-md-5 tier-key-col" style="${initialType === 'custom' ? '' : 'display: none;'}">
           <label class="form-label fs-xs fw-semibold mb-0 text-muted">JSON ключ</label>
-          <input type="text" class="form-control form-control-sm tier-key-input font-monospace" placeholder="1" value="${escapeHtml(initialKey)}" required>
+          <input type="text" class="form-control form-control-sm tier-key-input font-monospace" placeholder="${isCoupling ? (isOpticalCoupling ? '8' : '12') : '1'}" value="${escapeHtml(initialKey)}" required>
         </div>
       </div>
 
@@ -1780,10 +1943,10 @@ function setupWorksRulesListeners() {
 
       <!-- Footer to add additional works to this tier -->
       <div class="d-flex align-items-center justify-content-between pt-1_5 border-top">
-        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-add-work-to-tier d-inline-flex align-items-center gap-1" title="Добавить сопутствующую сметную работу в эту весовую категорию">
+        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 btn-add-work-to-tier d-inline-flex align-items-center gap-1" title="Добавить сопутствующую сметную работу в эту категорию">
           <i class='bx bx-plus'></i> Добавить работу в ступень
         </button>
-        <span class="fs-xs text-muted">Работы и материалы рассчитываются для кабелей данной ступени</span>
+        <span class="fs-xs text-muted">${isCoupling ? 'Работы и материалы рассчитываются для муфт данной ступени' : 'Работы и материалы рассчитываются для кабелей данной ступени'}</span>
       </div>
     `;
 
@@ -1792,7 +1955,7 @@ function setupWorksRulesListeners() {
       const workEl = createTierWorkItemCard(w, {
         index: idx + 1,
         defaultTitle: defaultTitle,
-        defaultMaterials: defaultCableMat
+        defaultMaterials: defaultMaterials
       });
       worksContainer.appendChild(workEl);
     });
@@ -1810,49 +1973,75 @@ function setupWorksRulesListeners() {
     const keyPreview = card.querySelector('.tier-key-preview');
 
     const updateCardConditionAndKey = (isUserManualKey = false) => {
-      const type = typeSelect.value;
+      const type = typeSelect ? typeSelect.value : 'up_to';
       const tVal = thresholdInput.value.trim().replace(',', '.');
       const numT = parseFloat(tVal);
 
-      if (type === 'optical') {
-        if (typeCol) typeCol.className = 'col-12 tier-type-col';
-        if (thresholdCol) thresholdCol.style.display = 'none';
-        if (keyCol) keyCol.style.display = 'none';
-        condBadge.className = 'badge bg-info-subtle text-info border tier-condition-badge';
-        condBadge.innerHTML = 'ВОЛС (оптика)';
-        if (!isUserManualKey) keyInput.value = 'оптический';
-      } else if (type === 'over') {
-        if (typeCol) typeCol.className = 'col-md-6 tier-type-col';
-        if (thresholdCol) {
-          thresholdCol.className = 'col-md-6 tier-threshold-col';
-          thresholdCol.style.display = '';
+      if (isCoupling) {
+        if (type === 'custom') {
+          if (typeCol) typeCol.className = 'col-md-4 tier-type-col';
+          if (thresholdCol) {
+            thresholdCol.className = 'col-md-3 tier-threshold-col';
+            thresholdCol.style.display = '';
+          }
+          if (keyCol) {
+            keyCol.className = 'col-md-5 tier-key-col';
+            keyCol.style.display = '';
+          }
+          condBadge.className = 'badge bg-secondary-subtle text-secondary-emphasis border tier-condition-badge';
+          condBadge.innerHTML = 'Кастомный ключ';
+        } else {
+          if (typeCol) typeCol.className = 'col-md-6 tier-type-col';
+          if (thresholdCol) {
+            thresholdCol.className = 'col-md-6 tier-threshold-col';
+            thresholdCol.style.display = '';
+          }
+          if (keyCol) keyCol.style.display = 'none';
+          condBadge.className = isOpticalCoupling ? 'badge bg-info-subtle text-info border tier-condition-badge' : 'badge bg-primary-subtle text-primary border tier-condition-badge';
+          condBadge.innerHTML = !isNaN(numT) ? (isOpticalCoupling ? `до ${Math.round(numT)} волокон` : `до ${Math.round(numT)} жил`) : (isOpticalCoupling ? 'до X волокон' : 'до X жил');
+          if (!isUserManualKey) keyInput.value = !isNaN(numT) ? String(Math.round(numT)) : (isOpticalCoupling ? '8' : '12');
         }
-        if (keyCol) keyCol.style.display = 'none';
-        condBadge.className = 'badge bg-warning-subtle text-warning-emphasis border tier-condition-badge';
-        condBadge.innerHTML = !isNaN(numT) ? `вес &gt; ${numT} кг/м` : 'вес &gt; X кг/м';
-        if (!isUserManualKey) keyInput.value = !isNaN(numT) ? `свыше ${numT}` : 'свыше 3';
-      } else if (type === 'up_to') {
-        if (typeCol) typeCol.className = 'col-md-6 tier-type-col';
-        if (thresholdCol) {
-          thresholdCol.className = 'col-md-6 tier-threshold-col';
-          thresholdCol.style.display = '';
-        }
-        if (keyCol) keyCol.style.display = 'none';
-        condBadge.className = 'badge bg-primary-subtle text-primary border tier-condition-badge';
-        condBadge.innerHTML = !isNaN(numT) ? `вес &le; ${numT} кг/м` : 'вес &le; X кг/м';
-        if (!isUserManualKey) keyInput.value = !isNaN(numT) ? String(numT) : '1';
       } else {
-        if (typeCol) typeCol.className = 'col-md-4 tier-type-col';
-        if (thresholdCol) {
-          thresholdCol.className = 'col-md-3 tier-threshold-col';
-          thresholdCol.style.display = '';
+        if (type === 'optical') {
+          if (typeCol) typeCol.className = 'col-12 tier-type-col';
+          if (thresholdCol) thresholdCol.style.display = 'none';
+          if (keyCol) keyCol.style.display = 'none';
+          condBadge.className = 'badge bg-info-subtle text-info border tier-condition-badge';
+          condBadge.innerHTML = 'ВОЛС (оптика)';
+          if (!isUserManualKey) keyInput.value = 'оптический';
+        } else if (type === 'over') {
+          if (typeCol) typeCol.className = 'col-md-6 tier-type-col';
+          if (thresholdCol) {
+            thresholdCol.className = 'col-md-6 tier-threshold-col';
+            thresholdCol.style.display = '';
+          }
+          if (keyCol) keyCol.style.display = 'none';
+          condBadge.className = 'badge bg-warning-subtle text-warning-emphasis border tier-condition-badge';
+          condBadge.innerHTML = !isNaN(numT) ? `вес &gt; ${numT} кг/м` : 'вес &gt; X кг/м';
+          if (!isUserManualKey) keyInput.value = !isNaN(numT) ? `свыше ${numT}` : 'свыше 3';
+        } else if (type === 'up_to') {
+          if (typeCol) typeCol.className = 'col-md-6 tier-type-col';
+          if (thresholdCol) {
+            thresholdCol.className = 'col-md-6 tier-threshold-col';
+            thresholdCol.style.display = '';
+          }
+          if (keyCol) keyCol.style.display = 'none';
+          condBadge.className = 'badge bg-primary-subtle text-primary border tier-condition-badge';
+          condBadge.innerHTML = !isNaN(numT) ? `вес &le; ${numT} кг/м` : 'вес &le; X кг/м';
+          if (!isUserManualKey) keyInput.value = !isNaN(numT) ? String(numT) : '1';
+        } else {
+          if (typeCol) typeCol.className = 'col-md-4 tier-type-col';
+          if (thresholdCol) {
+            thresholdCol.className = 'col-md-3 tier-threshold-col';
+            thresholdCol.style.display = '';
+          }
+          if (keyCol) {
+            keyCol.className = 'col-md-5 tier-key-col';
+            keyCol.style.display = '';
+          }
+          condBadge.className = 'badge bg-secondary-subtle text-secondary-emphasis border tier-condition-badge';
+          condBadge.innerHTML = 'Кастомный ключ';
         }
-        if (keyCol) {
-          keyCol.className = 'col-md-5 tier-key-col';
-          keyCol.style.display = '';
-        }
-        condBadge.className = 'badge bg-secondary-subtle text-secondary-emphasis border tier-condition-badge';
-        condBadge.innerHTML = 'Кастомный ключ';
       }
 
       if (keyPreview) {
@@ -1860,31 +2049,45 @@ function setupWorksRulesListeners() {
       }
     };
 
-    typeSelect.addEventListener('change', () => {
-      updateCardConditionAndKey(false);
-      const firstTitleInput = card.querySelector('.tier-work-title');
-      if (!firstTitleInput) return;
-      const currTitle = firstTitleInput.value.trim();
-      const currentWay = document.getElementById('addRuleWayName')?.value?.trim() || '';
-      const currentTpl = document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
-      const type = typeSelect.value;
-      const tVal = thresholdInput.value.trim().replace(',', '.');
+    if (typeSelect) {
+      typeSelect.addEventListener('change', () => {
+        updateCardConditionAndKey(false);
+        const firstTitleInput = card.querySelector('.tier-work-title');
+        if (!firstTitleInput) return;
+        const currTitle = firstTitleInput.value.trim();
+        const currentWay = document.getElementById('addRuleWayName')?.value?.trim() || '';
+        const currentTpl = document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
+        const type = typeSelect.value;
+        const tVal = thresholdInput.value.trim().replace(',', '.');
 
-      if (!currTitle || currTitle.startsWith('Прокладка кабеля') || currTitle.startsWith('Прокладка оптического')) {
-        if (type === 'optical') {
-          firstTitleInput.value = currentWay ? `Прокладка оптического кабеля (${currentWay})` : 'Прокладка оптического кабеля';
-        } else if (currentTpl && (currentTpl.includes('{масса}') || currentTpl.includes('{вес}'))) {
-          firstTitleInput.value = currentTpl.replace(/\{масса\}|\{вес\}/gi, tVal || '1').trim();
-        } else if (type === 'over') {
-          firstTitleInput.value = currentWay ? `Прокладка кабеля массой 1 м свыше ${tVal || 3} кг (${currentWay})` : `Прокладка кабеля массой 1 м свыше ${tVal || 3} кг`;
+        if (isCoupling) {
+          if (currentTpl && currentTpl.includes('{жилы}')) {
+            firstTitleInput.value = currentTpl.replace(/\{жилы\}/gi, tVal || (isOpticalCoupling ? '8' : '12')).trim();
+          }
         } else {
-          firstTitleInput.value = currentWay ? `Прокладка кабеля массой 1 м, кг, до: ${tVal || 1} (${currentWay})` : `Прокладка кабеля массой 1 м, кг, до: ${tVal || 1}`;
+          if (!currTitle || currTitle.startsWith('Прокладка кабеля') || currTitle.startsWith('Прокладка оптического')) {
+            if (type === 'optical') {
+              firstTitleInput.value = currentWay ? `Прокладка оптического кабеля (${currentWay})` : 'Прокладка оптического кабеля';
+            } else if (currentTpl && (currentTpl.includes('{масса}') || currentTpl.includes('{вес}'))) {
+              firstTitleInput.value = currentTpl.replace(/\{масса\}|\{вес\}/gi, tVal || '1').trim();
+            } else if (type === 'over') {
+              firstTitleInput.value = currentWay ? `Прокладка кабеля массой 1 м свыше ${tVal || 3} кг (${currentWay})` : `Прокладка кабеля массой 1 м свыше ${tVal || 3} кг`;
+            } else {
+              firstTitleInput.value = currentWay ? `Прокладка кабеля массой 1 м, кг, до: ${tVal || 1} (${currentWay})` : `Прокладка кабеля массой 1 м, кг, до: ${tVal || 1}`;
+            }
+          }
         }
-      }
-    });
+      });
+    }
 
     thresholdInput.addEventListener('input', () => {
       updateCardConditionAndKey(false);
+      const firstTitleInput = card.querySelector('.tier-work-title');
+      const currentTpl = document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
+      const tVal = thresholdInput.value.trim().replace(',', '.');
+      if (isCoupling && firstTitleInput && currentTpl && currentTpl.includes('{жилы}')) {
+        firstTitleInput.value = currentTpl.replace(/\{жилы\}/gi, tVal || (isOpticalCoupling ? '8' : '12')).trim();
+      }
     });
 
     keyInput.addEventListener('input', () => {
@@ -1916,6 +2119,42 @@ function setupWorksRulesListeners() {
     });
   }
 
+  function applyDefaultCouplingTiers(isOptical = false) {
+    const container = document.getElementById('addRuleInstallationTiersContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    const template = document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
+    const effectiveWay = document.getElementById('addRuleWayName')?.value?.trim() || '';
+    const ruleType = isOptical ? 'оптические_муфты' : 'муфты';
+
+    const defaultCouplingMat = [
+      {
+        "Наименование": "{МАРКА_МУФТЫ}",
+        "Тип": "материал",
+        "Единицы измерения": "шт",
+        "Формула": "КОЛИЧЕСТВО",
+        "ОтображатьФормулу": true,
+        "Раздел": "Монтажные работы"
+      }
+    ];
+
+    const tiers = isOptical ? [8, 16, 24, 32, 48, 96] : [12, 27, 48, 61];
+    tiers.forEach(t => {
+      const card = createInstallationTierCard({
+        type: 'cores_up_to',
+        threshold: t,
+        key: String(t),
+        unit: 'шт',
+        formula: 'КОЛИЧЕСТВО',
+        showFormula: true,
+        materials: JSON.parse(JSON.stringify(defaultCouplingMat))
+      }, { ruleName: effectiveWay, template: template, ruleType: ruleType });
+      container.appendChild(card);
+    });
+
+    refreshInstallationTiersBadges(container);
+  }
+
   // Standard filling with exact 5 parameters: 1, 2, 3, свыше 3, ВОЛС
   function applyDefaultStandardTiers(wayName = '') {
     const container = document.getElementById('addRuleInstallationTiersContainer');
@@ -1945,7 +2184,7 @@ function setupWorksRulesListeners() {
         formula: 'ДЛИНА',
         showFormula: true,
         materials: JSON.parse(JSON.stringify(defaultCableMat))
-      }, { ruleName: effectiveWay, template: template });
+      }, { ruleName: effectiveWay, template: template, ruleType: 'кабель' });
       container.appendChild(card);
     };
 
@@ -1973,9 +2212,12 @@ function setupWorksRulesListeners() {
     if (!container) return null;
     const cards = container.querySelectorAll('.tier-card');
     if (cards.length === 0) {
-      showToast('Добавьте хотя бы одну весовую категорию прокладки кабеля', 'warning', 'Проверка данных');
+      showToast('Добавьте хотя бы одну категорию/ступень сметных норм', 'warning', 'Проверка данных');
       return null;
     }
+
+    const selectedRuleType = document.getElementById('addRuleInstallationRuleType')?.value || 'кабель';
+    const isCouplingRule = selectedRuleType === 'муфты' || selectedRuleType === 'оптические_муфты';
 
     const tiersDict = {};
     const usedKeys = new Set();
@@ -1983,7 +2225,7 @@ function setupWorksRulesListeners() {
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i];
       const key = card.querySelector('.tier-key-input')?.value?.trim();
-      const type = card.querySelector('.tier-type-select')?.value || 'up_to';
+      const type = card.querySelector('.tier-type-select')?.value || (isCouplingRule ? 'cores_up_to' : 'up_to');
       const rawThreshold = card.querySelector('.tier-threshold-input')?.value?.trim();
 
       if (!key) {
@@ -2015,8 +2257,14 @@ function setupWorksRulesListeners() {
       for (let wIdx = 0; wIdx < workCards.length; wIdx++) {
         const wCard = workCards[wIdx];
         const title = wCard.querySelector('.tier-work-title')?.value?.trim();
-        const unit = wCard.querySelector('.tier-work-unit')?.value?.trim() || 'м';
-        const formula = wCard.querySelector('.tier-work-formula')?.value?.trim() || 'ДЛИНА';
+        const typeVal = wCard.querySelector('.tier-work-type')?.value?.trim() || 'работа';
+        const unit = wCard.querySelector('.tier-work-unit')?.value?.trim() || (isCouplingRule ? 'шт' : 'м');
+        const formula = wCard.querySelector('.tier-work-formula')?.value?.trim() || (isCouplingRule ? 'КОЛИЧЕСТВО' : 'ДЛИНА');
+        const sectionVal = wCard.querySelector('.tier-work-section')?.value?.trim() || '';
+        const conditionVal = wCard.querySelector('.tier-work-condition')?.value?.trim() || '';
+        const roundingRaw = wCard.querySelector('.tier-work-rounding')?.value?.trim();
+        const roundingVal = (roundingRaw !== undefined && roundingRaw !== '' && !isNaN(Number(roundingRaw))) ? Number(roundingRaw) : null;
+        const commentVal = wCard.querySelector('.tier-work-comment')?.value?.trim() || '';
         const showFormula = Boolean(wCard.querySelector('.tier-work-show-formula')?.checked);
 
         if (!title) {
@@ -2029,15 +2277,26 @@ function setupWorksRulesListeners() {
           "Наименование": title,
           "Единицы измерения": unit,
           "Формула": formula,
-          "Тип": "работа",
+          "Тип": typeVal,
           "ОтображатьФормулу": showFormula
         };
 
+        if (sectionVal) workItem["Раздел"] = sectionVal;
+        if (conditionVal) workItem["Условие"] = conditionVal;
+        if (roundingVal !== null) workItem["Округление"] = roundingVal;
+        if (commentVal) workItem["Комментарий"] = commentVal;
+
         if (wIdx === 0) {
-          if (type === 'optical') {
-            workItem["Категория"] = "Оптический кабель";
-          } else if (parsedThreshold !== null) {
-            workItem["МаксВес"] = parsedThreshold;
+          if (isCouplingRule) {
+            if (parsedThreshold !== null) {
+              workItem["МаксЖил"] = Math.round(parsedThreshold);
+            }
+          } else {
+            if (type === 'optical') {
+              workItem["Категория"] = "Оптический кабель";
+            } else if (parsedThreshold !== null) {
+              workItem["МаксВес"] = parsedThreshold;
+            }
           }
         }
 
@@ -2048,9 +2307,12 @@ function setupWorksRulesListeners() {
           const nName = nr.querySelector('.unified-nested-name')?.value?.trim();
           if (!nName) return;
           const nType = nr.querySelector('.unified-nested-type')?.value?.trim() || 'материал';
-          const nUnit = nr.querySelector('.unified-nested-unit')?.value?.trim() || 'км';
-          const nFormula = nr.querySelector('.unified-nested-formula')?.value?.trim() || 'ДЛИНА/1000';
+          const nUnit = nr.querySelector('.unified-nested-unit')?.value?.trim() || (isCouplingRule ? 'шт' : 'км');
+          const nFormula = nr.querySelector('.unified-nested-formula')?.value?.trim() || (isCouplingRule ? 'КОЛИЧЕСТВО' : 'ДЛИНА/1000');
           const nSection = nr.querySelector('.unified-nested-section')?.value?.trim() || '';
+          const nRoundingRaw = nr.querySelector('.unified-nested-rounding')?.value?.trim();
+          const nRounding = (nRoundingRaw !== undefined && nRoundingRaw !== '' && !isNaN(Number(nRoundingRaw))) ? Number(nRoundingRaw) : null;
+          const nComment = nr.querySelector('.unified-nested-comment')?.value?.trim() || '';
           const nShow = Boolean(nr.querySelector('.unified-nested-show')?.checked);
 
           const matItem = {
@@ -2061,6 +2323,8 @@ function setupWorksRulesListeners() {
             "ОтображатьФормулу": nShow
           };
           if (nSection) matItem["Раздел"] = nSection;
+          if (nRounding !== null) matItem["Округление"] = nRounding;
+          if (nComment) matItem["Комментарий"] = nComment;
           materials.push(matItem);
         });
 
@@ -2082,7 +2346,7 @@ function setupWorksRulesListeners() {
   // -------------------------------------------------------------------------
 
   function openEditRuleModal(sectionName, ruleName) {
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     const secDict = currentObj[sectionName];
     if (!secDict || typeof secDict !== 'object') {
       showToast(`Раздел «${sectionName}» не найден`, 'warning', 'Ошибка');
@@ -2129,8 +2393,26 @@ function setupWorksRulesListeners() {
     updateAddRuleSectionsVisibility();
 
     if (isInstallation) {
+      updateInstallationRuleTypeOptions(ruleName);
       const templateInput = document.getElementById('addRuleInstTemplate');
       if (templateInput) templateInput.value = ruleObj["Шаблон"] || '';
+
+      const ruleType = ruleObj["ТипПравила"] || 'кабель';
+      const selRuleType = document.getElementById('addRuleInstallationRuleType');
+      if (selRuleType) selRuleType.value = ruleType;
+
+      const tplLabel = document.getElementById('addRuleInstTemplateLabel');
+      const secTitle = document.getElementById('addRuleTiersSectionTitle');
+      if (ruleType === 'муфты') {
+        if (tplLabel) tplLabel.textContent = 'Шаблон наименования сметной работы (с маркером {жилы})';
+        if (secTitle) secTitle.innerHTML = `<i class='bx bx-slider text-primary me-1'></i>Ступени по количеству жил соединительных муфт`;
+      } else if (ruleType === 'оптические_муфты') {
+        if (tplLabel) tplLabel.textContent = 'Шаблон наименования сметной работы (с маркером {жилы})';
+        if (secTitle) secTitle.innerHTML = `<i class='bx bx-slider text-primary me-1'></i>Ступени по количеству волокон оптических муфт`;
+      } else {
+        if (tplLabel) tplLabel.textContent = 'Шаблон наименования сметной работы (с маркером {масса})';
+        if (secTitle) secTitle.innerHTML = `<i class='bx bx-slider text-primary me-1'></i>Весовые категории прокладки кабеля`;
+      }
 
       const instContainer = document.getElementById('addRuleInstallationTiersContainer');
       if (instContainer) {
@@ -2149,26 +2431,37 @@ function setupWorksRulesListeners() {
               let type = 'up_to';
               let threshold = null;
 
-              if (lowerKey.includes('оптич') || lowerKey.includes('волс') || (primaryItem["Категория"] || '').toLowerCase().includes('оптич')) {
-                type = 'optical';
-              } else if (lowerKey.includes('свыше') || lowerKey.includes('более') || lowerKey.includes('от') || lowerKey.includes('>')) {
-                type = 'over';
-              } else if (!isNaN(parseFloat(String(key).replace(',', '.'))) || lowerKey.includes('до')) {
-                type = 'up_to';
+              if (ruleType === 'муфты' || ruleType === 'оптические_муфты') {
+                type = 'cores_up_to';
+                if (primaryItem["МаксЖил"] !== undefined && primaryItem["МаксЖил"] !== null) {
+                  threshold = parseInt(primaryItem["МаксЖил"], 10);
+                } else {
+                  const cleanK = String(key).trim().replace(',', '.');
+                  const numK = parseFloat(cleanK);
+                  if (!isNaN(numK)) threshold = Math.round(numK);
+                }
               } else {
-                type = 'custom';
-              }
+                if (lowerKey.includes('оптич') || lowerKey.includes('волс') || (primaryItem["Категория"] || '').toLowerCase().includes('оптич')) {
+                  type = 'optical';
+                } else if (lowerKey.includes('свыше') || lowerKey.includes('более') || lowerKey.includes('от') || lowerKey.includes('>')) {
+                  type = 'over';
+                } else if (!isNaN(parseFloat(String(key).replace(',', '.'))) || lowerKey.includes('до')) {
+                  type = 'up_to';
+                } else {
+                  type = 'custom';
+                }
 
-              const cleanKey = String(key).trim().replace(',', '.');
-              const numK = parseFloat(cleanKey);
-              if (!isNaN(numK) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
-                threshold = numK;
-              } else {
-                const m = cleanKey.match(/(?:до|макс(?:имум)?|свыше|более|от|>)[_\s]*[:;]?[_\s]*(\d+(?:[.,]\d+)?)/i);
-                if (m) threshold = parseFloat(m[1].replace(',', '.'));
-              }
-              if (threshold === null && primaryItem["МаксВес"] !== undefined) {
-                threshold = parseFloat(String(primaryItem["МаксВес"]).replace(',', '.'));
+                const cleanKey = String(key).trim().replace(',', '.');
+                const numK = parseFloat(cleanKey);
+                if (!isNaN(numK) && /^-?\d+(?:\.\d+)?$/.test(cleanKey)) {
+                  threshold = numK;
+                } else {
+                  const m = cleanKey.match(/(?:до|макс(?:имум)?|свыше|более|от|>)[_\s]*[:;]?[_\s]*(\d+(?:[.,]\d+)?)/i);
+                  if (m) threshold = parseFloat(m[1].replace(',', '.'));
+                }
+                if (threshold === null && primaryItem["МаксВес"] !== undefined) {
+                  threshold = parseFloat(String(primaryItem["МаксВес"]).replace(',', '.'));
+                }
               }
 
               const card = createInstallationTierCard({
@@ -2176,16 +2469,20 @@ function setupWorksRulesListeners() {
                 type: type,
                 threshold: threshold,
                 works: items
-              }, { ruleName: ruleName, template: ruleObj["Шаблон"] || '' });
+              }, { ruleName: ruleName, template: ruleObj["Шаблон"] || '', ruleType: ruleType });
 
               instContainer.appendChild(card);
             });
             refreshInstallationTiersBadges(instContainer);
           } else {
-            applyDefaultStandardTiers(ruleName);
+            if (ruleType === 'муфты') applyDefaultCouplingTiers(false);
+            else if (ruleType === 'оптические_муфты') applyDefaultCouplingTiers(true);
+            else applyDefaultStandardTiers(ruleName);
           }
         } else {
-          applyDefaultStandardTiers(ruleName);
+          if (ruleType === 'муфты') applyDefaultCouplingTiers(false);
+          else if (ruleType === 'оптические_муфты') applyDefaultCouplingTiers(true);
+          else applyDefaultStandardTiers(ruleName);
         }
       }
     } else {
@@ -2247,7 +2544,11 @@ function setupWorksRulesListeners() {
   };
 
   if (radioConstruction) radioConstruction.addEventListener('change', updateAddRuleSectionsVisibility);
-  if (radioInstallation) radioInstallation.addEventListener('change', updateAddRuleSectionsVisibility);
+  if (radioInstallation) radioInstallation.addEventListener('change', () => {
+    updateAddRuleSectionsVisibility();
+    const editName = addRuleEditContext && addRuleEditContext.mode === 'edit' ? addRuleEditContext.originalRuleName : null;
+    updateInstallationRuleTypeOptions(editName);
+  });
 
   // Dynamic installation tiers toolbar and container event listeners
   const instTiersContainer = document.getElementById('addRuleInstallationTiersContainer');
@@ -2342,33 +2643,40 @@ function setupWorksRulesListeners() {
     });
   }
 
-  // Add cable tier button
+  // Add tier button
   const btnAddCableTier = document.getElementById('btnAddRuleCableTierBtn');
   if (btnAddCableTier && instTiersContainer) {
     btnAddCableTier.addEventListener('click', () => {
       const wayName = document.getElementById('addRuleWayName')?.value?.trim() || '';
       const template = document.getElementById('addRuleInstTemplate')?.value?.trim() || '';
+      const selectedRuleType = document.getElementById('addRuleInstallationRuleType')?.value || 'кабель';
+      const isCoupling = selectedRuleType === 'муфты' || selectedRuleType === 'оптические_муфты';
+      const isOptical = selectedRuleType === 'оптические_муфты';
 
       const existingThresholds = Array.from(instTiersContainer.querySelectorAll('.tier-threshold-input'))
         .map(inp => parseFloat(inp.value.replace(',', '.')))
         .filter(n => !isNaN(n));
 
-      let nextThreshold = 1;
+      let nextThreshold = isCoupling ? (isOptical ? 8 : 12) : 1;
       if (existingThresholds.length > 0) {
         const maxVal = Math.max(...existingThresholds);
-        if (maxVal < 3) nextThreshold = maxVal + 1;
-        else if (maxVal === 3) nextThreshold = 6;
-        else nextThreshold = maxVal + 2;
+        if (isCoupling) {
+          nextThreshold = isOptical ? maxVal + 16 : maxVal + 10;
+        } else {
+          if (maxVal < 3) nextThreshold = maxVal + 1;
+          else if (maxVal === 3) nextThreshold = 6;
+          else nextThreshold = maxVal + 2;
+        }
       }
 
       const card = createInstallationTierCard({
-        type: 'up_to',
+        type: isCoupling ? 'cores_up_to' : 'up_to',
         threshold: nextThreshold,
         key: String(nextThreshold),
-        unit: 'м',
-        formula: 'ДЛИНА',
+        unit: isCoupling ? 'шт' : 'м',
+        formula: isCoupling ? 'КОЛИЧЕСТВО' : 'ДЛИНА',
         showFormula: true
-      }, { ruleName: wayName, template: template });
+      }, { ruleName: wayName, template: template, ruleType: selectedRuleType });
 
       instTiersContainer.appendChild(card);
       refreshInstallationTiersBadges(instTiersContainer);
@@ -2382,6 +2690,11 @@ function setupWorksRulesListeners() {
   if (btnAddOpticalTier && instTiersContainer) {
     btnAddOpticalTier.addEventListener('click', () => {
       const wayName = document.getElementById('addRuleWayName')?.value?.trim() || '';
+      const selectedRuleType = document.getElementById('addRuleInstallationRuleType')?.value || 'кабель';
+      if (selectedRuleType === 'муфты' || selectedRuleType === 'оптические_муфты') {
+        showToast('Для муфт используйте кнопку добавления ступени', 'info', 'Ступень муфты');
+        return;
+      }
       const hasOptical = Array.from(instTiersContainer.querySelectorAll('.tier-type-select'))
         .some(sel => sel.value === 'optical');
       if (hasOptical) {
@@ -2395,7 +2708,7 @@ function setupWorksRulesListeners() {
         unit: 'м',
         formula: 'ДЛИНА',
         showFormula: true
-      }, { ruleName: wayName });
+      }, { ruleName: wayName, ruleType: 'кабель' });
 
       instTiersContainer.appendChild(card);
       refreshInstallationTiersBadges(instTiersContainer);
@@ -2403,12 +2716,56 @@ function setupWorksRulesListeners() {
     });
   }
 
-  // Standard filling button with parameters: 1, 2, 3, свыше 3, ВОЛС
+  // Standard filling button
   const btnApplyStdTiers = document.getElementById('btnApplyDefaultStandardTiers');
   if (btnApplyStdTiers) {
     btnApplyStdTiers.addEventListener('click', () => {
-      applyDefaultStandardTiers();
-      showToast('Заполнен стандартный набор категорий (1, 2, 3, свыше 3, ВОЛС)', 'success', 'Стандартное заполнение');
+      const selectedRuleType = document.getElementById('addRuleInstallationRuleType')?.value || 'кабель';
+      if (selectedRuleType === 'муфты') {
+        applyDefaultCouplingTiers(false);
+        showToast('Заполнен стандартный набор ступеней муфт (12, 27, 48, 61 жил)', 'success', 'Ступени муфт');
+      } else if (selectedRuleType === 'оптические_муфты') {
+        applyDefaultCouplingTiers(true);
+        showToast('Заполнен стандартный набор ступеней оптических муфт (8, 16, 24, 32, 48, 96 волокон)', 'success', 'Ступени оптических муфт');
+      } else {
+        applyDefaultStandardTiers();
+        showToast('Заполнен стандартный набор категорий (1, 2, 3, свыше 3, ВОЛС)', 'success', 'Стандартное заполнение');
+      }
+    });
+  }
+
+  // Listener for changing TipPravila
+  const selRuleType = document.getElementById('addRuleInstallationRuleType');
+  if (selRuleType) {
+    selRuleType.addEventListener('change', () => {
+      const val = selRuleType.value;
+      const tplInput = document.getElementById('addRuleInstTemplate');
+      const tplLabel = document.getElementById('addRuleInstTemplateLabel');
+      const secTitle = document.getElementById('addRuleTiersSectionTitle');
+      const wayName = document.getElementById('addRuleWayName')?.value?.trim() || '';
+
+      if (val === 'муфты') {
+        if (tplLabel) tplLabel.textContent = 'Шаблон наименования сметной работы (с маркером {жилы})';
+        if (tplInput && (!tplInput.value || tplInput.value.includes('{масса}') || tplInput.value.includes('Прокладка кабеля'))) {
+          tplInput.value = 'Установка муфты кабельной соединительной подземной для кабеля с количеством жил до: {жилы} с гидрофобным заполнением';
+        }
+        if (secTitle) secTitle.innerHTML = `<i class='bx bx-slider text-primary me-1'></i>Ступени по количеству жил соединительных муфт`;
+        applyDefaultCouplingTiers(false);
+      } else if (val === 'оптические_муфты') {
+        if (tplLabel) tplLabel.textContent = 'Шаблон наименования сметной работы (с маркером {жилы})';
+        if (tplInput && (!tplInput.value || tplInput.value.includes('{масса}') || tplInput.value.includes('Прокладка кабеля'))) {
+          tplInput.value = 'Установка муфты оптической соединительной тупиковой с количеством свариваемых волокон до: {жилы}';
+        }
+        if (secTitle) secTitle.innerHTML = `<i class='bx bx-slider text-primary me-1'></i>Ступени по количеству волокон оптических муфт`;
+        applyDefaultCouplingTiers(true);
+      } else {
+        if (tplLabel) tplLabel.textContent = 'Шаблон наименования сметной работы (с маркером {масса})';
+        if (tplInput && (!tplInput.value || tplInput.value.includes('{жилы}') || tplInput.value.includes('Установка муфты'))) {
+          tplInput.value = wayName ? `Прокладка кабеля массой 1 м, кг, до: {масса} (${wayName})` : 'Прокладка кабеля массой 1 м, кг, до: {масса}';
+        }
+        if (secTitle) secTitle.innerHTML = `<i class='bx bx-slider text-primary me-1'></i>Весовые категории прокладки кабеля`;
+        applyDefaultStandardTiers(wayName);
+      }
     });
   }
 
@@ -2417,8 +2774,11 @@ function setupWorksRulesListeners() {
   if (btnApplyTpl && instTiersContainer) {
     btnApplyTpl.addEventListener('click', () => {
       const tpl = document.getElementById('addRuleInstTemplate')?.value?.trim();
+      const selectedRuleType = document.getElementById('addRuleInstallationRuleType')?.value || 'кабель';
+      const isCoupling = selectedRuleType === 'муфты' || selectedRuleType === 'оптические_муфты';
+
       if (!tpl) {
-        showToast('Укажите шаблон с маркером {масса} в поле выше', 'warning', 'Шаблон');
+        showToast(isCoupling ? 'Укажите шаблон с маркером {жилы} в поле выше' : 'Укажите шаблон с маркером {масса} в поле выше', 'warning', 'Шаблон');
         document.getElementById('addRuleInstTemplate')?.focus();
         return;
       }
@@ -2431,15 +2791,20 @@ function setupWorksRulesListeners() {
         const titleInput = card.querySelector('.tier-work-title');
         if (!titleInput) return;
 
-        if (type === 'up_to') {
-          titleInput.value = tpl.replace(/\{масса\}|\{вес\}/gi, thVal || '1').trim();
+        if (isCoupling) {
+          titleInput.value = tpl.replace(/\{жилы\}/gi, thVal || '').trim();
           updatedCount++;
-        } else if (type === 'over') {
-          titleInput.value = tpl.replace(/\{масса\}|\{вес\}/gi, `свыше ${thVal || '3'}`).trim();
-          updatedCount++;
-        } else if (type === 'custom') {
-          titleInput.value = tpl.replace(/\{масса\}|\{вес\}/gi, thVal || '').trim();
-          updatedCount++;
+        } else {
+          if (type === 'up_to') {
+            titleInput.value = tpl.replace(/\{масса\}|\{вес\}/gi, thVal || '1').trim();
+            updatedCount++;
+          } else if (type === 'over') {
+            titleInput.value = tpl.replace(/\{масса\}|\{вес\}/gi, `свыше ${thVal || '3'}`).trim();
+            updatedCount++;
+          } else if (type === 'custom') {
+            titleInput.value = tpl.replace(/\{масса\}|\{вес\}/gi, thVal || '').trim();
+            updatedCount++;
+          }
         }
       });
 
@@ -2510,7 +2875,7 @@ function setupWorksRulesListeners() {
       const isInstallation = radioInstallation && radioInstallation.checked;
       const targetSectionKey = isInstallation ? "Монтажные работы" : "Строительные работы";
 
-      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
       if (!currentObj[targetSectionKey] || typeof currentObj[targetSectionKey] !== 'object' || Array.isArray(currentObj[targetSectionKey])) {
         currentObj[targetSectionKey] = {};
       }
@@ -2529,11 +2894,34 @@ function setupWorksRulesListeners() {
       if (isInstallation) {
         const templateInput = document.getElementById('addRuleInstTemplate');
         const templateVal = templateInput ? templateInput.value.trim() : '';
+        const selectedRuleType = document.getElementById('addRuleInstallationRuleType')?.value || 'кабель';
+
+        // Restriction: only one rule allowed for 'муфты' and 'оптические_муфты' in 'Монтажные работы'
+        if (selectedRuleType === 'муфты' || selectedRuleType === 'оптические_муфты') {
+          const isEdit = addRuleEditContext && addRuleEditContext.mode === 'edit';
+          const originalRuleName = isEdit ? addRuleEditContext.originalRuleName : null;
+          const originalSec = isEdit ? addRuleEditContext.originalSection : null;
+
+          const existingConflict = Object.entries(currentObj["Монтажные работы"] || {}).find(([rName, rObj]) => {
+            if (isEdit && originalSec === "Монтажные работы" && rName === originalRuleName) {
+              return false; // Editing self is valid
+            }
+            return rObj && rObj["ТипПравила"] === selectedRuleType;
+          });
+
+          if (existingConflict) {
+            const [conflictName] = existingConflict;
+            const typeLabel = selectedRuleType === 'муфты' ? '«муфты»' : '«оптические_муфты»';
+            showToast(`В разделе «Монтажные работы» уже есть правило с типом ${typeLabel}: «${conflictName}». Разрешено иметь только одно правило для данного типа. Отредактируйте существующее правило или выберите тип «Прокладка кабеля».`, 'warning', 'Ограничение типа правила');
+            return;
+          }
+        }
 
         const tiersDict = collectInstallationTiersData();
         if (!tiersDict) return; // Validation message already shown
 
         const rulePayload = {
+          "ТипПравила": selectedRuleType,
           "Работы": tiersDict
         };
         if (templateVal) {
@@ -2589,7 +2977,7 @@ function setupWorksRulesListeners() {
   // =========================================================================
 
   function openEditCableModal(groupName, markKey) {
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     const catalog = currentObj["Справочник кабелей"] || {};
     let targetGroup = groupName;
     let targetData = catalog[groupName]?.["Тип"]?.[markKey];
@@ -2634,7 +3022,7 @@ function setupWorksRulesListeners() {
 
     const cpList = document.getElementById('datalistCouplingsList');
     if (cpList) {
-      const cpCatalog = currentObj["Справочник муфт"] || (cachedDefaultRules && cachedDefaultRules["Справочник муфт"]) || {};
+      const cpCatalog = currentObj["Справочник муфт"] || {};
       cpList.innerHTML = Object.keys(cpCatalog).map(k => `<option value="${escapeHtml(k)}">${escapeHtml(cpCatalog[k]["Полное наименование"] || '')}</option>`).join('');
     }
 
@@ -2644,6 +3032,7 @@ function setupWorksRulesListeners() {
     const weightInput = document.getElementById('addCableWeight');
     const lenInput = document.getElementById('addCableBuildingLength');
     const couplingInput = document.getElementById('addCableCoupling');
+    const catSelect = document.getElementById('addCableCategory');
     const descInput = document.getElementById('addCableDescription');
 
     if (groupKeyInput) groupKeyInput.value = targetGroup;
@@ -2652,6 +3041,7 @@ function setupWorksRulesListeners() {
     if (weightInput) weightInput.value = targetData["Вес"] !== undefined ? targetData["Вес"] : '';
     if (lenInput) lenInput.value = targetData["Строительная длина"] !== undefined ? targetData["Строительная длина"] : 1000;
     if (couplingInput) couplingInput.value = targetData["Муфта"] || '';
+    if (catSelect) catSelect.value = targetData["Категория"] || '';
     if (descInput) descInput.value = targetData["Полное описание"] || '';
 
     const modalEl = document.getElementById('addCableModal');
@@ -2759,7 +3149,7 @@ function setupWorksRulesListeners() {
 
       const cpList = document.getElementById('datalistCouplingsList');
       if (cpList) {
-        const cpCatalog = (draft && draft["Справочник муфт"]) || (cachedDefaultRules && cachedDefaultRules["Справочник муфт"]) || {};
+        const cpCatalog = (draft && draft["Справочник муфт"]) || {};
         cpList.innerHTML = Object.keys(cpCatalog).map(k => `<option value="${escapeHtml(k)}">${escapeHtml(cpCatalog[k]["Полное наименование"] || '')}</option>`).join('');
       }
 
@@ -2770,6 +3160,7 @@ function setupWorksRulesListeners() {
       const weightInput = document.getElementById('addCableWeight');
       const lenInput = document.getElementById('addCableBuildingLength');
       const coupInput = document.getElementById('addCableCoupling');
+      const catSelect = document.getElementById('addCableCategory');
 
       const catEntries = Object.entries(cableCatalog);
       let targetGrpKey = '';
@@ -2777,8 +3168,10 @@ function setupWorksRulesListeners() {
       let defaultWeight = '0.35';
       let defaultLen = '1000';
       let defaultCoup = '';
+      let defaultCategory = '';
 
       if (catVal === 'optical') {
+        defaultCategory = 'Оптический кабель';
         const optEntry = catEntries.find(([k, v]) => v?.["Категория"] === 'Оптический кабель' || k.toLowerCase().includes('оптич') || (v?.["Название"] || '').toLowerCase().includes('оптич'));
         if (optEntry) {
           targetGrpKey = optEntry[0];
@@ -2800,6 +3193,9 @@ function setupWorksRulesListeners() {
         const normalEntry = catEntries.find(([k, v]) => v?.["Категория"] !== 'Оптический кабель' && !k.toLowerCase().includes('оптич')) || catEntries[0];
         targetGrpKey = normalEntry[0];
         targetGrpName = normalEntry[1]?.["Название"] || normalEntry[0];
+        if (normalEntry[1]?.["Категория"] === 'Оптический кабель') {
+          defaultCategory = 'Оптический кабель';
+        }
         const firstMarkData = normalEntry[1]?.["Тип"] ? Object.values(normalEntry[1]["Тип"])[0] : null;
         if (firstMarkData) {
           if (firstMarkData["Вес"]) defaultWeight = String(firstMarkData["Вес"]);
@@ -2813,6 +3209,7 @@ function setupWorksRulesListeners() {
       if (weightInput) weightInput.value = defaultWeight;
       if (lenInput) lenInput.value = defaultLen;
       if (coupInput) coupInput.value = defaultCoup;
+      if (catSelect) catSelect.value = defaultCategory;
 
       const modalEl = document.getElementById('addCableModal');
       if (modalEl && window.bootstrap && bootstrap.Modal) {
@@ -2838,16 +3235,20 @@ function setupWorksRulesListeners() {
         return;
       }
 
-      const weight = parseFloat(document.getElementById('addCableWeight')?.value || '0.35') || 0.35;
-      const buildingLength = parseInt(document.getElementById('addCableBuildingLength')?.value || '1000', 10) || 1000;
-      const coupling = document.getElementById('addCableCoupling')?.value?.trim() || '';
-      const description = document.getElementById('addCableDescription')?.value?.trim() || (groupName ? `${groupName} ${mark}` : `Кабель ${mark}`);
-      const isOptical = groupKey === 'Оптический кабель' || groupName.toLowerCase().includes('оптич') || mark.toLowerCase().includes('окк');
+      const rawWeightStr = (document.getElementById('addCableWeight')?.value ?? '').trim().replace(',', '.');
+      const parsedWeight = rawWeightStr === '' ? NaN : parseFloat(rawWeightStr);
+      const weight = Number.isFinite(parsedWeight) && parsedWeight >= 0 ? parsedWeight : 0.35;
 
-      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+      const rawLenStr = (document.getElementById('addCableBuildingLength')?.value ?? '').trim();
+      const parsedLen = rawLenStr === '' ? NaN : parseInt(rawLenStr, 10);
+      const buildingLength = Number.isFinite(parsedLen) && parsedLen >= 0 ? parsedLen : 1000;
+      const coupling = document.getElementById('addCableCoupling')?.value?.trim() || '';
+      const cableCategory = document.getElementById('addCableCategory')?.value?.trim() || '';
+      const description = document.getElementById('addCableDescription')?.value?.trim() || (groupName ? `${groupName} ${mark}` : `Кабель ${mark}`);
+
+      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
       if (!currentObj["Справочник кабелей"] || typeof currentObj["Справочник кабелей"] !== 'object') {
-        const existingCat = (cachedDefaultRules && cachedDefaultRules["Справочник кабелей"]) ? cachedDefaultRules["Справочник кабелей"] : {};
-        currentObj["Справочник кабелей"] = JSON.parse(JSON.stringify(existingCat));
+        currentObj["Справочник кабелей"] = {};
       }
 
       // If in edit mode, remove old cable mark if group or mark changed
@@ -2864,7 +3265,7 @@ function setupWorksRulesListeners() {
       if (!currentObj["Справочник кабелей"][groupKey] || typeof currentObj["Справочник кабелей"][groupKey] !== 'object') {
         currentObj["Справочник кабелей"][groupKey] = {
           "Название": groupName,
-          ...(isOptical ? { "Категория": "Оптический кабель" } : {}),
+          ...(cableCategory ? { "Категория": cableCategory } : {}),
           "Тип": {}
         };
       } else {
@@ -2877,13 +3278,17 @@ function setupWorksRulesListeners() {
         currentObj["Справочник кабелей"][groupKey]["Тип"] = {};
       }
 
-      currentObj["Справочник кабелей"][groupKey]["Тип"][mark] = {
+      const cableEntry = {
         "Строительная длина": buildingLength,
         "Муфта": coupling,
         "Вес": weight,
-        ...(isOptical ? { "Категория": "Оптический кабель" } : {}),
         "Полное описание": description
       };
+      if (cableCategory) {
+        cableEntry["Категория"] = cableCategory;
+      }
+
+      currentObj["Справочник кабелей"][groupKey]["Тип"][mark] = cableEntry;
 
       populateDynamicCableGroups(currentObj);
       const isEdit = addCableEditContext && addCableEditContext.mode === 'edit';
@@ -2926,7 +3331,7 @@ function setupWorksRulesListeners() {
   // =========================================================================
 
   function openEditCouplingModal(couplingKey) {
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     const catalog = currentObj["Справочник муфт"] || {};
     const data = catalog[couplingKey];
 
@@ -3002,11 +3407,13 @@ function setupWorksRulesListeners() {
       }
 
       const fullName = document.getElementById('addCouplingFullName')?.value?.trim() || `Муфта кабельная соединительная ${mark}`;
-      const maxCores = parseInt(document.getElementById('addCouplingMaxCores')?.value || '24', 10) || 24;
+      const rawMaxCoresStr = (document.getElementById('addCouplingMaxCores')?.value ?? '').trim();
+      const parsedMaxCores = rawMaxCoresStr === '' ? NaN : parseInt(rawMaxCoresStr, 10);
+      const maxCores = Number.isFinite(parsedMaxCores) && parsedMaxCores >= 0 ? parsedMaxCores : 24;
       const unit = document.getElementById('addCouplingUnit')?.value?.trim() || 'шт';
       const isOptical = Boolean(document.getElementById('addCouplingIsOptical')?.checked);
 
-      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
       if (!currentObj["Справочник муфт"] || typeof currentObj["Справочник муфт"] !== 'object' || Array.isArray(currentObj["Справочник муфт"])) {
         currentObj["Справочник муфт"] = {};
       }
@@ -3045,7 +3452,7 @@ function setupWorksRulesListeners() {
   // =========================================================================
 
   function openEditEquipmentModal(markKey, targetMethod = null) {
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     const eqCatalog = currentObj["Оборудование"] || {};
     const eqObj = eqCatalog[markKey];
 
@@ -3129,7 +3536,7 @@ function setupWorksRulesListeners() {
     const method = methodInput.value.trim() || 'Не указано';
 
     const draft = getDraftRulesFromEditor();
-    const eqCatalog = (draft && draft["Оборудование"]) || (cachedDefaultRules && cachedDefaultRules["Оборудование"]) || {};
+    const eqCatalog = (draft && draft["Оборудование"]) || {};
 
     let exists = false;
     if (eqCatalog[mark] && eqCatalog[mark]["Работы"] && eqCatalog[mark]["Работы"][method]) {
@@ -3205,7 +3612,7 @@ function setupWorksRulesListeners() {
       const methodsList = document.getElementById('datalistEquipMethods');
       if (methodsList) {
         const draft = getDraftRulesFromEditor();
-        const eqCatalog = (draft && draft["Оборудование"]) || (cachedDefaultRules && cachedDefaultRules["Оборудование"]) || {};
+        const eqCatalog = (draft && draft["Оборудование"]) || {};
         const knownMethods = new Set(['Не указано', 'На стрелочном башмаке', 'На бетонном фундаменте', 'В релейном шкафу', 'Боковые пути']);
         Object.values(eqCatalog).forEach(e => {
           if (e && e["Работы"] && typeof e["Работы"] === 'object') {
@@ -3262,7 +3669,7 @@ function setupWorksRulesListeners() {
         return;
       }
 
-      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+      const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
       if (!currentObj["Оборудование"] || typeof currentObj["Оборудование"] !== 'object' || Array.isArray(currentObj["Оборудование"])) {
         currentObj["Оборудование"] = {};
       }
@@ -3272,10 +3679,17 @@ function setupWorksRulesListeners() {
         const oldMark = addEquipEditContext.originalMark;
         const oldMethod = addEquipEditContext.originalMethod;
 
-        if (oldMark && oldMark !== mark && currentObj["Оборудование"][oldMark]) {
-          // Move existing methods to new mark
-          currentObj["Оборудование"][mark] = currentObj["Оборудование"][oldMark];
-          delete currentObj["Оборудование"][oldMark];
+        if (oldMark && oldMark !== mark) {
+          if (currentObj["Оборудование"][mark] !== undefined) {
+            showToast(`Оборудование с маркой «${mark}» уже существует. Укажите уникальное наименование марки или отредактируйте существующую запись.`, 'warning', 'Конфликт имен');
+            if (markInput) markInput.focus();
+            return;
+          }
+          if (currentObj["Оборудование"][oldMark]) {
+            // Move existing methods to new mark
+            currentObj["Оборудование"][mark] = currentObj["Оборудование"][oldMark];
+            delete currentObj["Оборудование"][oldMark];
+          }
         }
 
         if (!currentObj["Оборудование"][mark] || typeof currentObj["Оборудование"][mark] !== 'object') {
@@ -3285,8 +3699,15 @@ function setupWorksRulesListeners() {
           currentObj["Оборудование"][mark]["Работы"] = {};
         }
 
-        if (oldMethod && oldMethod !== method && currentObj["Оборудование"][mark]["Работы"][oldMethod]) {
-          delete currentObj["Оборудование"][mark]["Работы"][oldMethod];
+        if (oldMethod && oldMethod !== method) {
+          if (currentObj["Оборудование"][mark]["Работы"][method] !== undefined) {
+            showToast(`Способ установки «${method}» для марки «${mark}» уже существует. Выберите другое название способа или отредактируйте существующий.`, 'warning', 'Конфликт способов');
+            if (methodInput) methodInput.focus();
+            return;
+          }
+          if (currentObj["Оборудование"][mark]["Работы"][oldMethod]) {
+            delete currentObj["Оборудование"][mark]["Работы"][oldMethod];
+          }
         }
       }
 
@@ -3321,8 +3742,18 @@ function setupWorksRulesListeners() {
 
   [
     ['settingNumberingMode', 'ТипНумерации', v => v],
-    ['settingDecimalsWorks', 'ОкруглениеРабот', v => parseInt(v, 10) || 2],
-    ['settingDecimalsMaterials', 'ОкруглениеМатериалов', v => parseInt(v, 10) || 3],
+    ['settingDecimalsWorks', 'ОкруглениеРабот', v => {
+      const trimmed = String(v ?? '').trim();
+      if (!trimmed) return 2;
+      const n = parseInt(trimmed, 10);
+      return Number.isFinite(n) ? Math.min(10, Math.max(0, n)) : 2;
+    }],
+    ['settingDecimalsMaterials', 'ОкруглениеМатериалов', v => {
+      const trimmed = String(v ?? '').trim();
+      if (!trimmed) return 3;
+      const n = parseInt(trimmed, 10);
+      return Number.isFinite(n) ? Math.min(10, Math.max(0, n)) : 3;
+    }],
     ['settingGgeVersion', 'ВерсияGGE', v => v],
     ['settingAccessLevel', 'УровеньДоступа', v => v],
     ['settingSoftName', 'ПрограммныйКомплекс', v => v],
@@ -3558,7 +3989,7 @@ function setupWorksRulesListeners() {
 
   function deleteRuleItem(sectionName, ruleName) {
     if (!sectionName || !ruleName) return;
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     if (currentObj[sectionName]?.[ruleName] !== undefined) {
       delete currentObj[sectionName][ruleName];
     } else {
@@ -3578,7 +4009,7 @@ function setupWorksRulesListeners() {
 
   function deleteCableItem(groupName, markKey) {
     if (!markKey) return;
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     const catalog = currentObj["Справочник кабелей"] || {};
     if (groupName !== undefined && catalog[groupName]?.["Тип"]?.[markKey]) {
       delete catalog[groupName]["Тип"][markKey];
@@ -3600,7 +4031,7 @@ function setupWorksRulesListeners() {
 
   function deleteCouplingItem(markKey) {
     if (!markKey) return;
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     if (currentObj["Справочник муфт"]?.[markKey]) {
       delete currentObj["Справочник муфт"][markKey];
     }
@@ -3614,7 +4045,7 @@ function setupWorksRulesListeners() {
 
   function deleteEquipmentMethodItem(markKey, methodName) {
     if (!markKey || !methodName) return;
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     const eqObj = currentObj["Оборудование"]?.[markKey];
     if (eqObj) {
       if (eqObj["Работы"]) delete eqObj["Работы"][methodName];
@@ -3630,7 +4061,7 @@ function setupWorksRulesListeners() {
 
   function deleteEquipmentAllItem(markKey) {
     if (!markKey) return;
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     if (currentObj["Оборудование"]?.[markKey]) {
       delete currentObj["Оборудование"][markKey];
     }
@@ -3742,7 +4173,7 @@ function setupWorksRulesListeners() {
   }
 
   function openEditCableGroupModal(groupKey = null) {
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     const catalog = currentObj["Справочник кабелей"] || {};
 
     const keyInput = document.getElementById('editCableGroupKey');
@@ -3817,10 +4248,9 @@ function setupWorksRulesListeners() {
     const newTemplate = tplInput ? tplInput.value.trim() : '';
     const shouldUpdateDesc = updateDescCheck ? updateDescCheck.checked : true;
 
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     if (!currentObj["Справочник кабелей"] || typeof currentObj["Справочник кабелей"] !== 'object') {
-      const existingCat = (cachedDefaultRules && cachedDefaultRules["Справочник кабелей"]) ? cachedDefaultRules["Справочник кабелей"] : {};
-      currentObj["Справочник кабелей"] = JSON.parse(JSON.stringify(existingCat));
+      currentObj["Справочник кабелей"] = {};
     }
 
     const isEdit = addCableGroupEditContext && addCableGroupEditContext.mode === 'edit';
@@ -3897,7 +4327,7 @@ function setupWorksRulesListeners() {
 
   function deleteCableGroupItem(groupKey) {
     if (groupKey === undefined || groupKey === null) return;
-    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || cachedDefaultRules || {}));
+    const currentObj = JSON.parse(JSON.stringify(getDraftRulesFromEditor() || {}));
     const catalog = currentObj["Справочник кабелей"];
     if (!catalog || !catalog[groupKey]) return;
 
@@ -3926,10 +4356,21 @@ function setupWorksRulesListeners() {
     const draft = getDraftRulesFromEditor();
     populateDynamicCableGroups(draft);
 
+    const cpList = document.getElementById('datalistCouplingsList');
+    if (cpList) {
+      const cpCatalog = (draft && draft["Справочник муфт"]) || {};
+      cpList.innerHTML = Object.keys(cpCatalog).map(k => `<option value="${escapeHtml(k)}">${escapeHtml(cpCatalog[k]["Полное наименование"] || '')}</option>`).join('');
+    }
+
+    const groupObj = (getCableCatalog(draft) || {})[groupKey] || {};
+    const groupCategory = String(groupObj["Категория"] || '').trim();
+
     const groupKeyInput = document.getElementById('addCableGroupKey');
     const groupNameInput = document.getElementById('addCableGroupName');
+    const catSelect = document.getElementById('addCableCategory');
     if (groupKeyInput) groupKeyInput.value = groupKey;
     if (groupNameInput) groupNameInput.value = groupName;
+    if (catSelect) catSelect.value = groupCategory === 'Оптический кабель' ? 'Оптический кабель' : '';
 
     const modalEl = document.getElementById('addCableModal');
     if (modalEl && window.bootstrap && bootstrap.Modal) {
@@ -4249,3 +4690,4 @@ function setupWorksRulesListeners() {
     }
   });
 }
+window.setupWorksRulesListeners = setupWorksRulesListeners;

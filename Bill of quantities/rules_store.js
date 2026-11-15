@@ -12,6 +12,7 @@
 
   let cachedRules = null;
   let cachedFactoryRules = null;
+  let lastCheckedSavedAt = 0;
   let listeners = [];
 
   const rulesStore = {
@@ -22,12 +23,14 @@
      * Synchronously returns cached rules, or reads from LocalStorage, or fallback empty structure.
      */
     getRulesSync() {
-      if (cachedRules) return cachedRules;
       const fromLocal = this.loadFromLocalStorage();
       if (fromLocal) {
-        cachedRules = fromLocal;
+        cachedFactoryRules = null;
+        if (typeof window !== 'undefined') window.cachedDefaultRules = null;
+        if (!cachedRules) cachedRules = fromLocal;
         return cachedRules;
       }
+      if (cachedRules) return cachedRules;
       return cachedFactoryRules || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} };
     },
 
@@ -49,6 +52,13 @@
     },
 
     /**
+     * Checks whether the user has saved custom rules in LocalStorage.
+     */
+    hasSavedRules() {
+      return Boolean(this.loadFromLocalStorage());
+    },
+
+    /**
      * Gets metadata about saved rules in LocalStorage.
      */
     getStorageMeta() {
@@ -67,8 +77,8 @@
     /**
      * Loads rules: first checks LocalStorage, if empty fetches ./works_rules.json.
      */
-    async fetchFactoryRulesJson() {
-      if (cachedFactoryRules) {
+    async fetchFactoryRulesJson(forceReload = false) {
+      if (!forceReload && cachedFactoryRules) {
         return JSON.parse(JSON.stringify(cachedFactoryRules));
       }
       const candidates = [
@@ -79,13 +89,13 @@
       ];
       for (const path of candidates) {
         try {
-          const res = await fetch(`${path}?t=${Date.now()}`);
+          const res = await fetch(`${path}?t=${Date.now()}`, { cache: 'no-store' });
           if (res.ok) {
             const data = await res.json();
             if (data && typeof data === 'object') {
               cachedFactoryRules = JSON.parse(JSON.stringify(data));
-              window.cachedDefaultRules = cachedFactoryRules;
-              return cachedFactoryRules;
+              window.cachedDefaultRules = JSON.parse(JSON.stringify(cachedFactoryRules));
+              return JSON.parse(JSON.stringify(cachedFactoryRules));
             }
           }
         } catch (e) {
@@ -102,11 +112,16 @@
       const local = this.loadFromLocalStorage();
       if (local) {
         cachedRules = JSON.parse(JSON.stringify(local));
+        cachedFactoryRules = null;
+        window.cachedDefaultRules = null;
         window.currentWorksRules = cachedRules;
+        const meta = this.getStorageMeta();
+        if (meta && meta.savedAt) lastCheckedSavedAt = meta.savedAt;
         return cachedRules;
       }
 
-      // Fetch default factory rules
+      lastCheckedSavedAt = 0;
+      // Fetch default factory rules only when LocalStorage has no saved rules
       const factory = await this.fetchFactoryRulesJson();
       if (factory) {
         cachedRules = JSON.parse(JSON.stringify(factory));
@@ -135,8 +150,11 @@
         version: 1
       };
       localStorage.setItem(LOCAL_STORAGE_RULES_META_KEY, JSON.stringify(meta));
+      lastCheckedSavedAt = meta.savedAt;
 
       cachedRules = JSON.parse(jsonStr);
+      cachedFactoryRules = null;
+      window.cachedDefaultRules = null;
       window.currentWorksRules = cachedRules;
 
       this._notifyListeners({ type: 'saved', rules: cachedRules, meta });
@@ -147,13 +165,15 @@
      * Clears saved rules from LocalStorage and resets to factory works_rules.json.
      */
     async resetToDefaultRules() {
-      const defaultData = await this.fetchFactoryRulesJson();
+      cachedFactoryRules = null;
+      const defaultData = await this.fetchFactoryRulesJson(true);
       if (!defaultData) {
         throw new Error('Не удалось получить заводские правила works_rules.json');
       }
 
       localStorage.removeItem(LOCAL_STORAGE_RULES_KEY);
       localStorage.removeItem(LOCAL_STORAGE_RULES_META_KEY);
+      lastCheckedSavedAt = 0;
 
       cachedRules = JSON.parse(JSON.stringify(defaultData));
       window.currentWorksRules = cachedRules;
@@ -222,11 +242,24 @@
   };
 
   // 1. Cross-tab storage event handler (supported in all browsers for 15+ years)
-  window.addEventListener('storage', (e) => {
+  window.addEventListener('storage', async (e) => {
     if (e.key === LOCAL_STORAGE_RULES_KEY || e.key === LOCAL_STORAGE_RULES_META_KEY) {
-      cachedRules = rulesStore.loadFromLocalStorage();
-      window.currentWorksRules = cachedRules;
-      rulesStore._notifyListeners({ type: 'external-storage-change', key: e.key, newValue: e.newValue });
+      const local = rulesStore.loadFromLocalStorage();
+      if (local) {
+        cachedRules = local;
+        cachedFactoryRules = null;
+        window.cachedDefaultRules = null;
+        window.currentWorksRules = cachedRules;
+        const meta = rulesStore.getStorageMeta();
+        if (meta && meta.savedAt) lastCheckedSavedAt = meta.savedAt;
+        rulesStore._notifyListeners({ type: 'external-storage-change', key: e.key, newValue: e.newValue, rules: cachedRules });
+      } else {
+        lastCheckedSavedAt = 0;
+        const factory = await rulesStore.fetchFactoryRulesJson(true);
+        cachedRules = factory || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} };
+        window.currentWorksRules = cachedRules;
+        rulesStore._notifyListeners({ type: 'external-storage-change', key: e.key, newValue: e.newValue, rules: cachedRules });
+      }
     }
   });
 
@@ -235,11 +268,23 @@
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       syncChannel = new BroadcastChannel('si_works_rules_sync');
-      syncChannel.onmessage = (event) => {
+      syncChannel.onmessage = async (event) => {
         if (event && event.data && event.data.type === 'rules-updated') {
-          cachedRules = rulesStore.loadFromLocalStorage();
-          window.currentWorksRules = cachedRules;
-          rulesStore._notifyListeners({ type: 'external-storage-change', source: 'broadcast-channel' });
+          const local = rulesStore.loadFromLocalStorage();
+          if (local) {
+            cachedRules = local;
+            cachedFactoryRules = null;
+            window.cachedDefaultRules = null;
+            window.currentWorksRules = cachedRules;
+            const meta = rulesStore.getStorageMeta();
+            if (meta && meta.savedAt) lastCheckedSavedAt = meta.savedAt;
+          } else {
+            lastCheckedSavedAt = 0;
+            const factory = await rulesStore.fetchFactoryRulesJson(true);
+            cachedRules = factory || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} };
+            window.currentWorksRules = cachedRules;
+          }
+          rulesStore._notifyListeners({ type: 'external-storage-change', source: 'broadcast-channel', rules: cachedRules });
         }
       };
     }
@@ -271,8 +316,7 @@
   };
 
   // 3. Fallback check on tab activation (handles suspended background tabs / sleeping tabs)
-  let lastCheckedSavedAt = 0;
-  function checkTabRulesFreshness() {
+  async function checkTabRulesFreshness() {
     try {
       const metaStr = localStorage.getItem(LOCAL_STORAGE_RULES_META_KEY);
       if (metaStr) {
@@ -280,12 +324,24 @@
         if (meta && meta.savedAt && meta.savedAt > lastCheckedSavedAt) {
           if (lastCheckedSavedAt > 0) {
             // New rules were saved while tab was in background
-            cachedRules = rulesStore.loadFromLocalStorage();
-            window.currentWorksRules = cachedRules;
-            rulesStore._notifyListeners({ type: 'external-storage-change', source: 'tab-focus' });
+            const local = rulesStore.loadFromLocalStorage();
+            if (local) {
+              cachedRules = local;
+              cachedFactoryRules = null;
+              window.cachedDefaultRules = null;
+              window.currentWorksRules = cachedRules;
+              rulesStore._notifyListeners({ type: 'external-storage-change', source: 'tab-focus', rules: cachedRules });
+            }
           }
           lastCheckedSavedAt = meta.savedAt;
         }
+      } else if (lastCheckedSavedAt > 0 && !localStorage.getItem(LOCAL_STORAGE_RULES_KEY)) {
+        // Saved rules were reset to factory defaults while tab was in background
+        lastCheckedSavedAt = 0;
+        const factory = await rulesStore.fetchFactoryRulesJson(true);
+        cachedRules = factory || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} };
+        window.currentWorksRules = cachedRules;
+        rulesStore._notifyListeners({ type: 'external-storage-change', source: 'tab-focus-reset', rules: cachedRules });
       }
     } catch (e) {}
   }
@@ -425,7 +481,8 @@
   if (typeof window.getCableRules !== 'function') window.getCableRules = getCableRules;
 
   function getCableCatalog(rulesData) {
-    const rules = rulesData || window.currentWorksRules || (window.rulesStore ? window.rulesStore.getRulesSync() : null) || window.cachedDefaultRules;
+    const hasSaved = window.rulesStore && typeof window.rulesStore.hasSavedRules === 'function' && window.rulesStore.hasSavedRules();
+    const rules = rulesData || window.currentWorksRules || (window.rulesStore ? window.rulesStore.getRulesSync() : null) || (!hasSaved ? window.cachedDefaultRules : null);
     if (rules && typeof rules === 'object' && !Array.isArray(rules)) {
       if (rules["Справочник кабелей"] && typeof rules["Справочник кабелей"] === 'object') {
         return rules["Справочник кабелей"];
@@ -434,7 +491,7 @@
         return rules["Кабели"];
       }
     }
-    if (window.cachedDefaultRules && window.cachedDefaultRules["Справочник кабелей"] && typeof window.cachedDefaultRules["Справочник кабелей"] === 'object') {
+    if (!hasSaved && window.cachedDefaultRules && window.cachedDefaultRules["Справочник кабелей"] && typeof window.cachedDefaultRules["Справочник кабелей"] === 'object') {
       return window.cachedDefaultRules["Справочник кабелей"];
     }
     return {};
@@ -442,7 +499,8 @@
   window.getCableCatalog = getCableCatalog;
 
   function getCouplingCatalog(rulesData) {
-    const rules = rulesData || window.currentWorksRules || (window.rulesStore ? window.rulesStore.getRulesSync() : null) || window.cachedDefaultRules;
+    const hasSaved = window.rulesStore && typeof window.rulesStore.hasSavedRules === 'function' && window.rulesStore.hasSavedRules();
+    const rules = rulesData || window.currentWorksRules || (window.rulesStore ? window.rulesStore.getRulesSync() : null) || (!hasSaved ? window.cachedDefaultRules : null);
     if (rules && typeof rules === 'object' && !Array.isArray(rules)) {
       if (rules["Справочник муфт"] && typeof rules["Справочник муфт"] === 'object') {
         return rules["Справочник муфт"];
@@ -451,7 +509,7 @@
         return rules["Муфты"];
       }
     }
-    if (window.cachedDefaultRules && window.cachedDefaultRules["Справочник муфт"] && typeof window.cachedDefaultRules["Справочник муфт"] === 'object') {
+    if (!hasSaved && window.cachedDefaultRules && window.cachedDefaultRules["Справочник муфт"] && typeof window.cachedDefaultRules["Справочник муфт"] === 'object') {
       return window.cachedDefaultRules["Справочник муфт"];
     }
     return {};
@@ -659,17 +717,14 @@
   if (typeof window.parseMaxCoresFromString !== 'function') window.parseMaxCoresFromString = parseMaxCoresFromString;
 
   function getCouplingRuleTiers(rulesData, isOptical = false) {
-    const rules = rulesData || window.currentWorksRules || window.cachedDefaultRules;
+    const hasSaved = typeof window !== 'undefined' && window.rulesStore && typeof window.rulesStore.hasSavedRules === 'function' && window.rulesStore.hasSavedRules();
+    const rules = rulesData || window.currentWorksRules || (window.rulesStore ? window.rulesStore.getRulesSync() : null) || (!hasSaved ? window.cachedDefaultRules : null);
     const cableRules = getCableRules(rules);
+    const targetRuleType = isOptical ? 'оптические_муфты' : 'муфты';
     const tiersSet = new Set();
 
     for (const r of (cableRules && cableRules.rules ? cableRules.rules : [])) {
-      const rName = (r["Название"] || r.name || '').toLowerCase();
-      if (rName.includes('муфт')) {
-        const isRuleOpt = rName.includes('оптич') || rName.includes('волс');
-        if (isOptical && !isRuleOpt) continue;
-        if (!isOptical && isRuleOpt) continue;
-
+      if (r["ТипПравила"] === targetRuleType) {
         const wm = r["Работы"] || r["Работы и материалы"] || {};
         if (wm && typeof wm === 'object' && !Array.isArray(wm)) {
           Object.keys(wm).forEach(k => {

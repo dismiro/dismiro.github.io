@@ -415,7 +415,7 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
           Обнаружено замечаний: ${totalCount} (ВОР содержит ${worksCount} сметных позиций)${hasFormulaErrors ? `, включая ошибки формул: ${formulaErrors.length}` : ''}
         </div>
         <div class="text-body">
-          ${hasFormulaErrors ? '<strong>Внимание!</strong> Из-за некорректных формул часть работ или материалов не была рассчитана и не попала в итоговую ведомость. ' : ''}Ниже сгруппированы все проблемные места, ошибки в формулах, не объявленные работы и отсутствующие записи в справочниках. Вы можете исправить правила в JSON редакторе или продолжить формирование файла.
+          ${hasFormulaErrors ? '<strong>Внимание!</strong> Из-за некорректных формул часть работ или материалов не была рассчитана и не попала в итоговую ведомость. ' : ''}Ниже сгруппированы все проблемные места, ошибки в формулах, не объявленные работы и отсутствующие записи в справочниках. Вы можете исправить правила в редакторе или продолжить формирование файла.
         </div>
       </div>
     </div>
@@ -459,7 +459,7 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
             <span class="fw-semibold small">Некорректная формула (${formulaErrors.length} поз.)</span>
           </div>
           <button type="button" class="btn btn-xs btn-outline-warning text-dark fw-semibold d-inline-flex align-items-center gap-1" id="btnEditFormulasFromModal">
-            <i class='bx bx-edit'></i> Исправить в JSON правил
+            <i class='bx bx-edit'></i> Исправить в правилах
           </button>
         </div>
         <div class="table-responsive" style="max-height: 220px;">
@@ -760,7 +760,11 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
     btnFe.addEventListener('click', () => {
       const modalInstance = bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
-      openWorksRulesModal('editor');
+      const firstSec = (formulaErrors[0] && formulaErrors[0].section ? formulaErrors[0].section : '').toLowerCase();
+      let feTab = 'construction';
+      if (firstSec.includes('оборудован')) feTab = 'equipment';
+      else if (firstSec.includes('монтаж')) feTab = 'installation';
+      openWorksRulesModal(feTab);
     });
   }
 
@@ -820,10 +824,27 @@ function showGgeExportWarningsModal(warningsInfo, onProceed) {
 
   // Footer Actions
   if (openRulesBtn) {
-    openRulesBtn.onclick = () => {
+    openRulesBtn.onclick = (e) => {
+      e.preventDefault();
       const modalInstance = bootstrap.Modal.getInstance(modalEl);
       if (modalInstance) modalInstance.hide();
-      openWorksRulesModal('editor');
+      let targetTab = 'construction';
+      if (hasFormulaErrors) {
+        const firstSec = (formulaErrors[0] && formulaErrors[0].section ? formulaErrors[0].section : '').toLowerCase();
+        if (firstSec.includes('оборудован')) targetTab = 'equipment';
+        else if (firstSec.includes('монтаж')) targetTab = 'installation';
+      } else if (equipmentMissing.length > 0) {
+        targetTab = 'equipment';
+      } else if (trenchMissing.length > 0) {
+        targetTab = 'construction';
+      } else if (cableMissing.length > 0) {
+        targetTab = 'installation';
+      } else if (cableMissingInCatalog.length > 0) {
+        targetTab = 'cables';
+      } else if (couplingsMissing.length > 0 || couplingsExceeded.length > 0) {
+        targetTab = 'couplings';
+      }
+      openWorksRulesModal(targetTab, e);
     };
   }
 

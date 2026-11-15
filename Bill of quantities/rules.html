@@ -174,7 +174,7 @@
             </a>
             <a href="#json" class="rules-nav-pill" id="navPillJson" data-pane="tabWorksJsonPane">
               <i class='bx bx-code-curly fs-5 text-warning'></i>
-              <span>Исходный JSON</span>
+              <span>Просмотр JSON</span>
             </a>
           </div>
 
@@ -444,14 +444,15 @@
             </div>
           </div>
 
-          <!-- Pane 7: Исходный JSON (Легковесный просмотр) -->
+          <!-- Pane 7: Просмотр JSON (только для проверки) -->
           <div class="tab-pane fade" id="tabWorksJsonPane" role="tabpanel">
             <div class="card border shadow-sm mb-3">
               <div class="card-header py-2 px-3 bg-body-tertiary d-flex align-items-center justify-content-between w-100">
                 <div class="d-flex align-items-center gap-2">
                   <i class='bx bx-code-curly fs-5 text-warning'></i>
-                  <h2 class="fs-6 fw-bold mb-0">Исходный JSON правил и нормативной базы</h2>
+                  <h2 class="fs-6 fw-bold mb-0">Просмотр JSON правил (только для проверки)</h2>
                 </div>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border font-monospace" style="font-size: 0.72rem;">Только чтение</span>
               </div>
               <div class="card-body p-3">
                 <div id="worksJsonErrorAlert" class="alert alert-danger py-2 px-3 mb-2 small d-flex align-items-start gap-2 d-none">
@@ -464,7 +465,7 @@
                 </div>
 
                 <div class="mt-2 text-muted small d-flex align-items-center justify-content-between flex-wrap gap-2">
-                  <span class="fs-xs"><i class='bx bx-info-circle text-primary me-1'></i>Редактирование выполняется через вкладки и формы выше. Здесь отображается актуальная сформированная структура JSON.</span>
+                  <span class="fs-xs"><i class='bx bx-info-circle text-primary me-1'></i>Вкладка предназначена только для проверки сформированной структуры JSON. Заполнение и редактирование правил выполняется через формы в соответствующих разделах.</span>
                   <span id="jsonLinesCountBadge" class="badge bg-light text-muted border font-monospace">0 строк</span>
                 </div>
               </div>
@@ -519,23 +520,31 @@
               <div id="addRuleWorksCardsContainer" class="d-flex flex-column gap-2" style="max-height: 480px; overflow-y: auto;"></div>
             </div>
 
-            <!-- Weight Tiers for Cable Installation (Монтажные работы) -->
+            <!-- Weight Tiers for Cable Installation & Couplings (Монтажные работы) -->
             <div id="addRuleInstallationContainer" class="d-none">
               <div class="row g-2 mb-3">
-                <div class="col-12 col-md-8">
-                  <label for="addRuleInstTemplate" class="form-label small fw-bold mb-1">Шаблон наименования сметной работы (с маркером {масса})</label>
+                <div class="col-12 col-md-4">
+                  <label for="addRuleInstallationRuleType" class="form-label small fw-bold mb-1">Назначение правила (ТипПравила)</label>
+                  <select class="form-select form-select-sm" id="addRuleInstallationRuleType">
+                    <option value="кабель">Прокладка кабеля (по массе 1 м)</option>
+                    <option value="муфты">Установка соединительных муфт (по жилам)</option>
+                    <option value="оптические_муфты">Установка оптических муфт (по волокнам)</option>
+                  </select>
+                </div>
+                <div class="col-12 col-md-5">
+                  <label for="addRuleInstTemplate" class="form-label small fw-bold mb-1" id="addRuleInstTemplateLabel">Шаблон наименования (с маркером {масса} или {жилы})</label>
                   <input type="text" class="form-control form-control-sm font-monospace" id="addRuleInstTemplate" placeholder="Прокладка кабеля массой 1 м, кг, до: {масса}">
                 </div>
-                <div class="col-12 col-md-4 d-flex align-items-end">
+                <div class="col-12 col-md-3 d-flex align-items-end">
                   <button type="button" class="btn btn-sm btn-outline-primary w-100 d-inline-flex align-items-center justify-content-center gap-1" id="btnApplyRuleTemplateToTiers">
-                    <i class='bx bx-check-double'></i> Применить шаблон к ступеням
+                    <i class='bx bx-check-double'></i> Применить шаблон
                   </button>
                 </div>
               </div>
 
               <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-2 flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2">
-                  <span class="fw-bold small text-dark"><i class='bx bx-slider text-primary me-1'></i>Весовые категории прокладки кабеля</span>
+                  <span class="fw-bold small text-dark" id="addRuleTiersSectionTitle"><i class='bx bx-slider text-primary me-1'></i>Ступени и сметные нормы</span>
                   <span id="addRuleTiersCountBadge" class="badge bg-secondary-subtle text-secondary-emphasis border fs-xs">0 категорий</span>
                 </div>
                 <div class="dropdown">
@@ -634,17 +643,29 @@
             </div>
 
             <div class="row g-2 mb-3">
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-3">
                 <label for="addCableWeight" class="form-label small fw-bold mb-1">Масса 1 м, кг <span class="text-danger">*</span></label>
                 <input type="number" step="0.001" min="0" class="form-control form-control-sm" id="addCableWeight" value="0.35" required>
               </div>
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-3">
                 <label for="addCableBuildingLength" class="form-label small fw-bold mb-1">Строительная длина, м <span class="text-danger">*</span></label>
                 <input type="number" step="10" min="0" class="form-control form-control-sm" id="addCableBuildingLength" value="1000" required>
               </div>
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-3">
                 <label for="addCableCoupling" class="form-label small fw-bold mb-1">Тип муфты по умолчанию</label>
                 <input type="text" class="form-control form-control-sm" id="addCableCoupling" placeholder="например: ВМ-14 или ВМ-28" list="datalistCouplingsList">
+              </div>
+              <div class="col-12 col-md-3">
+                <label for="addCableCategory" class="form-label small fw-bold mb-1">Категория кабеля</label>
+                <select class="form-select form-select-sm" id="addCableCategory">
+                  <option value="">По категории группы (не задана)</option>
+                  <option value="Оптический кабель">Оптический кабель (ВОЛС)</option>
+                  <option value="Сигнально-блокировочный кабель">Сигнально-блокировочный кабель</option>
+                  <option value="Электрический кабель">Электрический кабель</option>
+                  <option value="Силовой кабель">Силовой кабель</option>
+                  <option value="Контрольный кабель">Контрольный кабель</option>
+                  <option value="Кабель связи">Кабель связи</option>
+                </select>
               </div>
             </div>
 
@@ -711,8 +732,10 @@
             <div class="mb-3">
               <label for="editCableGroupCategory" class="form-label small fw-bold mb-1">Категория</label>
               <select class="form-select form-select-sm" id="editCableGroupCategory">
+                <option value="">Не задана (по умолчанию)</option>
                 <option value="Сигнально-блокировочный кабель">Сигнально-блокировочный кабель</option>
                 <option value="Оптический кабель">Оптический кабель (ВОЛС)</option>
+                <option value="Электрический кабель">Электрический кабель</option>
                 <option value="Силовой кабель">Силовой кабель</option>
                 <option value="Контрольный кабель">Контрольный кабель</option>
                 <option value="Кабель связи">Кабель связи</option>
@@ -921,6 +944,36 @@
               <i class='bx bx-check'></i> Добавить оборудование
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 7: Confirm Reset Rules to Factory Defaults -->
+  <div class="modal fade" id="confirmResetRulesModal" tabindex="-1" aria-labelledby="confirmResetRulesModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border shadow">
+        <div class="modal-header py-2_5 px-3 bg-danger-subtle border-bottom">
+          <div class="d-flex align-items-center gap-2">
+            <i class='bx bx-reset fs-4 text-danger'></i>
+            <h5 class="modal-title fw-bold fs-6 mb-0 text-dark" id="confirmResetRulesModalTitle">Сброс правил к заводским</h5>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body p-3">
+          <p class="mb-2 text-dark">
+            Вы уверены, что хотите сбросить все правила к заводским (<code>works_rules.json</code>)?
+          </p>
+          <div class="alert alert-warning py-2 px-3 small mb-0 d-flex align-items-start gap-2">
+            <i class='bx bx-error-circle fs-5 text-warning flex-shrink-0 mt-0_5'></i>
+            <div>Все сохраненные изменения в браузере (<code>LocalStorage</code>) и несохраненный черновик будут удалены.</div>
+          </div>
+        </div>
+        <div class="modal-footer py-2 px-3 border-top">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="button" class="btn btn-danger btn-sm d-inline-flex align-items-center gap-1 fw-bold" id="btnConfirmResetRules">
+            <i class='bx bx-reset'></i> Сбросить к заводским
+          </button>
         </div>
       </div>
     </div>

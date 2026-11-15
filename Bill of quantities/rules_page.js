@@ -21,12 +21,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 4. Initial Render
   if (rules) {
-    window.currentWorksRules = rules;
-    if (typeof setModalDraftRules === 'function') setModalDraftRules(rules);
-    setWorksJsonEditorValue(JSON.stringify(rules, null, 2));
-    validateWorksJsonInput();
-    renderRulesModalContent(rules);
-    updateStorageStatusUi();
+    applyRulesToPage(rules, { resetDirty: false });
   }
 
   // 5. Setup Modal and Rules Event Listeners
@@ -40,13 +35,43 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 6. Listen for Store updates
   window.rulesStore.subscribe((event) => {
+    if (event && event.type === 'external-storage-change' && event.rules) {
+      applyRulesToPage(event.rules, { resetDirty: true });
+      return;
+    }
     if (event && event.rules) {
       window.currentWorksRules = event.rules;
       if (typeof setModalDraftRules === 'function') setModalDraftRules(event.rules);
     }
-    updateStorageStatusUi();
+    if (typeof updateStorageStatusUi === 'function') {
+      updateStorageStatusUi();
+    }
   });
 });
+
+function applyRulesToPage(rulesData, { resetDirty = true } = {}) {
+  const cloned = (rulesData && typeof rulesData === 'object')
+    ? JSON.parse(JSON.stringify(rulesData))
+    : {};
+  window.currentWorksRules = cloned;
+  if (typeof setModalDraftRules === 'function') setModalDraftRules(cloned);
+  if (typeof setWorksJsonEditorValue === 'function') {
+    setWorksJsonEditorValue(JSON.stringify(cloned, null, 2));
+  }
+  hideSaveValidationError();
+  if (typeof validateWorksJsonInput === 'function') {
+    validateWorksJsonInput();
+  }
+  if (typeof renderRulesModalContent === 'function') {
+    renderRulesModalContent(cloned, true);
+  }
+  if (resetDirty && typeof setDraftDirtyState === 'function') {
+    setDraftDirtyState(false);
+  }
+  if (typeof updateStorageStatusUi === 'function') {
+    updateStorageStatusUi();
+  }
+}
 
 
 
@@ -186,23 +211,47 @@ function setupPageActions() {
 
   // Reset
   const btnReset = document.getElementById('resetRulesBtn');
-  if (btnReset) {
-    btnReset.addEventListener('click', async () => {
-      if (!confirm('Вы уверены, что хотите сбросить все правила к заводским works_rules.json? Все сохраненные изменения в браузере будут удалены.')) {
-        return;
+  const confirmResetModalEl = document.getElementById('confirmResetRulesModal');
+  const btnConfirmReset = document.getElementById('btnConfirmResetRules');
+
+  async function executeFactoryReset() {
+    const origHtml = btnConfirmReset ? btnConfirmReset.innerHTML : '';
+    if (btnConfirmReset) {
+      btnConfirmReset.disabled = true;
+      btnConfirmReset.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Сброс...`;
+    }
+    try {
+      const defaultData = await window.rulesStore.resetToDefaultRules();
+      applyRulesToPage(defaultData, { resetDirty: true });
+      if (confirmResetModalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(confirmResetModalEl).hide();
       }
-      try {
-        const defaultData = await window.rulesStore.resetToDefaultRules();
-        window.currentWorksRules = defaultData;
-        if (typeof setModalDraftRules === 'function') setModalDraftRules(defaultData);
-        setWorksJsonEditorValue(JSON.stringify(defaultData, null, 2));
-        validateWorksJsonInput();
-        renderRulesModalContent(defaultData);
-        if (typeof setDraftDirtyState === 'function') setDraftDirtyState(false);
-        updateStorageStatusUi();
-        showToast('Сметные правила сброшены к заводским настройкам.', 'info', 'Сброс выполнен');
-      } catch (err) {
-        showToast('Ошибка сброса: ' + err.message, 'error', 'Ошибка');
+      showToast('Сметные правила сброшены к заводским настройкам (works_rules.json).', 'info', 'Сброс выполнен');
+    } catch (err) {
+      showToast('Ошибка сброса: ' + err.message, 'error', 'Ошибка');
+    } finally {
+      if (btnConfirmReset) {
+        btnConfirmReset.disabled = false;
+        btnConfirmReset.innerHTML = origHtml;
+      }
+    }
+  }
+
+  if (btnConfirmReset) {
+    btnConfirmReset.addEventListener('click', executeFactoryReset);
+  }
+
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      const dropdownBtn = document.getElementById('rulesActionsDropdownBtn');
+      if (dropdownBtn && window.bootstrap && bootstrap.Dropdown) {
+        const dropdownInstance = bootstrap.Dropdown.getInstance(dropdownBtn);
+        if (dropdownInstance) dropdownInstance.hide();
+      }
+      if (confirmResetModalEl && window.bootstrap && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(confirmResetModalEl).show();
+      } else {
+        executeFactoryReset();
       }
     });
   }

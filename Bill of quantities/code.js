@@ -429,7 +429,8 @@ function parseCableTypeAndSymbol(str) {
 // Check if a cable type has category = "Оптический кабель" in the cable catalog
 function isCableCategoryOptical(rawType, catalog) {
   if (!rawType) return false;
-  const cat = catalog || (typeof getCableCatalog === 'function' ? getCableCatalog(currentWorksRules) : null) || (typeof currentWorksRules === 'object' && currentWorksRules ? currentWorksRules["Справочник кабелей"] : null) || (typeof cachedDefaultRules === 'object' && cachedDefaultRules ? cachedDefaultRules["Справочник кабелей"] : null) || {};
+  const hasSaved = window.rulesStore && typeof window.rulesStore.hasSavedRules === 'function' && window.rulesStore.hasSavedRules();
+  const cat = catalog || (typeof getCableCatalog === 'function' ? getCableCatalog(currentWorksRules) : null) || (typeof currentWorksRules === 'object' && currentWorksRules ? currentWorksRules["Справочник кабелей"] : null) || (!hasSaved && typeof cachedDefaultRules === 'object' && cachedDefaultRules ? cachedDefaultRules["Справочник кабелей"] : null) || {};
   const str = String(rawType).trim();
   if (!str) return false;
 
@@ -678,13 +679,10 @@ function lookupCouplingInfo(rawType, couplingCatalog, isCableOptical = false) {
 // Get coupling installation works array from rules or fallback
 function getCouplingInstallationWorkItems(tier, rulesData, isOptical = false) {
   const cableRules = getCableRules(rulesData || currentWorksRules);
+  const targetRuleType = isOptical ? 'оптические_муфты' : 'муфты';
   const foundItems = [];
   for (const r of cableRules.rules) {
-    const rName = (r["Название"] || r.name || '').toLowerCase();
-    if (rName.includes('муфт')) {
-      const isRuleOpt = rName.includes('оптич') || rName.includes('волс');
-      if (isOptical && !isRuleOpt) continue;
-      if (!isOptical && isRuleOpt) continue;
+    if (r["ТипПравила"] === targetRuleType) {
 
       const wm = r["Работы"] || r["Работы и материалы"] || {};
       const tierKey = String(tier);
@@ -756,7 +754,8 @@ function getCouplingInstallationWorkItems(tier, rulesData, isOptical = false) {
 
 // Calculate active couplings summary from active cables and catalog
 function getActiveCouplingsSummary(rulesData) {
-  const rules = rulesData || currentWorksRules || cachedDefaultRules;
+  const hasSaved = window.rulesStore && typeof window.rulesStore.hasSavedRules === 'function' && window.rulesStore.hasSavedRules();
+  const rules = rulesData || currentWorksRules || (window.rulesStore ? window.rulesStore.getRulesSync() : null) || (!hasSaved ? cachedDefaultRules : null);
   const cableCatalog = getCableCatalog(rules);
   const couplingCatalog = getCouplingCatalog(rules);
 
@@ -973,14 +972,14 @@ function getCableWeightTier(weight, rule) {
 }
 
 // Active rules state and cached standard rules loaded dynamically from rulesStore or works_rules.json
-var cachedDefaultRules = null;
-var currentWorksRules = { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} };
+var cachedDefaultRules = window.cachedDefaultRules || null;
+var currentWorksRules = window.currentWorksRules || { "Строительные работы": {}, "Монтажные работы": {}, "Оборудование": {} };
 window.cachedDefaultRules = cachedDefaultRules;
 window.currentWorksRules = currentWorksRules;
 
 // Open rules manager page (standard navigation in current tab, wheel-click/middle-click opens in new tab)
-function openWorksRulesModal(tab = 'editor', event = null) {
-  let hash = 'json';
+function openWorksRulesModal(tab = 'construction', event = null) {
+  let hash = 'construction';
   if (tab === 'construction') hash = 'construction';
   else if (tab === 'installation') hash = 'installation';
   else if (tab === 'cables') hash = 'cables';
@@ -1076,6 +1075,30 @@ window.updateIndexRulesStorageBadge = updateIndexRulesStorageBadge;
 
 // Load rules from store or file
 async function initWorksRules() {
+  const hasSaved = window.rulesStore && typeof window.rulesStore.hasSavedRules === 'function' && window.rulesStore.hasSavedRules();
+
+  if (hasSaved) {
+    cachedDefaultRules = null;
+    window.cachedDefaultRules = null;
+    try {
+      const localRules = window.rulesStore.loadFromLocalStorage();
+      if (localRules && typeof localRules === 'object') {
+        currentWorksRules = localRules;
+        window.currentWorksRules = currentWorksRules;
+        await window.rulesStore.loadRules();
+        updateIndexRulesStorageBadge();
+        if (currentData) {
+          calculateVolumes({ refreshRawData: false });
+        }
+        return currentWorksRules;
+      }
+    } catch (err) {
+      console.warn('[initWorksRules] Ошибка загрузки сохраненных правил из LocalStorage:', err);
+    }
+    updateIndexRulesStorageBadge();
+    return currentWorksRules;
+  }
+
   if (window.rulesStore) {
     try {
       const rules = await window.rulesStore.loadRules();
@@ -1097,6 +1120,8 @@ async function initWorksRules() {
     const res = await fetch('./works_rules.json?t=' + Date.now());
     if (res.ok) {
       const data = await res.json();
+      cachedDefaultRules = data;
+      window.cachedDefaultRules = data;
       currentWorksRules = data;
       window.currentWorksRules = data;
       updateIndexRulesStorageBadge();
@@ -2550,13 +2575,14 @@ function renderCableResult(summary, totalCount, totalLength, grandRoutingSummary
 }
 
 // Universal alert renderer for formula evaluation errors across VOR sections
-function renderFormulaErrorsAlertHtml(formulaErrors, sectionTitle = 'работах/материалах') {
+function renderFormulaErrorsAlertHtml(formulaErrors, sectionTitle = 'работах/материалах', targetTab = 'construction') {
   if (!Array.isArray(formulaErrors) || formulaErrors.length === 0) return '';
   const errorItems = formulaErrors.map(e => `
     <li class="mb-1">
       <strong class="text-danger">«${escapeHtml(e.name)}»</strong>: формула <code>${escapeHtml(e.formula)}</code> — <span class="text-danger-emphasis">${escapeHtml(e.reason)}</span>
     </li>
   `).join('');
+  const safeTab = ['construction', 'installation', 'equipment', 'cables', 'couplings', 'settings'].includes(targetTab) ? targetTab : 'construction';
   return `
     <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
       <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
@@ -2574,8 +2600,8 @@ function renderFormulaErrorsAlertHtml(formulaErrors, sectionTitle = 'работ�
             </div>
           </div>
         </div>
-        <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('editor')">
-          <i class="bx bx-edit"></i> Исправить в JSON
+        <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 mt-1" onclick="openWorksRulesModal('${safeTab}')">
+          <i class="bx bx-edit"></i> Исправить в правилах
         </button>
       </div>
     </div>
@@ -2613,19 +2639,19 @@ function renderEquipmentStatement(equipmentData, equipmentWorksCalc) {
       missingBadge.classList.remove('bg-warning-subtle', 'text-warning-emphasis');
       missingBadge.classList.add('bg-danger-subtle', 'text-danger-emphasis');
       missingBadge.innerHTML = `<i class='bx bx-error me-1'></i>Ошибка формулы (${equipmentWorksCalc.formulaErrors.length})`;
-      missingBadge.onclick = () => openWorksRulesModal('editor');
+      missingBadge.onclick = () => openWorksRulesModal('equipment');
     } else if (hasMissing) {
       missingBadge.classList.remove('d-none');
       missingBadge.classList.remove('bg-danger-subtle', 'text-danger-emphasis');
       missingBadge.classList.add('bg-warning-subtle', 'text-warning-emphasis');
       missingBadge.textContent = `Неполные правила (${equipmentWorksCalc.missingInRules.length})`;
-      missingBadge.onclick = () => openWorksRulesModal('editor');
+      missingBadge.onclick = () => openWorksRulesModal('equipment');
     } else {
       missingBadge.classList.add('d-none');
     }
   }
 
-  const formulaErrorAlertHtml = hasFormulaErrors ? renderFormulaErrorsAlertHtml(equipmentWorksCalc.formulaErrors, 'разделе «Оборудование»') : '';
+  const formulaErrorAlertHtml = hasFormulaErrors ? renderFormulaErrorsAlertHtml(equipmentWorksCalc.formulaErrors, 'разделе «Оборудование»', 'equipment') : '';
 
   let missingAlertHtml = '';
   if (hasMissing) {
@@ -2655,7 +2681,7 @@ function renderEquipmentStatement(equipmentData, equipmentWorksCalc) {
   const entries = Object.entries(equipmentData.summary || {}).sort((a, b) => b[1].count - a[1].count);
 
   let rowsHtml = '';
-  entries.forEach(([key, val], idx) => {
+  entries.forEach(([, val], idx) => {
     const isMissing = equipmentWorksCalc && equipmentWorksCalc.missingInRules && equipmentWorksCalc.missingInRules.some(m =>
       (m.mark || '').toLowerCase() === (val.mark || '').toLowerCase() &&
       (m.method || 'Не указано').toLowerCase() === (val.method || 'Не указано').toLowerCase()
@@ -2826,19 +2852,19 @@ function renderInstallationWorks(cableWorksCalc) {
       b.classList.remove('bg-warning-subtle', 'text-warning-emphasis');
       b.classList.add('bg-danger-subtle', 'text-danger-emphasis');
       b.innerHTML = `<i class='bx bx-error me-1'></i>Ошибка формулы (${cableWorksCalc.formulaErrors.length})`;
-      b.onclick = () => openWorksRulesModal('editor');
+      b.onclick = () => openWorksRulesModal('installation');
     } else if (hasMissing) {
       b.classList.remove('d-none');
       b.classList.remove('bg-danger-subtle', 'text-danger-emphasis');
       b.classList.add('bg-warning-subtle', 'text-warning-emphasis');
       b.innerHTML = `Неполные правила (${totalMissingCount})`;
-      b.onclick = () => openWorksRulesModal('editor');
+      b.onclick = () => openWorksRulesModal('installation');
     } else {
       b.classList.add('d-none');
     }
   });
 
-  const formulaErrorAlertHtml = hasFormulaErrors ? renderFormulaErrorsAlertHtml(cableWorksCalc.formulaErrors, 'монтажных работах/материалах') : '';
+  const formulaErrorAlertHtml = hasFormulaErrors ? renderFormulaErrorsAlertHtml(cableWorksCalc.formulaErrors, 'монтажных работах/материалах', 'installation') : '';
 
   let missingCableAlertHtml = '';
   if (hasMissingCable) {
@@ -3064,19 +3090,19 @@ function renderConstructionWorks(worksCalc) {
       badge.classList.remove('bg-warning-subtle', 'text-warning-emphasis');
       badge.classList.add('bg-danger-subtle', 'text-danger-emphasis');
       badge.innerHTML = `<i class='bx bx-error me-1'></i>Ошибка формулы (${worksCalc.formulaErrors.length})`;
-      badge.onclick = () => openWorksRulesModal('editor');
+      badge.onclick = () => openWorksRulesModal('construction');
     } else if (hasMissing) {
       badge.classList.remove('d-none');
       badge.classList.remove('bg-danger-subtle', 'text-danger-emphasis');
       badge.classList.add('bg-warning-subtle', 'text-warning-emphasis');
       badge.innerHTML = `Неполные правила (${worksCalc.missingInRules.length})`;
-      badge.onclick = () => openWorksRulesModal('editor');
+      badge.onclick = () => openWorksRulesModal('construction');
     } else {
       badge.classList.add('d-none');
     }
   });
 
-  const formulaErrorAlertHtml = hasFormulaErrors ? renderFormulaErrorsAlertHtml(worksCalc.formulaErrors, 'строительных работах/материалах') : '';
+  const formulaErrorAlertHtml = hasFormulaErrors ? renderFormulaErrorsAlertHtml(worksCalc.formulaErrors, 'строительных работах/материалах', 'construction') : '';
 
   let missingAlertHtml = '';
   if (hasMissing) {
@@ -3959,7 +3985,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
   const cableEntries = Object.entries(cableSummary || {}).sort((a, b) => (b[1].length || 0) - (a[1].length || 0));
 
   // Collect all routing types used across all cables
-  cableEntries.forEach(([cType, cInfo]) => {
+  cableEntries.forEach(([, cInfo]) => {
     const routingMap = cInfo.routingTypes || {};
     for (const [rName, rLen] of Object.entries(routingMap)) {
       const trimmed = (rName || '').trim();
@@ -4016,7 +4042,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
             section: sectionName,
             type: workItem.type || 'работа',
             parentWorkName: null,
-            comment: `${commentPrefix} (до ${tier} ${unitLabel})`
+            comment: (workItem.rawItem && (workItem.rawItem["Комментарий"] || workItem.rawItem.comment)) || `${commentPrefix} (до ${tier} ${unitLabel})`
           });
 
           // Process materials and equipment declared under this work
@@ -4173,7 +4199,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
   rules.forEach(rule => {
     const ruleName = (rule["Название"] || rule.name || '').trim();
     if (!ruleName) return;
-    if (ruleName.toLowerCase().includes('муфт')) return; // Skip coupling rules in cable routing loop
+    if (rule["ТипПравила"] !== 'кабель') return; // Strictly cable routing rules only
 
     const parsedWM = parseRuleWorksAndMaterials(rule);
     const template = (rule["Шаблон"] || rule.template || '').trim();
@@ -4182,7 +4208,7 @@ function calculateWorksFromCables(cableSummary, rulesData) {
     if (!parsedWM.allItems || parsedWM.allItems.length === 0) {
       let totLen = 0;
       let count = 0;
-      cableEntries.forEach(([cType, cInfo]) => {
+      cableEntries.forEach(([, cInfo]) => {
         const routingMap = cInfo.routingTypes || {};
         for (const [rName, rLen] of Object.entries(routingMap)) {
           const lVal = Number(rLen) || 0;

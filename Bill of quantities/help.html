@@ -190,6 +190,7 @@
                     <ul class="list-unstyled mb-0">
                       <li><a href="../index.html" class="dropdown-item">Главная страница</a></li>
                       <li><a href="./index.html" class="dropdown-item fw-semibold text-primary">Ведомости объемов работ (ВОР) <span class="badge bg-success ms-2">Активный</span></a></li>
+                      <li><a href="rules.html" class="dropdown-item"><i class='bx bx-slider-alt me-1'></i>Редактор сметных правил</a></li>
                       <li><a href="../indicator/index.html" class="dropdown-item">Жильность кабеля к МУ <span class="badge bg-success ms-2">Готово</span></a></li>
                       <li><a href="../crossroad/index.html" class="dropdown-item">Параметры извещения переезд <span class="badge bg-warning ms-2">В разработке</span></a></li>
                       <li><a href="../battery/index.html" class="dropdown-item">Расчет емкости аккумуляторов<span class="badge bg-warning ms-2">В разработке</span></a></li>
@@ -201,12 +202,8 @@
             <li class="nav-item dropdown">
               <a href="#" class="nav-link dropdown-toggle active" data-bs-toggle="dropdown">Справка</a>
               <ul class="dropdown-menu">
-                <li><a href="../help.html" class="dropdown-item">Вся платформа</a></li>
                 <li><a href="./help.html" class="dropdown-item active">Этот модуль</a></li>
               </ul>
-            </li>
-            <li class="nav-item">
-              <a href="../about.html" class="nav-link">О нас</a>
             </li>
           </ul>
         </div>
@@ -651,8 +648,8 @@
                     </div>
                     <ul class="small text-muted ps-3 mb-0">
                       <li class="mb-1">Таблицы <strong>Кабели</strong>, <strong>Участки трассы / траншеи</strong> и <strong>Напольное оборудование</strong>.</li>
-                      <li class="mb-1">Контроль соответствия длин и наличия муфт по каждому кабелю.</li>
-                      <li class="mb-1">Глобальный поиск по строкам и сворачивание панели кнопкой <kbd>«</kbd>.</li>
+                      <li class="mb-1">Контроль соответствия длин и наличия муфт по каждому кабелю, кнопка <strong>«Закрыть»</strong> для смены файла.</li>
+                      <li class="mb-1">Глобальный поиск по строкам, запуск расчета (<span class="badge bg-light text-dark border"><i class='bx bx-play-circle'></i></span>) и сворачивание панели (<span class="badge bg-light text-dark border"><i class='bx bx-chevrons-left'></i></span>).</li>
                     </ul>
                   </div>
                 </div>
@@ -666,7 +663,7 @@
                     <ul class="small text-muted ps-3 mb-0">
                       <li class="mb-1"><strong>Ведомость траншей</strong> — сумма длин и долей по типам прокладки.</li>
                       <li class="mb-1"><strong>Ведомость кабелей</strong> — сумма длин и ниток по маркам кабелей.</li>
-                      <li class="mb-1"><strong>Ведомость муфт</strong> и <strong>Ведомость оборудования</strong>.</li>
+                      <li class="mb-1"><strong>Ведомость соединительных муфт</strong> и <strong>Ведомость оборудования</strong> (появляется при наличии оборудования в проекте).</li>
                     </ul>
                   </div>
                 </div>
@@ -678,8 +675,8 @@
                       <h3 class="h6 mb-0 fw-bold">Столбец 3: Итоговая ВОР</h3>
                     </div>
                     <ul class="small text-muted ps-3 mb-0">
-                      <li class="mb-1"><strong>Строительные работы</strong> (разработка и засыпка грунта).</li>
-                      <li class="mb-1"><strong>Монтажные работы</strong> (прокладка кабелей, труб, муфт, оборудования).</li>
+                      <li class="mb-1"><strong>Строительные работы</strong> (разработка и засыпка грунта, подготовка оснований).</li>
+                      <li class="mb-1"><strong>Монтажные работы</strong> (прокладка кабелей, труб, установка муфт и оборудования).</li>
                       <li class="mb-1">Иерархическая привязка материалов <span class="font-monospace fw-bold">↳</span> и экспорт в <code>.gge</code> / <code>.xlsx</code>.</li>
                     </ul>
                   </div>
@@ -701,7 +698,7 @@
                   <div>
                     <h3 class="h6 fw-bold mb-1">Загрузите JSON-файл проекта</h3>
                     <p class="small text-muted mb-0">
-                      Перетащите сформированный в САПР файл выгрузки (например, <code>data_export.json</code>, см. <a href="#section-cad-export" class="fw-semibold text-primary">раздел 1 «Подготовка в САПР»</a>) в пунктирную область первого столбца или нажмите <strong>«Загрузить свой файл (.json)»</strong>. Для демонстрации работы нажмите кнопку <strong>«Загрузить пример»</strong>. Программа автоматически определяет кодировку файла (<code>UTF-8</code>, <code>Windows-1251</code>, <code>UTF-16</code>) и сразу запускает расчет.
+                      Перетащите сформированный в САПР файл выгрузки (например, <code>data_export.json</code>, см. <a href="#section-cad-export" class="fw-semibold text-primary">раздел 1 «Подготовка в САПР»</a>) в пунктирную область первого столбца или нажмите <strong>«Загрузить свой файл (.json)»</strong>. Для демонстрации работы нажмите кнопку <strong>«Загрузить пример»</strong>. Программа автоматически определяет кодировку файла (<code>UTF-8</code>, <code>Windows-1251</code>, <code>UTF-16</code>) и сразу запускает расчет. Для сброса текущего файла нажмите кнопку <strong>«Закрыть»</strong> рядом с его именем, а для повторного расчета — кнопку <span class="badge bg-light text-dark border"><i class='bx bx-play-circle'></i></span>.
                     </p>
                   </div>
                 </div>
@@ -711,7 +708,7 @@
                   <div>
                     <h3 class="h6 fw-bold mb-1">Проверьте уведомления и полноту правил</h3>
                     <p class="small text-muted mb-0">
-                      Если в проекте встретились способы прокладки, марки кабелей или оборудование, для которых в базе нет сметных норм, на карточках появятся подробные предупреждения. Для создания недостающих правил откройте окно сметных норм (кнопка <span class="badge bg-light text-dark border"><i class='bx bx-slider-alt'></i></span>), перейдите в соответствующую вкладку и нажмите кнопку <strong>«Добавить»</strong>, чтобы детально заполнить все параметры через диалоговое окно.
+                      Если в проекте встретились способы прокладки, марки кабелей, муфты или оборудование, для которых в базе нет сметных норм, на карточках появятся подробные предупреждения. Для создания недостающих правил откройте редактор сметных норм (кнопка <span class="badge bg-light text-dark border"><i class='bx bx-slider-alt'></i></span>), перейдите в нужную вкладку и нажмите кнопку добавления (<strong>«Добавить строительную работу»</strong>, <strong>«Добавить монтажную работу»</strong>, <strong>«Добавить оборудование»</strong>, <strong>«Добавить марку»</strong> или <strong>«Добавить муфту»</strong>).
                     </p>
                   </div>
                 </div>
@@ -721,7 +718,7 @@
                   <div>
                     <h3 class="h6 fw-bold mb-1">При необходимости скорректируйте сметные нормы</h3>
                     <p class="small text-muted mb-0">
-                      Нажмите кнопку <span class="badge bg-light text-dark border"><i class='bx bx-slider-alt'></i></span> в шапке первого столбца, чтобы перейти на страницу сметных норм и справочников (<code>rules.html</code>). После внесения изменений нажмите <strong>«Сохранить в LocalStorage»</strong> (<kbd>Ctrl+S</kbd>) — данные автоматически синхронизируются с калькулятором работ.
+                      Нажмите кнопку <span class="badge bg-light text-dark border"><i class='bx bx-slider-alt'></i></span> в шапке первого столбца (или бейдж статуса правил в навигационной панели), чтобы перейти на страницу редактора правил (<code>rules.html</code>). После внесения изменений нажмите <strong>«Сохранить»</strong> (<kbd>Ctrl+S</kbd>) — данные автоматически сохранятся в браузере, а на вкладке калькулятора появится уведомление с кнопкой <strong>«Пересчитать проект»</strong>.
                     </p>
                   </div>
                 </div>
@@ -731,7 +728,7 @@
                   <div>
                     <h3 class="h6 fw-bold mb-1">Экспортируйте готовую ведомость</h3>
                     <p class="small text-muted mb-0">
-                      В нижней карточке третьего столбца нажмите <strong>«GGE (.gge)»</strong> для выгрузки в формате Главгосэкспертизы 3.01 или <strong>«Excel (.xlsx)»</strong> для получения таблицы Excel со всеми расчетными листами.
+                      В нижней карточке третьего столбца нажмите <strong>«GGE (.gge)»</strong> или <strong>«Excel (.xlsx)»</strong> — либо выберите <strong>«Экспорт ВОР в GGE (.gge)»</strong> / <strong>«Экспорт ВОР в Excel (.xlsx)»</strong> в выпадающем меню кнопки <span class="badge bg-light text-dark border"><i class='bx bx-download'></i></span> в шапке первого столбца.
                     </p>
                   </div>
                 </div>
@@ -802,10 +799,17 @@
                       <td class="ps-3 font-monospace fw-semibold">ОКБ-Н-Сп-4/2(2,0)Сп-16(2) "8кН"</td>
                       <td><span class="badge bg-info-subtle text-info-emphasis border">Оптический кабель</span></td>
                       <td>Оптический кабель связи (ВОЛС)</td>
-                      <td class="pe-3">Все конструктивные скобки <code>(2,0)</code>, <code>(2)</code> сохраняются полностью</td>
+                      <td class="pe-3">Все конструктивные скобки <code>(2,0)</code>, <code>(2)</code> сохраняются полностью (если марка отнесена к категории <code>«Оптический кабель»</code>)</td>
                     </tr>
                   </tbody>
                 </table>
+              </div>
+
+              <div class="alert alert-light border d-flex align-items-start gap-2 small text-muted mb-4">
+                <i class='bx bx-info-circle text-primary fs-5 mt-0'></i>
+                <div>
+                  <strong>Важно для ВОЛС и новых марок:</strong> Признак оптического кабеля определяется строго по категории <code>"Оптический кабель"</code> в разделе <strong>«Справочник кабелей»</strong> — иначе конечные скобки вида <code>(2)</code> будут отброшены как число запасных жил. Если марка кабеля не найдена в справочнике, ей присваивается оценочная масса 1 м (<code>0,4 кг/м</code> или <code>0,28 кг/м</code> для ВОЛС) с предупреждением <code>«нет в справочнике»</code>.
+                </div>
               </div>
 
               <h3 class="h6 fw-bold mb-2"><i class='bx bx-git-merge text-warning me-1'></i>4.2. Расчет количества соединительных муфт</h3>
@@ -835,7 +839,7 @@
             </div>
             <div class="card-body p-4">
               <p class="small text-muted mb-3">
-                Нормативная база и справочники вынесены на отдельную страницу <strong>«ВОР · Нормативная база»</strong> (<code>rules.html</code>), разделенную на 7 функциональных разделов с визуальными формами, фильтрацией и возможностью быстрого добавления позиций. Все изменения сохраняются в LocalStorage браузера кнопкой <strong>«Сохранить в LocalStorage»</strong> или горячей клавишей <kbd>Ctrl+S</kbd> (<kbd>Cmd+S</kbd>) и мгновенно применяются в калькуляторе на главной странице.
+                Нормативная база и справочники вынесены на отдельную страницу <strong>«ВОР · Редактор правил и справочников»</strong> (<code>rules.html</code>), разделенную на 7 разделов с визуальными формами, поиском, фильтрацией и быстрым добавлением позиций. Все изменения сохраняются в LocalStorage браузера кнопкой <strong>«Сохранить»</strong> или горячей клавишей <kbd>Ctrl+S</kbd> (<kbd>Cmd+S</kbd>) и синхронизируются с калькулятором на главной странице.
               </p>
 
               <div class="row g-3">
@@ -856,7 +860,7 @@
                       <i class='bx bx-wrench text-info fs-5'></i> 2. Монтажные работы
                     </div>
                     <p class="small text-muted mb-0">
-                      Сметные нормы затягивания и прокладки кабелей по способам прокладки с дифференциацией по весовым ступеням (масса 1 м кабеля), числу жил/волокон и условиям (число параллельно прокладываемых кабелей).
+                      Сметные нормы по <code>ТипПравила</code>: прокладка кабелей (<code>"кабель"</code> — по весовым ступеням и признаку ВОЛС), установка медных муфт (<code>"муфты"</code> — по жилам) и оптических муфт (<code>"оптические_муфты"</code> — по волокнам). Для каждого типа муфт допускается не более одного правила; поддерживается пакетное переименование ступеней по шаблону с маркером <code>{масса}</code> или <code>{жилы}</code> (кнопка <strong>«Применить шаблон»</strong>).
                     </p>
                   </div>
                 </div>
@@ -878,7 +882,7 @@
                       <i class='bx bx-network-chart text-success fs-5'></i> 4. Справочник кабелей
                     </div>
                     <p class="small text-muted mb-0">
-                      Каталог марок и типоразмеров с расчетной массой 1 м кабеля, строительной длиной, закрепленной соединительной муфтой и <strong>шаблоном полного наименования</strong> для группы марок (с авто-подстановкой уникальных типоразмеров).
+                      Каталог марок и типоразмеров с фильтрацией по категориям (<code>Кабели СЦБ</code>, <code>Особые кабели</code>, <code>Оптические кабели (ВОЛС)</code>), массой 1 м кабеля, строительной длиной и закрепленной муфтой. Кнопки <strong>«Все обозначения и группы»</strong> и <strong>«Создать группу»</strong> позволяют настраивать группы марок и шаблон полного описания с маркером <code>{тип}</code>.
                     </p>
                   </div>
                 </div>
@@ -908,10 +912,10 @@
                 <div class="col-12">
                   <div class="p-3 rounded border bg-light-subtle">
                     <div class="fw-bold mb-1 d-flex align-items-center gap-2">
-                      <i class='bx bx-code-curly text-warning fs-5'></i> 7. Исходный JSON
+                      <i class='bx bx-code-curly text-warning fs-5'></i> 7. Просмотр JSON и операции с файлом правил
                     </div>
                     <p class="small text-muted mb-0">
-                      Легковесный просмотр активной конфигурации в блоке <code>&lt;pre&gt;&lt;code&gt;</code> со счетчиком строк, проверкой синтаксиса на лету, возможностью импорта стороннего файла <code>.json</code>, экспортом текущих правил кнопкой <strong>«Экспорт»</strong> и полным сбросом к заводским настройкам <strong>«По умолчанию»</strong>.
+                      Вкладка <strong>«Просмотр JSON»</strong> отображает текущую структуру правил в режиме <strong>«Только чтение»</strong> со счетчиком строк для визуального контроля. В выпадающем меню справа от кнопки <strong>«Сохранить»</strong> доступны команды: <strong>«Импорт правил (.json)»</strong>, <strong>«Экспорт правил (.json)»</strong> и <strong>«Сбросить к заводским»</strong>.
                     </p>
                   </div>
                 </div>
@@ -944,10 +948,10 @@
                       <td class="ps-3 fw-semibold">Строительные работы<br><span class="text-muted fw-normal">(по участкам траншей)</span></td>
                       <td>
                         <span class="routing-tag mb-1">ДЛИНА</span><br>
-                        <span class="routing-tag mb-1">КАБЕЛЕЙ</span> / <span class="routing-tag mb-1">КОЛИЧЕСТВО_КАБЕЛЕЙ</span><br>
-                        <span class="routing-tag mb-1">КОЛИЧЕСТВО_ПЕРЕСЕЧЕНИЙ</span><br>
-                        <span class="routing-tag mb-1">КОЛИЧЕСТВО_ТРУБ</span><br>
-                        <span class="routing-tag">ДЛИНА_ТРУБ</span>
+                        <span class="routing-tag mb-1">КАБЕЛЕЙ</span> / <span class="routing-tag mb-1">КОЛИЧЕСТВО_КАБЕЛЕЙ</span> / <span class="routing-tag mb-1">КОЛИЧЕСТВО</span><br>
+                        <span class="routing-tag mb-1">КОЛИЧЕСТВО_ПЕРЕСЕЧЕНИЙ</span> / <span class="routing-tag mb-1">ЧИСЛО_ПЕРЕСЕЧЕНИЙ</span> / <span class="routing-tag mb-1">ПЕРЕСЕЧЕНИЙ</span><br>
+                        <span class="routing-tag mb-1">КОЛИЧЕСТВО_ТРУБ</span> / <span class="routing-tag mb-1">ЧИСЛО_ТРУБ</span><br>
+                        <span class="routing-tag">ДЛИНА_ТРУБ</span> / <span class="routing-tag">ДЛИНА_ТРУБЫ</span>
                       </td>
                       <td class="pe-3">
                         <div class="mb-1"><code>"0,36*ДЛИНА"</code> — объем грунта по длине траншеи.</div>
@@ -958,7 +962,8 @@
                     <tr>
                       <td class="ps-3 fw-semibold">Монтажные работы<br><span class="text-muted fw-normal">(прокладка кабелей)</span></td>
                       <td>
-                        <span class="routing-tag">ДЛИНА</span>
+                        <span class="routing-tag mb-1">ДЛИНА</span><br>
+                        <span class="routing-tag">КОЛИЧЕСТВО</span> / <span class="routing-tag">ШТ</span>
                       </td>
                       <td class="pe-3">
                         <div class="mb-1">Для работ: <code>"ДЛИНА"</code> (суммарная длина кабелей данной весовой категории в метрах).</div>
@@ -968,11 +973,12 @@
                     <tr>
                       <td class="ps-3 fw-semibold">Установка муфт и Оборудование</td>
                       <td>
-                        <span class="routing-tag mb-1">КОЛИЧЕСТВО</span><br>
-                        <span class="routing-tag">КОЛИЧЕСТВО_МУФТ</span>
+                        <span class="routing-tag mb-1">КОЛИЧЕСТВО</span> / <span class="routing-tag mb-1">ШТ</span><br>
+                        <span class="routing-tag mb-1">КОЛИЧЕСТВО_МУФТ</span><br>
+                        <span class="routing-tag">ДЛИНА</span> <span class="text-muted">(синоним количества)</span>
                       </td>
                       <td class="pe-3">
-                        <div><code>"КОЛИЧЕСТВО"</code> — количество устанавливаемых муфт или единиц напольного оборудования в штуках.</div>
+                        <div><code>"КОЛИЧЕСТВО"</code> (или <code>"ШТ"</code>) — количество устанавливаемых муфт или единиц напольного оборудования в штуках.</div>
                       </td>
                     </tr>
                   </tbody>
@@ -981,8 +987,10 @@
 
               <h3 class="h6 fw-bold mb-2">Дополнительные поля и макроподстановки в JSON</h3>
               <ul class="small text-muted mb-3">
-                <li class="mb-1"><code>"{МАРКА_КАБЕЛЯ}"</code> — указывается в поле <code>"Наименование"</code> материала внутри правил прокладки кабелей. Автоматически разворачивается в отдельные строки материалов для каждой марки кабеля с подстановкой её полного описания из справочника.</li>
+                <li class="mb-1"><code>"{МАРКА_КАБЕЛЯ}"</code> (синонимы <code>"{КАБЕЛЬ}"</code>, <code>"{МАРКА}"</code>) — указывается в поле <code>"Наименование"</code> материала внутри правил прокладки кабелей. Автоматически разворачивается в отдельные строки материалов для каждой марки кабеля с подстановкой её полного описания из справочника.</li>
                 <li class="mb-1"><code>"{МАРКА_МУФТЫ}"</code> — указывается в поле <code>"Наименование"</code> материала внутри правил установки муфт. Автоматически подставляет полное наименование каждой рассчитанной муфты.</li>
+                <li class="mb-1"><code>"{масса}"</code> / <code>"{вес}"</code> и <code>"{жилы}"</code> — маркеры шаблона наименования ступеней монтажных работ в редакторе правил; <code>"{тип}"</code> — маркер типоразмера в поле <code>"Шаблон описания"</code> группы кабелей.</li>
+                <li class="mb-1"><code>"ТипПравила"</code> — тип правила в «Монтажных работах»: <code>"кабель"</code> (по массе 1 м и ВОЛС), <code>"муфты"</code> или <code>"оптические_муфты"</code>; в справочниках используется порог <code>"МаксВес"</code> / <code>"МаксЖил"</code> и тип позиции <code>"Тип": "работа" | "материал" | "оборудование"</code> (а также раздел <code>"Оборудование"</code>).</li>
                 <li class="mb-1"><code>"Условие": "кабелей &gt; 4"</code> — фильтр участков траншеи по числу проложенных в ней кабелей (поддерживаются форматы: <code>"кабелей &gt; 4"</code>, <code>"&gt;= 5"</code>, <code>"до 4 кабелей"</code>, <code>"от 2 до 4 кабелей"</code>).</li>
                 <li class="mb-1"><code>"ОтображатьФормулу": true / false</code> — управляет выводом текстовой формулы расчета в графу «Формула» таблицы ВОР, а также в выгрузки <code>.gge</code> и <code>.xlsx</code>.</li>
                 <li class="mb-1"><code>"Раздел": "Монтажные работы"</code> — позволяет перенести работу или материал из раздела «Строительные работы» в раздел «Монтажные работы» (например, для укладки ПНД-труб в поперечных траншеях).</li>
@@ -1032,7 +1040,7 @@
                       <i class='bx bx-spreadsheet fs-5'></i> Формат Microsoft Excel (.xlsx)
                     </div>
                     <p class="small text-muted mb-0">
-                      Формирует готовую рабочую книгу Excel, содержащую оформленный лист <strong>«ВОР»</strong> со стандартной шапкой (графы 1–7) и числовым форматированием объемов, а также сводные листы: <strong>«Ведомость кабелей»</strong>, <strong>«Ведомость траншей»</strong> и <strong>«Ведомость муфт»</strong>.
+                      Формирует готовую рабочую книгу Excel, содержащую оформленный лист <strong>«ВОР»</strong> со стандартной шапкой (9 столбцов — графы 1–7 с подграфами <code>6</code>, <code>6.1</code>, <code>6.2</code>) и числовым форматированием объемов, а также сводные листы: <strong>«Ведомость кабелей»</strong>, <strong>«Ведомость траншей»</strong>, <strong>«Ведомость муфт»</strong> и <strong>«Ведомость оборудования»</strong> (при наличии оборудования в проекте).
                     </p>
                   </div>
                 </div>
