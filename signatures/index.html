@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="ru" data-bs-theme="auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Модуль проверки отчетов о подписании документов электронной подписью (Excel / CSV): список подписантов, срок действия сертификатов, сверка с перечнем ожидаемых подписей.">
+  <title>Проверка электронной подписи (ЭП)</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  <link href="../assets/theme.min.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --ep-font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --ep-font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+      --ep-surface: #ffffff;
+      --ep-surface-muted: #f8fafc;
+      --ep-border: #e2e8f0;
+      --ep-text: #0f172a;
+      --ep-text-muted: #64748b;
+      --ep-accent: #2563eb;
+      --ep-ok: #16a34a;
+      --ep-ok-soft: rgba(22, 163, 74, 0.1);
+      --ep-warn: #d97706;
+      --ep-warn-soft: rgba(217, 119, 6, 0.11);
+      --ep-err: #dc2626;
+      --ep-err-soft: rgba(220, 38, 38, 0.1);
+    }
+
+    [data-bs-theme="dark"] {
+      --ep-surface: #131826;
+      --ep-surface-muted: #0d111c;
+      --ep-border: #252f44;
+      --ep-text: #f1f5f9;
+      --ep-text-muted: #94a3b8;
+      --ep-accent: #60a5fa;
+      --ep-ok: #4ade80;
+      --ep-ok-soft: rgba(74, 222, 128, 0.14);
+      --ep-warn: #fbbf24;
+      --ep-warn-soft: rgba(251, 191, 36, 0.14);
+      --ep-err: #f87171;
+      --ep-err-soft: rgba(248, 113, 113, 0.15);
+    }
+
+    body {
+      font-family: var(--ep-font-sans);
+      background-color: var(--ep-surface-muted);
+      color: var(--ep-text);
+    }
+
+    .ep-container {
+      max-width: 1520px;
+      width: 100%;
+      margin: 0 auto;
+      padding-top: 5rem;
+      padding-bottom: 3rem;
+    }
+
+    .ep-panel {
+      background-color: var(--ep-surface);
+      border: 1px solid var(--ep-border);
+      border-radius: 0.75rem;
+    }
+
+    .ep-panel-header {
+      padding: 0.9rem 1.25rem;
+      border-bottom: 1px solid var(--ep-border);
+    }
+
+    .ep-panel-body {
+      padding: 1.25rem;
+    }
+
+    .ep-tabular {
+      font-family: var(--ep-font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ep-heading-balance {
+      text-wrap: balance;
+    }
+
+    /* Drop zone */
+    .ep-dropzone {
+      border: 1.5px dashed var(--ep-border);
+      border-radius: 0.75rem;
+      background-color: var(--ep-surface-muted);
+      transition: border-color 0.18s ease, background-color 0.18s ease;
+      cursor: pointer;
+    }
+
+    .ep-dropzone:hover,
+    .ep-dropzone.is-dragover {
+      border-color: var(--ep-accent);
+      background-color: rgba(37, 99, 235, 0.05);
+    }
+
+    /* Interactive surname selector items */
+    .ep-surname-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      max-height: 290px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .ep-surname-chip {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--ep-border);
+      border-radius: 0.5rem;
+      background-color: var(--ep-surface-muted);
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+      overflow: hidden;
+    }
+
+    .ep-surname-chip.is-selected {
+      border-color: var(--ep-accent);
+      background-color: rgba(37, 99, 235, 0.1);
+    }
+
+    .ep-surname-btn {
+      border: 0;
+      background: transparent;
+      color: var(--ep-text);
+      font-size: 0.84rem;
+      font-weight: 500;
+      padding: 0.35rem 0.6rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      cursor: pointer;
+      white-space: nowrap;
+      line-height: 1.3;
+    }
+
+    .ep-surname-btn:hover {
+      color: var(--ep-accent);
+    }
+
+    .ep-surname-chip.is-selected .ep-surname-btn {
+      color: var(--ep-accent);
+      font-weight: 600;
+    }
+
+    .ep-surname-del {
+      border: 0;
+      border-left: 1px solid var(--ep-border);
+      background: transparent;
+      color: var(--ep-text-muted);
+      padding: 0.35rem 0.45rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .ep-surname-del:hover {
+      color: var(--ep-err);
+      background-color: var(--ep-err-soft);
+    }
+
+    /* Expected signer rows */
+    .ep-expected-list {
+      max-height: 340px;
+      overflow-y: auto;
+    }
+
+    .ep-expected-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--ep-border);
+      font-size: 0.875rem;
+    }
+
+    .ep-expected-row:last-child {
+      border-bottom: 0;
+    }
+
+    /* KPI Strip */
+    .ep-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 1199.98px) {
+      .ep-kpi-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 575.98px) {
+      .ep-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .ep-kpi-cell {
+      background-color: var(--ep-surface);
+      border: 1px solid var(--ep-border);
+      border-radius: 0.65rem;
+      padding: 0.85rem 1rem;
+    }
+
+    .ep-kpi-label {
+      font-size: 0.78rem;
+      color: var(--ep-text-muted);
+      margin-bottom: 0.25rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ep-kpi-value {
+      font-size: 1.45rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    /* Filter tabs */
+    .ep-filter-bar {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      padding: 0.25rem;
+      background-color: var(--ep-surface-muted);
+      border: 1px solid var(--ep-border);
+      border-radius: 0.6rem;
+    }
+
+    .ep-filter-btn {
+      border: 0;
+      background: transparent;
+      color: var(--ep-text-muted);
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 0.35rem 0.7rem;
+      border-radius: 0.42rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .ep-filter-btn:hover {
+      color: var(--ep-text);
+    }
+
+    .ep-filter-btn.is-active {
+      background-color: var(--ep-surface);
+      color: var(--ep-text);
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    /* Semantic statuses (color + icon + text) */
+    .ep-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.81rem;
+      font-weight: 600;
+      padding: 0.22rem 0.55rem;
+      border-radius: 0.4rem;
+      white-space: nowrap;
+    }
+
+    .ep-status-ok {
+      color: var(--ep-ok);
+      background-color: var(--ep-ok-soft);
+    }
+
+    .ep-status-warn {
+      color: var(--ep-warn);
+      background-color: var(--ep-warn-soft);
+    }
+
+    .ep-status-err {
+      color: var(--ep-err);
+      background-color: var(--ep-err-soft);
+    }
+
+    .ep-status-neutral {
+      color: var(--ep-text-muted);
+      background-color: rgba(100, 116, 139, 0.12);
+    }
+
+    .ep-table th {
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--ep-text-muted);
+      border-bottom: 1px solid var(--ep-border) !important;
+      background-color: var(--ep-surface-muted) !important;
+      white-space: nowrap;
+      padding: 0.65rem 0.85rem;
+    }
+
+    .ep-table td {
+      padding: 0.68rem 0.85rem;
+      border-bottom: 1px solid var(--ep-border);
+      vertical-align: middle;
+      font-size: 0.88rem;
+    }
+
+    .ep-detail-row td {
+      background-color: var(--ep-surface-muted);
+      padding: 0.75rem 1rem;
+      font-size: 0.82rem;
+    }
+
+    .ep-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 0.75rem 1.25rem;
+    }
+
+    .ep-meta-label {
+      font-size: 0.75rem;
+      color: var(--ep-text-muted);
+      margin-bottom: 0.15rem;
+    }
+
+    .ep-meta-val {
+      font-size: 0.88rem;
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    .ep-btn-nowrap {
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header navbar navbar-expand-lg bg-light shadow-sm fixed-top">
+    <div class="container px-3">
+      <a href="../index.html" class="navbar-brand pe-3 text-nowrap">
+        <img src="../assets/logo.svg" width="47" alt="S &amp; I">
+        Signaling &amp; Interlocking
+      </a>
+      <div id="navbarNav" class="offcanvas offcanvas-end">
+        <div class="offcanvas-header border-bottom">
+          <h5 class="offcanvas-title">Меню</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
+        </div>
+        <div class="offcanvas-body">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item dropdown">
+              <a href="#" class="nav-link dropdown-toggle text-nowrap" data-bs-toggle="dropdown">Сервисы</a>
+              <div class="dropdown-menu p-0">
+                <div class="d-lg-flex">
+                  <div class="mega-dropdown-column d-flex justify-content-center align-items-center rounded-3 rounded-end-0 px-0" style="margin: -1px; background-color: #f3f6ff;">
+                    <img src="../assets/images/landings.jpg" alt="Сервисы платформы">
+                  </div>
+                  <div class="mega-dropdown-column pt-lg-3 pb-lg-4" style="--si-mega-dropdown-column-width: 25rem;">
+                    <ul class="list-unstyled mb-0">
+                      <li><a href="../index.html" class="dropdown-item">Главная страница</a></li>
+                      <li><a href="../indicator/index.html" class="dropdown-item">Жильность кабеля к МУ <span class="badge bg-success ms-2">Готово</span></a></li>
+                      <li><a href="../Bill of quantities/index.html" class="dropdown-item">Ведомости объемов работ (ВОР) <span class="badge bg-warning ms-2">Тестирование</span></a></li>
+                      <li><a href="../specification/index.html" class="dropdown-item">Расчеты для спецификаций <span class="badge bg-warning ms-2">Тестирование</span></a></li>
+                      <li><a href="../battery/index.html" class="dropdown-item">Расчет емкости аккумуляторов <span class="badge bg-warning ms-2">В разработке</span></a></li>
+                      <li><a href="../crossroad/index.html" class="dropdown-item">Параметры извещения переезд <span class="badge bg-warning ms-2">В разработке</span></a></li>
+                      <li><a href="../QR/index.html" class="dropdown-item">Передача данных по QR</a></li>
+                      <li><a href="./index.html" class="dropdown-item fw-semibold text-primary">Проверка электронной подписи (ЭП)</a></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li class="nav-item">
+              <a href="../index.html" class="nav-link text-nowrap">Все модули</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="form-check form-switch mode-switch pe-lg-1 ms-auto me-3" data-bs-toggle="mode">
+        <input type="checkbox" class="form-check-input" id="theme-mode">
+        <label class="form-check-label d-none d-sm-block" for="theme-mode">Светлая</label>
+        <label class="form-check-label d-none d-sm-block" for="theme-mode">Темная</label>
+      </div>
+      <button type="button" class="navbar-toggler" data-bs-toggle="offcanvas" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Открыть меню">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </div>
+  </header>
+
+  <main class="container ep-container px-3 px-xl-4">
+    <!-- Page Title Header -->
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+      <div>
+        <div class="small text-muted mb-1">Платформа проектирования · Инструмент контроля документов</div>
+        <h1 class="h2 fw-bold mb-1 ep-heading-balance">Проверка электронной подписи (ЭП)</h1>
+        <p class="text-muted mb-0" style="max-width: 720px; font-size: 0.94rem;">
+          Распознавание отчетов о подписании из Excel и CSV, контроль срока «действует до» и сверка состава подписантов с сохраненным перечнем ожидаемых подписей.
+        </p>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <button type="button" id="btnLoadSample" class="btn btn-outline-secondary btn-sm ep-btn-nowrap d-inline-flex align-items-center gap-1_5 py-2 px-3">
+          <i class="bx bx-file-find fs-5"></i> Загрузить пример отчета
+        </button>
+        <label for="reportFileInput" class="btn btn-primary btn-sm ep-btn-nowrap d-inline-flex align-items-center gap-1_5 py-2 px-3 mb-0" style="cursor: pointer;">
+          <i class="bx bx-upload fs-5"></i> Загрузить отчет (.xlsx, .csv)
+        </label>
+        <input type="file" id="reportFileInput" class="d-none" accept=".xlsx,.xls,.csv">
+      </div>
+    </div>
+
+    <div class="row g-4 align-items-start">
+      <!-- Left Column: Saved Surname Directory & Expected Signers Checklist -->
+      <div class="col-12 col-lg-4 d-flex flex-column gap-4">
+        <!-- 1. Saved Surname Directory -->
+        <section class="ep-panel" aria-label="Справочник фамилий">
+          <div class="ep-panel-header d-flex align-items-center justify-content-between gap-2">
+            <div>
+              <h2 class="h6 fw-bold mb-0">Справочник фамилий</h2>
+              <div class="small text-muted">Кликните по фамилии, чтобы добавить в перечень</div>
+            </div>
+            <span id="directoryCountText" class="small text-muted ep-tabular">0 чел.</span>
+          </div>
+          <div class="ep-panel-body">
+            <form id="addSurnameForm" class="input-group input-group-sm mb-2">
+              <input type="text" id="newSurnameInput" class="form-control" placeholder="Фамилия или Фамилия И.О." autocomplete="off">
+              <button type="submit" class="btn btn-primary ep-btn-nowrap px-3">Добавить</button>
+            </form>
+
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+              <button type="button" id="btnToggleBulkPanel" class="btn btn-link btn-sm p-0 text-decoration-none d-inline-flex align-items-center gap-1">
+                <i class="bx bx-list-plus"></i> Добавить списком
+              </button>
+              <div class="d-flex align-items-center gap-2">
+                <button type="button" id="btnSelectAllFromDir" class="btn btn-link btn-sm p-0 text-decoration-none d-none">
+                  Добавить всех
+                </button>
+                <button type="button" id="btnClearDirectoryPrompt" class="btn btn-link btn-sm p-0 text-danger text-decoration-none d-none">
+                  Очистить
+                </button>
+              </div>
+            </div>
+
+            <!-- Inline Clear Directory Confirmation (no browser confirm popups) -->
+            <div id="clearDirConfirmBox" class="border rounded p-2 mb-3 d-none" style="background-color: var(--ep-err-soft); border-color: var(--ep-err) !important;">
+              <div class="small fw-semibold mb-2">Удалить все фамилии из справочника?</div>
+              <div class="d-flex gap-2">
+                <button type="button" id="btnConfirmClearDir" class="btn btn-danger btn-sm py-1 px-2">Удалить</button>
+                <button type="button" id="btnCancelClearDir" class="btn btn-outline-secondary btn-sm py-1 px-2">Отмена</button>
+              </div>
+            </div>
+
+            <!-- Bulk Paste Panel -->
+            <div id="bulkAddPanel" class="border rounded p-2_5 mb-3 d-none" style="background-color: var(--ep-surface-muted);">
+              <label for="bulkSurnamesTextarea" class="form-label small fw-semibold mb-1">По одной фамилии или ФИО на строке:</label>
+              <textarea id="bulkSurnamesTextarea" class="form-control form-control-sm mb-2" rows="4" placeholder="Минаев&#10;Лисаков И.М.&#10;Маркова"></textarea>
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" id="btnCancelBulk" class="btn btn-outline-secondary btn-sm py-1 px-2">Отмена</button>
+                <button type="button" id="btnSaveBulk" class="btn btn-primary btn-sm py-1 px-3">Сохранить список</button>
+              </div>
+            </div>
+
+            <!-- Directory Filter -->
+            <div id="directorySearchWrap" class="input-group input-group-sm mb-2 d-none">
+              <span class="input-group-text bg-transparent"><i class="bx bx-search text-muted"></i></span>
+              <input type="text" id="directorySearchInput" class="form-control" placeholder="Поиск по справочнику...">
+            </div>
+
+            <!-- Clickable Surname Grid -->
+            <div id="surnameDirectoryContainer" class="ep-surname-grid"></div>
+          </div>
+        </section>
+
+        <!-- 2. Expected Signers Checklist -->
+        <section class="ep-panel" aria-label="Перечень ожидаемых подписей">
+          <div class="ep-panel-header d-flex align-items-center justify-content-between gap-2">
+            <div>
+              <h2 class="h6 fw-bold mb-0">Перечень ожидаемых подписей</h2>
+              <div class="small text-muted">Сохраняется в браузере автоматически</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <span id="expectedCountText" class="small text-muted ep-tabular">0 чел.</span>
+              <button type="button" id="btnClearExpected" class="btn btn-link btn-sm p-0 text-danger text-decoration-none d-none">
+                Очистить
+              </button>
+            </div>
+          </div>
+          <div id="expectedSignersContainer" class="ep-expected-list"></div>
+        </section>
+      </div>
+
+      <!-- Right Column: File Upload, Document Metadata & Verification Results -->
+      <div class="col-12 col-lg-8 d-flex flex-column gap-4">
+        <!-- Upload & Controls Panel -->
+        <section class="ep-panel">
+          <div class="ep-panel-body">
+            <!-- Empty Dropzone -->
+            <div id="dropZoneEmpty" class="ep-dropzone p-4 text-center">
+              <div class="mb-2 text-primary">
+                <i class="bx bx-spreadsheet" style="font-size: 2.5rem;"></i>
+              </div>
+              <div class="fw-bold mb-1">Перетащите файл отчета ЭП сюда</div>
+              <div class="small text-muted mb-3">
+                Поддерживаются таблицы <code>.xlsx</code>, <code>.xls</code> и <code>.csv</code> (протоколы с блоками сертификатов и табличные выгрузки)
+              </div>
+              <div class="d-flex justify-content-center gap-2 flex-wrap">
+                <label for="reportFileInput" class="btn btn-primary btn-sm ep-btn-nowrap px-3 py-1_5 mb-0" style="cursor: pointer;">
+                  Выбрать файл
+                </label>
+                <button type="button" id="btnDropzoneSample" class="btn btn-outline-secondary btn-sm ep-btn-nowrap px-3 py-1_5">
+                  Открыть пример отчета
+                </button>
+              </div>
+            </div>
+
+            <!-- Active File Header Bar -->
+            <div id="activeReportBar" class="d-none">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div class="d-flex align-items-center gap-2 min-width-0">
+                  <i class="bx bx-file fs-4 text-primary flex-shrink-0"></i>
+                  <div class="text-truncate">
+                    <div class="fw-bold text-truncate" id="activeReportFileName">—</div>
+                    <div class="small text-muted" id="activeReportModeInfo">—</div>
+                  </div>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <select id="sheetSelect" class="form-select form-select-sm d-none" style="width: auto;" aria-label="Выбор листа Excel"></select>
+                  <button type="button" id="btnToggleColumnMapping" class="btn btn-outline-secondary btn-sm ep-btn-nowrap d-none">
+                    <i class="bx bx-columns"></i> Настроить столбцы
+                  </button>
+                  <button type="button" id="btnSaveAllFromReport" class="btn btn-outline-primary btn-sm ep-btn-nowrap">
+                    <i class="bx bx-user-plus"></i> Сохранить фамилии в справочник
+                  </button>
+                  <button type="button" id="btnCloseReport" class="btn btn-outline-danger btn-sm ep-btn-nowrap">
+                    <i class="bx bx-x"></i> Закрыть файл
+                  </button>
+                </div>
+              </div>
+
+              <!-- Document Metadata Strip (from Protocol Header) -->
+              <div id="docMetaSection" class="pt-3 mt-3 border-top d-none">
+                <div id="docMetaGrid" class="ep-meta-grid"></div>
+              </div>
+
+              <!-- Optional Tabular Column Mapping Bar -->
+              <div id="columnMappingBar" class="pt-3 mt-3 border-top d-none">
+                <div class="small fw-semibold mb-2">Соответствие столбцов таблицы (для нестандартных выгрузок):</div>
+                <div class="row g-2 align-items-end">
+                  <div class="col-12 col-md-4">
+                    <label for="mapNameCol" class="form-label small text-muted mb-1">Столбец ФИО / Подписанта</label>
+                    <select id="mapNameCol" class="form-select form-select-sm"></select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label for="mapValidToCol" class="form-label small text-muted mb-1">Столбец «Действует до»</label>
+                    <select id="mapValidToCol" class="form-select form-select-sm"></select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label for="mapSignedAtCol" class="form-label small text-muted mb-1">Дата / время подписи (опц.)</label>
+                    <select id="mapSignedAtCol" class="form-select form-select-sm"></select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Error Banner -->
+        <div id="reportErrorAlert" class="alert alert-danger d-none mb-0" role="alert"></div>
+
+        <!-- KPI Summary Strip -->
+        <section id="kpiSection" class="ep-kpi-grid d-none" aria-label="Сводка проверки ЭП">
+          <div class="ep-kpi-cell">
+            <div class="ep-kpi-label">Подписали в отчете</div>
+            <div id="kpiTotalInReport" class="ep-kpi-value ep-tabular">0</div>
+          </div>
+          <div class="ep-kpi-cell">
+            <div class="ep-kpi-label">Ожидается по списку</div>
+            <div id="kpiTotalExpected" class="ep-kpi-value ep-tabular">0</div>
+          </div>
+          <div class="ep-kpi-cell">
+            <div class="ep-kpi-label">Совпали</div>
+            <div id="kpiMatched" class="ep-kpi-value ep-tabular">0</div>
+          </div>
+          <div class="ep-kpi-cell">
+            <div class="ep-kpi-label">Недостает подписей</div>
+            <div id="kpiMissing" class="ep-kpi-value ep-tabular">0</div>
+          </div>
+          <div class="ep-kpi-cell">
+            <div class="ep-kpi-label">Лишние / Срок ЭП</div>
+            <div id="kpiExtraOrCert" class="ep-kpi-value ep-tabular">0 / 0</div>
+          </div>
+        </section>
+
+        <!-- Results Table Panel -->
+        <section id="resultsPanel" class="ep-panel d-none" aria-label="Результаты проверки подписей">
+          <div class="ep-panel-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="ep-filter-bar" role="tablist" aria-label="Фильтр результатов">
+              <button type="button" class="ep-filter-btn is-active" data-filter="all">Все</button>
+              <button type="button" class="ep-filter-btn" data-filter="matched">Совпали</button>
+              <button type="button" class="ep-filter-btn" data-filter="missing">Недостающие</button>
+              <button type="button" class="ep-filter-btn" data-filter="extra">Лишние</button>
+              <button type="button" class="ep-filter-btn" data-filter="cert_issues">Срок ЭП</button>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <div class="input-group input-group-sm" style="width: 220px;">
+                <span class="input-group-text bg-transparent"><i class="bx bx-search text-muted"></i></span>
+                <input type="text" id="resultsSearchInput" class="form-control" placeholder="Поиск по ФИО, e-mail...">
+              </div>
+              <button type="button" id="btnCopySummary" class="btn btn-outline-secondary btn-sm ep-btn-nowrap" title="Скопировать текстовый итог проверки в буфер обмена">
+                <i class="bx bx-copy"></i> Копировать итог
+              </button>
+            </div>
+          </div>
+
+          <div id="emptyExpectedHint" class="px-3 py-2 border-bottom small text-muted d-none" style="background-color: var(--ep-surface-muted);">
+            Перечень ожидаемых подписей пуст — отображены все подписанты из файла и проверка сроков их сертификатов. Кликните по фамилиям слева для запуска сверки.
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover mb-0 ep-table">
+              <thead>
+                <tr>
+                  <th>Статус сверки</th>
+                  <th>Подписант (ФИО)</th>
+                  <th>Действует до</th>
+                  <th>Срок сертификата</th>
+                  <th>Время подписи (МСК)</th>
+                  <th class="text-end">Действия</th>
+                </tr>
+              </thead>
+              <tbody id="resultsTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast Notification -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+    <div id="epToast" class="toast fade hide" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="toast-header">
+        <i id="epToastIcon" class="bx bx-info-circle fs-5 me-2 text-primary"></i>
+        <strong id="epToastTitle" class="me-auto">Уведомление</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Закрыть"></button>
+      </div>
+      <div id="epToastBody" class="toast-body small"></div>
+    </div>
+  </div>
+
+  <script src="../assets/theme.min.js"></script>
+  <script src="../assets/theme-switcher.js"></script>
+  <script src="../assets/js/xlsx.full.min.js"></script>
+  <script src="./parser.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
