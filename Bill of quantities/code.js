@@ -118,11 +118,18 @@ function validateAndEvaluateFormula(formula, dataCtx, domain = 'cable', context 
     expr = replaceFormulaToken(expr, 'ДЛИНА', count, true);
   } else {
     // domain === 'cable' (default)
-    const num = Number(baseValue) || 0;
-    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО_МУФТ', num, true);
-    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО', num, true);
-    expr = replaceFormulaToken(expr, 'ШТ', num, true);
-    expr = replaceFormulaToken(expr, 'ДЛИНА', num, true);
+    const len = (typeof dataCtx === 'object' && dataCtx !== null)
+      ? (Number(dataCtx.length !== undefined ? dataCtx.length : baseValue) || 0)
+      : (Number(baseValue) || 0);
+    const cab = (typeof dataCtx === 'object' && dataCtx !== null && dataCtx.cablesCount !== undefined)
+      ? (Number(dataCtx.cablesCount) || 0)
+      : len;
+    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ', cab, true);
+    expr = replaceFormulaToken(expr, 'КАБЕЛЕ[ЙЯИ]', cab, true);
+    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО_МУФТ', len, true);
+    expr = replaceFormulaToken(expr, 'КОЛИЧЕСТВО', len, true);
+    expr = replaceFormulaToken(expr, 'ШТ', len, true);
+    expr = replaceFormulaToken(expr, 'ДЛИНА', len, true);
   }
 
   // Check for remaining unknown identifiers (variables)
@@ -218,13 +225,18 @@ function validateAndEvaluateFormula(formula, dataCtx, domain = 'cable', context 
 
 
 // Build display string for formula in VOR
-function buildWorkFormulaDisplay(formula, totalLength, itemsCount) {
+function buildWorkFormulaDisplay(formula, totalLength, itemsCount, totalCablesCount) {
   const clean = (formula || 'ДЛИНА').trim();
+  const cabCount = totalCablesCount !== undefined ? Number(totalCablesCount) : (Number(itemsCount) || 0);
   if (clean.toUpperCase() === 'ДЛИНА') {
     return `${totalLength.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} м кабеля${itemsCount > 1 ? ` (${itemsCount} мар.)` : ''}`;
   }
+  if (/^(?:КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|КАБЕЛЕ[ЙЯИ])$/i.test(clean)) {
+    return `${cabCount.toLocaleString('ru-RU')} каб.`;
+  }
   let disp = clean.replace(/,/g, '.').replace(/\*/g, ' * ');
-  disp = disp.replace(/ДЛИНА/gi, `${totalLength.toLocaleString('ru-RU')} м кабеля`);
+  disp = replaceFormulaToken(disp, 'КОЛИЧЕСТВО[_\\s]?КАБЕЛЕЙ|КАБЕЛЕ[ЙЯИ]', `${cabCount.toLocaleString('ru-RU')} каб.`, false);
+  disp = replaceFormulaToken(disp, 'ДЛИНА', `${totalLength.toLocaleString('ru-RU')} м кабеля`, false);
   return normalizeFormulaMathOperators(disp);
 }
 
@@ -2260,7 +2272,7 @@ function getActiveCableSummary() {
       const type = normalizeCableType(rawType, catalog);
       const length = Number(c.length) || 0;
       if (!cableSummary[type]) {
-        cableSummary[type] = { count: 0, length: 0, routingTypes: {} };
+        cableSummary[type] = { count: 0, length: 0, routingTypes: {}, routingCounts: {} };
       }
       cableSummary[type].count += 1;
       cableSummary[type].length += length;
@@ -2282,6 +2294,7 @@ function getActiveCableSummary() {
           if (sum > 0) {
             hasRouting = true;
             cableSummary[type].routingTypes[trimmedName] = (cableSummary[type].routingTypes[trimmedName] || 0) + sum;
+            cableSummary[type].routingCounts[trimmedName] = (cableSummary[type].routingCounts[trimmedName] || 0) + 1;
             grandRoutingSummary[trimmedName] = (grandRoutingSummary[trimmedName] || 0) + sum;
           }
         }
@@ -2290,6 +2303,7 @@ function getActiveCableSummary() {
       if (!hasRouting && length > 0) {
         const fallbackName = 'Не определен';
         cableSummary[type].routingTypes[fallbackName] = (cableSummary[type].routingTypes[fallbackName] || 0) + length;
+        cableSummary[type].routingCounts[fallbackName] = (cableSummary[type].routingCounts[fallbackName] || 0) + 1;
         grandRoutingSummary[fallbackName] = (grandRoutingSummary[fallbackName] || 0) + length;
       }
     });
@@ -3662,17 +3676,22 @@ function calculateWorksFromTrenches(trenchSummary, rulesData) {
             displayFormula = replaceFormulaToken(displayFormula, 'КОЛИЧЕСТВО[_\s]?КАБЕЛЕЙ|КАБЕЛЕ[ЙЯИ]|КОЛИЧЕСТВО', `${segCables} каб.`);
             if (condSuffix) displayFormula += condSuffix;
           } else if (matchingSegments.length <= 3) {
-            // Detailed segment breakdown: "(100 м * 5 каб + 250 м * 6 каб)"
-            const parts = matchingSegments.map(seg => {
-              const segLen = Number(seg.length) || 0;
-              const segCables = Number(seg.cablesCount) || 0;
-              return `${segLen} м * ${segCables} каб`;
-            });
-            const formulaPrefix = formula.replace(/ДЛИНА.*КОЛИЧЕСТВО.*КАБЕЛЕЙ|ДЛИНА.*КАБЕЛЕЙ|КОЛИЧЕСТВО.*КАБЕЛЕЙ.*ДЛИНА/gi, '').replace(/^\s*\*+\s*|\s*\*+\s*$/g, '').trim();
-            if (formulaPrefix && formulaPrefix !== '1') {
-              displayFormula = `${formulaPrefix} * (${parts.join(' + ')})${condSuffix}`;
+            const hasLenToken = /(?:^|[^a-zA-Z0-9а-яА-ЯёЁ_])ДЛИНА(?:[^a-zA-Z0-9а-яА-ЯёЁ_]|$)/i.test(formula);
+            if (!hasLenToken) {
+              displayFormula = matchingSegments.map(s => formatSegmentFormulaWithTokens(formula, s, unitSuffix)).join(' + ') + condSuffix;
             } else {
-              displayFormula = `(${parts.join(' + ')})${condSuffix}`;
+              // Detailed segment breakdown: "(100 м * 5 каб + 250 м * 6 каб)"
+              const parts = matchingSegments.map(seg => {
+                const segLen = Number(seg.length) || 0;
+                const segCables = Number(seg.cablesCount) || 0;
+                return `${segLen} м * ${segCables} каб`;
+              });
+              const formulaPrefix = formula.replace(/ДЛИНА.*КОЛИЧЕСТВО.*КАБЕЛЕЙ|ДЛИНА.*КАБЕЛЕЙ|КОЛИЧЕСТВО.*КАБЕЛЕЙ.*ДЛИНА/gi, '').replace(/^\s*\*+\s*|\s*\*+\s*$/g, '').trim();
+              if (formulaPrefix && formulaPrefix !== '1') {
+                displayFormula = `${formulaPrefix} * (${parts.join(' + ')})${condSuffix}`;
+              } else {
+                displayFormula = `(${parts.join(' + ')})${condSuffix}`;
+              }
             }
           } else {
             // More than 3 segments: compact summary
@@ -3807,6 +3826,8 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
   // Sort cables in this group by length descending
   cablesList.sort((a, b) => (b.length || 0) - (a.length || 0));
   const totalGroupLength = cablesList.reduce((sum, c) => sum + (Number(c.length) || 0), 0);
+  const totalGroupCablesCount = cablesList.reduce((sum, c) => sum + (Number(c.count) || 1), 0);
+  const groupEvalCtx = { length: totalGroupLength, cablesCount: totalGroupCablesCount };
 
   const primaryWork = workItems.find(w => (w["Тип"] || w.type) !== 'материал') || workItems[0];
   let primaryWorkTitle = (primaryWork ? (primaryWork["Наименование"] || primaryWork.name || '') : '').trim();
@@ -3823,7 +3844,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
     const targetSection = (work["Раздел"] || work.section || sectionName).trim();
     const workShowFormula = shouldShowFormula(work);
 
-    const evalRes = validateAndEvaluateFormula(formula, totalGroupLength, 'cable', {
+    const evalRes = validateAndEvaluateFormula(formula, groupEvalCtx, 'cable', {
       name: workTitle,
       type: determinedWorkType,
       section: targetSection,
@@ -3838,7 +3859,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
 
     const rawVal = evalRes.value;
     const unit = work["Единицы измерения"] || work.unit || 'м';
-    const rawFormulaDisp = buildWorkFormulaDisplay(formula, totalGroupLength, cablesList.length);
+    const rawFormulaDisp = buildWorkFormulaDisplay(formula, totalGroupLength, cablesList.length, totalGroupCablesCount);
     const formulaDisplay = workShowFormula ? rawFormulaDisp : '';
 
     calculatedWorks.push({
@@ -3860,7 +3881,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
       parentWorkName: (isWorkSub && primaryWork !== work) ? primaryWorkTitle : undefined,
       parentWorkUnit: (isWorkSub && primaryWork !== work) ? primaryWorkUnit : undefined,
       parentWorkSection: (isWorkSub && primaryWork !== work) ? targetSection : undefined,
-      cablesCount: cablesList.length,
+      cablesCount: totalGroupCablesCount,
       comment: work["Комментарий"] || work.comment || ''
     });
 
@@ -3881,7 +3902,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
 
       if (matNameTpl.includes('{МАРКА_КАБЕЛЯ}') || matNameTpl.includes('{КАБЕЛЬ}') || matNameTpl.includes('{МАРКА}')) {
         // Expand material for each cable in this group
-        const matCheck = validateAndEvaluateFormula(matFormula, 100, 'cable', {
+        const matCheck = validateAndEvaluateFormula(matFormula, { length: 100, cablesCount: 1 }, 'cable', {
           name: matNameTpl,
           type: determinedMatType,
           section: matSection,
@@ -3894,14 +3915,15 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
         }
 
         cablesList.forEach(c => {
-          const cVol = validateAndEvaluateFormula(matFormula, c.length, 'cable').value;
+          const cCount = Number(c.count) || 1;
+          const cVol = validateAndEvaluateFormula(matFormula, { length: c.length, cablesCount: cCount }, 'cable').value;
           let formulaSuffix = '';
           if (isOptical) {
             formulaSuffix = ' (ВОЛС)';
           } else if (c.weight) {
             formulaSuffix = ` (масса 1 м: ${c.weight} кг)`;
           }
-          const rawCFormulaDisp = buildWorkFormulaDisplay(matFormula, c.length, 1) + formulaSuffix;
+          const rawCFormulaDisp = buildWorkFormulaDisplay(matFormula, c.length, 1, cCount) + formulaSuffix;
           const cFormulaDisp = matShowFormula ? rawCFormulaDisp : '';
 
           calculatedWorks.push({
@@ -3930,7 +3952,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
         });
       } else {
         // Static item declared in work
-        const matEvalRes = validateAndEvaluateFormula(matFormula, totalGroupLength, 'cable', {
+        const matEvalRes = validateAndEvaluateFormula(matFormula, groupEvalCtx, 'cable', {
           name: matNameTpl,
           type: determinedMatType,
           section: matSection,
@@ -3942,7 +3964,7 @@ function processCableGroupWorks(workItems, cablesList, groupMeta, context) {
           return; // Skip this material
         }
         const matRawVal = matEvalRes.value;
-        const rawMatFormulaDisp = buildWorkFormulaDisplay(matFormula, totalGroupLength, cablesList.length);
+        const rawMatFormulaDisp = buildWorkFormulaDisplay(matFormula, totalGroupLength, cablesList.length, totalGroupCablesCount);
         const matFormulaDisp = matShowFormula ? rawMatFormulaDisp : '';
         calculatedWorks.push({
           name: matNameTpl,
@@ -4248,9 +4270,13 @@ function calculateWorksFromCables(cableSummary, rulesData) {
 
           const cMeta = lookupCableInfo(cType, catalog);
           const weight = cMeta.weight || 0.35;
+          const effectiveCount = (cInfo.routingCounts && cInfo.routingCounts[trimmedRName])
+            ? cInfo.routingCounts[trimmedRName]
+            : (Number(cInfo.count) || 1);
           const cableItem = {
             type: cType,
             length: effectiveLen,
+            count: effectiveCount,
             weight: weight,
             fullDescription: cMeta.fullDescription,
             buildingLength: cMeta.buildingLength,
