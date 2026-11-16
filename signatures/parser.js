@@ -1,11 +1,6 @@
 (function (global) {
   'use strict';
 
-  const MONTHS_RU = [
-    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
-  ];
-
   function normalizeText(str) {
     return String(str || '')
       .replace(/\u00A0/g, ' ')
@@ -127,7 +122,6 @@
       return { raw: '', cn: '', sn: '', g: '', email: '', org: '', title: '', fields };
     }
 
-    // Parse comma-separated X.509 RDN attributes with basic quote support
     const parts = [];
     let current = '';
     let inQuotes = false;
@@ -137,7 +131,6 @@
         inQuotes = !inQuotes;
         current += ch;
       } else if (ch === ',' && !inQuotes) {
-        // Check whether what follows looks like KEY=
         const rest = raw.slice(i + 1).trim();
         if (/^[A-Za-zА-Яа-яЁё0-9._-]+\s*=/.test(rest)) {
           parts.push(current.trim());
@@ -179,7 +172,6 @@
       fullName = raw;
     }
 
-    // If SN wasn't explicitly present, infer surname from first token of fullName
     const surname = sn || (fullName ? fullName.split(/\s+/)[0] : '');
     const givenName = g || (fullName ? fullName.split(/\s+/).slice(1).join(' ') : '');
 
@@ -226,7 +218,6 @@
     const s = cleanValue(String(input));
     if (!s) return null;
 
-    // DD.MM.YYYY [HH:MM[:SS]] or DD/MM/YYYY
     const ruMatch = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})(?:[\sT]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
     if (ruMatch) {
       const day = parseInt(ruMatch[1], 10);
@@ -243,7 +234,6 @@
       }
     }
 
-    // YYYY-MM-DD [HH:MM[:SS]]
     const isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[\sT]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
     if (isoMatch) {
       const year = parseInt(isoMatch[1], 10);
@@ -260,7 +250,6 @@
       }
     }
 
-    // Numeric string Excel serial
     if (/^\d{5}(?:\.\d+)?$/.test(s)) {
       return parseDateValue(parseFloat(s));
     }
@@ -281,16 +270,6 @@
     if (hasExplicitTime) {
       return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
     }
-    return `${dd}.${mm}.${yyyy}`;
-  }
-
-  function formatDateShort(dateObj, rawFallback) {
-    if (!dateObj || isNaN(dateObj.getTime())) {
-      return cleanValue(rawFallback) || '—';
-    }
-    const dd = String(dateObj.getDate()).padStart(2, '0');
-    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const yyyy = dateObj.getFullYear();
     return `${dd}.${mm}.${yyyy}`;
   }
 
@@ -331,144 +310,206 @@
     };
   }
 
-  function detectDocumentMetadata(rows) {
+  const DOC_HEADER_ALIASES = {
+    fileName: ['наименование файла', 'имя файла', 'файл'],
+    projectCode: ['шифр проекта', 'шифр'],
+    projectName: ['наименование проекта', 'проект'],
+    contractNumber: ['№ договора', 'номер договора', 'договор'],
+    stageNumber: ['№ этапа', 'номер этапа', 'этап'],
+    docName: ['наименование документа', 'документ']
+  };
+
+  function matchHeaderRowToColMap(row) {
+    if (!Array.isArray(row)) return null;
+    const colMap = {};
+    let matches = 0;
+
+    row.forEach((cellVal, cIdx) => {
+      const norm = normalizeText(cellVal);
+      if (!norm) return;
+
+      let bestField = null;
+      let bestScore = -1;
+
+      Object.entries(DOC_HEADER_ALIASES).forEach(([fieldKey, aliases]) => {
+        aliases.forEach((alias) => {
+          if (norm === alias) {
+            const score = 1000 + alias.length;
+            if (score > bestScore) {
+              bestScore = score;
+              bestField = fieldKey;
+            }
+          } else if (norm.includes(alias)) {
+            const score = alias.length;
+            if (score > bestScore) {
+              bestScore = score;
+              bestField = fieldKey;
+            }
+          }
+        });
+      });
+
+      if (bestField && colMap[bestField] === undefined) {
+        colMap[bestField] = cIdx;
+        matches++;
+      }
+    });
+
+    return matches >= 2 ? colMap : null;
+  }
+
+  function looksLikeProtocolLineText(text) {
+    const norm = normalizeText(text);
+    if (!norm) return false;
+    return /^(?:время подписи|формат подписи|информация о сертификате|субъект\s*:|издатель\s*:|действует с\s*:|действует до\s*:|серийный номер\s*:|отпечаток|подпись\s+(?:действительна|недействительна|не\s+найдена|проверена))/.test(norm);
+  }
+
+  function extractDocMetaFromRow(row, colMap) {
+    if (!Array.isArray(row) || !colMap) return null;
+    const fileCol = colMap.fileName !== undefined ? colMap.fileName : 0;
+    const fileVal = cleanValue(row[fileCol]);
+    if (!fileVal || looksLikeProtocolLineText(fileVal)) return null;
+
+    // Count how many mapped metadata columns have non-empty values in this row
+    let populatedMappedCols = 0;
     const meta = {
-      fileName: '',
+      fileName: fileVal,
       projectCode: '',
       projectName: '',
       contractNumber: '',
       stageNumber: '',
       docName: '',
-      overallStatus: '',
-      headerRowIndex: -1
+      overallStatus: ''
     };
 
-    const headerAliases = {
-      fileName: ['наименование файла', 'имя файла', 'файл'],
-      projectCode: ['шифр проекта', 'шифр'],
-      projectName: ['наименование проекта', 'проект'],
-      contractNumber: ['№ договора', 'номер договора', 'договор'],
-      stageNumber: ['№ этапа', 'номер этапа', 'этап'],
-      docName: ['наименование документа', 'документ']
-    };
+    Object.entries(colMap).forEach(([fieldKey, cIdx]) => {
+      const val = cleanValue(row[cIdx]);
+      if (val) populatedMappedCols++;
+      meta[fieldKey] = val;
+    });
 
-    for (let r = 0; r < Math.min(rows.length, 10); r++) {
-      const row = rows[r] || [];
-      const colMap = {};
-      let matches = 0;
+    const looksLikeFileName = /\.(pdf|docx?|xlsx?|dwg|dxf|tif|tiff|png|jpg|jpeg|xml|sig|p7s|txt|zip|rar)$/i.test(fileVal);
+    if (populatedMappedCols >= 2 || looksLikeFileName) {
+      return meta;
+    }
 
-      row.forEach((cellVal, cIdx) => {
-        const norm = normalizeText(cellVal);
-        if (!norm) return;
+    return null;
+  }
 
-        let bestField = null;
-        let bestScore = -1;
+  function rowToProtocolLines(row, rIdx) {
+    const out = [];
+    if (!Array.isArray(row)) return out;
 
-        Object.entries(headerAliases).forEach(([fieldKey, aliases]) => {
-          aliases.forEach((alias) => {
-            if (norm === alias) {
-              const score = 1000 + alias.length;
-              if (score > bestScore) {
-                bestScore = score;
-                bestField = fieldKey;
-              }
-            } else if (norm.includes(alias)) {
-              const score = alias.length;
-              if (score > bestScore) {
-                bestScore = score;
-                bestField = fieldKey;
-              }
-            }
-          });
-        });
+    const nonEmpty = row
+      .map((cell) => ({ raw: cell, str: String(cell === null || cell === undefined ? '' : cell).trim() }))
+      .filter((item) => item.str !== '');
 
-        if (bestField && colMap[bestField] === undefined) {
-          colMap[bestField] = cIdx;
-          matches++;
+    if (nonEmpty.length === 0) return out;
+
+    // Two-column key/value row (e.g. ["Действует до:", "13.03.2027 06:21:15"])
+    if (nonEmpty.length === 2 && !nonEmpty[0].str.includes('\n')) {
+      const keyCand = nonEmpty[0].str.replace(/:$/, '').trim();
+      const keyNorm = normalizeText(keyCand);
+      const knownKeys = [
+        'время подписи по гринвичу', 'время подписи по мск', 'время подписи',
+        'формат подписи', 'субъект', 'издатель', 'действует с', 'действует до',
+        'серийный номер', 'отпечаток сертификата', 'отпечаток',
+        'наименование файла', 'шифр проекта', 'наименование проекта',
+        '№ договора', '№ этапа', 'наименование документа'
+      ];
+      if (knownKeys.some((k) => keyNorm === k || keyNorm.startsWith('информация о сертификате'))) {
+        let valPart = nonEmpty[1].raw;
+        if (typeof valPart === 'number' && (keyNorm === 'действует с' || keyNorm === 'действует до' || keyNorm.startsWith('время подписи'))) {
+          const parsed = parseDateValue(valPart);
+          valPart = parsed ? formatDateDisplay(parsed, '') : String(valPart);
         }
-      });
-
-      if (matches >= 2) {
-        meta.headerRowIndex = r;
-        // Find next non-empty value row
-        for (let nr = r + 1; nr < Math.min(rows.length, r + 4); nr++) {
-          const valRow = rows[nr] || [];
-          const hasAny = valRow.some((v) => cleanValue(v) !== '');
-          if (!hasAny) continue;
-          Object.entries(colMap).forEach(([fieldKey, cIdx]) => {
-            meta[fieldKey] = cleanValue(valRow[cIdx]);
-          });
-          meta.valueRowIndex = nr;
-          break;
-        }
-        break;
+        out.push({ text: `${keyCand}: ${cleanValue(valPart)}`, rowIndex: rIdx });
+        return out;
       }
     }
 
-    return meta;
-  }
-
-  function extractProtocolLines(rows, docMeta) {
-    const lines = [];
-    const skipRows = new Set();
-    if (docMeta.headerRowIndex >= 0) skipRows.add(docMeta.headerRowIndex);
-    if (docMeta.valueRowIndex >= 0) skipRows.add(docMeta.valueRowIndex);
-
-    rows.forEach((row, rIdx) => {
-      if (skipRows.has(rIdx) || !Array.isArray(row)) return;
-      const nonEmpty = row
-        .map((cell) => ({ raw: cell, str: String(cell === null || cell === undefined ? '' : cell).trim() }))
-        .filter((item) => item.str !== '');
-
-      if (nonEmpty.length === 0) return;
-
-      // Key in first non-empty cell and value in second non-empty cell (e.g. ["Действует до:", "13.03.2027 06:21:15"])
-      if (nonEmpty.length === 2 && !nonEmpty[0].str.includes('\n')) {
-        const keyCand = nonEmpty[0].str.replace(/:$/, '').trim();
-        const keyNorm = normalizeText(keyCand);
-        const knownKeys = [
-          'время подписи по гринвичу', 'время подписи по мск', 'время подписи',
-          'формат подписи', 'субъект', 'издатель', 'действует с', 'действует до',
-          'серийный номер', 'отпечаток сертификата', 'отпечаток',
-          'наименование файла', 'шифр проекта', 'наименование проекта',
-          '№ договора', '№ этапа', 'наименование документа'
-        ];
-        if (knownKeys.some((k) => keyNorm === k || keyNorm.startsWith('информация о сертификате'))) {
-          let valPart = nonEmpty[1].raw;
-          if (typeof valPart === 'number' && (keyNorm === 'действует с' || keyNorm === 'действует до' || keyNorm.startsWith('время подписи'))) {
-            const parsed = parseDateValue(valPart);
-            valPart = parsed ? formatDateDisplay(parsed, '') : String(valPart);
-          }
-          lines.push({ text: `${keyCand}: ${cleanValue(valPart)}`, rowIndex: rIdx });
-          return;
+    nonEmpty.forEach((item) => {
+      const subLines = item.str.split(/\r?\n/);
+      subLines.forEach((sl) => {
+        const cleaned = sl.trim();
+        if (cleaned) {
+          out.push({ text: cleaned, rowIndex: rIdx });
         }
-      }
-
-      nonEmpty.forEach((item) => {
-        const subLines = item.str.split(/\r?\n/);
-        subLines.forEach((sl) => {
-          const cleaned = sl.trim();
-          if (cleaned) {
-            lines.push({ text: cleaned, rowIndex: rIdx });
-          }
-        });
       });
     });
 
-    return lines;
+    return out;
   }
 
-  function parseProtocolCertificates(rows, referenceNow) {
-    const docMeta = detectDocumentMetadata(rows);
-    const lines = extractProtocolLines(rows, docMeta);
+  function parseProtocolDocuments(rows, referenceNow) {
+    const documents = [];
+    let activeColMap = null;
 
-    const certificates = [];
+    let currentDoc = null;
     let pendingPre = { signedAtUtc: '', signedAtMsk: '', signatureFormat: '' };
-    let current = null;
+    let currentCert = null;
 
-    function createCert(certNum) {
+    function createEmptyDoc(metaOverride, fallbackIndex) {
       return {
-        certNumber: certNum || certificates.length + 1,
+        index: fallbackIndex,
+        id: `doc_${fallbackIndex}`,
+        docMeta: Object.assign({
+          fileName: '',
+          projectCode: '',
+          projectName: '',
+          contractNumber: '',
+          stageNumber: '',
+          docName: '',
+          overallStatus: ''
+        }, metaOverride || {}),
+        certificates: []
+      };
+    }
+
+    function commitCert() {
+      if (!currentCert) return;
+      if (currentCert.subjectRaw || currentCert.fullName || currentCert.validToRaw || currentCert.serialNumber) {
+        if (!currentDoc) {
+          currentDoc = createEmptyDoc({ fileName: 'Отчет о подписании' }, documents.length);
+        }
+
+        const subj = parseX509Subject(currentCert.subjectRaw);
+        currentCert.fullName = currentCert.fullName || subj.fullName;
+        currentCert.surname = currentCert.surname || subj.surname;
+        currentCert.givenName = currentCert.givenName || subj.givenName;
+        currentCert.email = currentCert.email || subj.email;
+        currentCert.org = currentCert.org || subj.org;
+        currentCert.title = currentCert.title || subj.title;
+
+        if (currentCert.issuerRaw) {
+          const iss = parseX509Subject(currentCert.issuerRaw);
+          currentCert.issuerShort = iss.cn || iss.org || currentCert.issuerRaw;
+        }
+
+        const validity = evaluateCertificateValidity(currentCert.validToDate, referenceNow);
+        currentCert.certStatus = validity.certStatus;
+        currentCert.validityLabel = validity.label;
+        currentCert.daysLeft = validity.daysLeft;
+        currentCert.validToDisplay = formatDateDisplay(currentCert.validToDate, currentCert.validToRaw);
+        currentCert.validFromDisplay = formatDateDisplay(currentCert.validFromDate, currentCert.validFromRaw);
+
+        currentDoc.certificates.push(currentCert);
+      }
+      currentCert = null;
+    }
+
+    function commitDoc() {
+      commitCert();
+      pendingPre = { signedAtUtc: '', signedAtMsk: '', signatureFormat: '' };
+      if (currentDoc && (currentDoc.docMeta.fileName || currentDoc.docMeta.docName || currentDoc.certificates.length > 0)) {
+        documents.push(currentDoc);
+      }
+      currentDoc = null;
+    }
+
+    function createCert(certNum, rowIndex) {
+      return {
+        certNumber: certNum || ((currentDoc ? currentDoc.certificates.length : 0) + 1),
         signedAtUtc: pendingPre.signedAtUtc || '',
         signedAtMsk: pendingPre.signedAtMsk || '',
         signatureFormat: pendingPre.signatureFormat || '',
@@ -487,158 +528,197 @@
         validToDate: null,
         serialNumber: '',
         thumbprint: '',
-        rowIndex: 0
+        rowIndex: rowIndex || 0
       };
     }
 
-    function commitCurrent() {
-      if (!current) return;
-      if (current.subjectRaw || current.fullName || current.validToRaw || current.serialNumber) {
-        const subj = parseX509Subject(current.subjectRaw);
-        current.fullName = current.fullName || subj.fullName;
-        current.surname = current.surname || subj.surname;
-        current.givenName = current.givenName || subj.givenName;
-        current.email = current.email || subj.email;
-        current.org = current.org || subj.org;
-        current.title = current.title || subj.title;
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      if (!Array.isArray(row) || row.every((c) => cleanValue(c) === '')) continue;
 
-        if (current.issuerRaw) {
-          const iss = parseX509Subject(current.issuerRaw);
-          current.issuerShort = iss.cn || iss.org || current.issuerRaw;
-        }
-
-        const validity = evaluateCertificateValidity(current.validToDate, referenceNow);
-        current.certStatus = validity.certStatus;
-        current.validityLabel = validity.label;
-        current.daysLeft = validity.daysLeft;
-        current.validToDisplay = formatDateDisplay(current.validToDate, current.validToRaw);
-        current.validFromDisplay = formatDateDisplay(current.validFromDate, current.validFromRaw);
-        certificates.push(current);
-      }
-      current = null;
-    }
-
-    for (const lineObj of lines) {
-      const line = lineObj.text;
-      const norm = normalizeText(line);
-
-      // Overall verification line
-      if (/^подпись\s+(действительна|недействительна|не\s+найдена|проверена)/i.test(norm)) {
-        if (!docMeta.overallStatus) {
-          docMeta.overallStatus = cleanValue(line);
-        }
+      // 1. Detect header row (`Наименование файла | Шифр проекта | ...`)
+      const detectedHeader = matchHeaderRowToColMap(row);
+      if (detectedHeader) {
+        activeColMap = detectedHeader;
         continue;
       }
 
-      // Metadata lines if present in key-value format
-      const kvMatch = line.match(/^([^:]{2,50}):\s*(.*)$/);
-      if (!kvMatch) continue;
-
-      const key = kvMatch[1].trim();
-      const val = kvMatch[2].trim();
-      const keyNorm = normalizeText(key);
-
-      if (keyNorm === 'наименование файла' && !docMeta.fileName) {
-        docMeta.fileName = val;
-        continue;
-      }
-      if (keyNorm === 'шифр проекта' && !docMeta.projectCode) {
-        docMeta.projectCode = val;
-        continue;
-      }
-      if (keyNorm === 'наименование проекта' && !docMeta.projectName) {
-        docMeta.projectName = val;
-        continue;
-      }
-      if (keyNorm === 'наименование документа' && !docMeta.docName) {
-        docMeta.docName = val;
-        continue;
+      // 2. Detect document metadata row matching `activeColMap`
+      if (activeColMap) {
+        const newMeta = extractDocMetaFromRow(row, activeColMap);
+        if (newMeta) {
+          commitDoc();
+          currentDoc = createEmptyDoc(newMeta, documents.length);
+          continue;
+        }
       }
 
-      // Certificate header: Информация о сертификате 1:
-      const certHeaderMatch = keyNorm.match(/^информация\s+о\s+сертификате\s*(\d+)?$/i);
-      if (certHeaderMatch) {
-        commitCurrent();
-        const num = certHeaderMatch[1] ? parseInt(certHeaderMatch[1], 10) : certificates.length + 1;
-        current = createCert(num);
-        current.rowIndex = lineObj.rowIndex;
-        pendingPre = { signedAtUtc: '', signedAtMsk: '', signatureFormat: '' };
-        continue;
-      }
+      // 3. Process protocol lines inside the row
+      const lines = rowToProtocolLines(row, r);
+      for (const lineObj of lines) {
+        const line = lineObj.text;
+        const norm = normalizeText(line);
 
-      // Pre-certificate signature timestamp / format lines
-      if (keyNorm === 'время подписи по гринвичу') {
-        if (current && current.subjectRaw) {
-          commitCurrent();
+        // Overall verification line (usually right after doc meta)
+        if (/^подпись\s+(действительна|недействительна|не\s+найдена|проверена)/i.test(norm)) {
+          if (currentDoc && currentDoc.certificates.length > 0 && currentDoc.docMeta.overallStatus) {
+            // Status line starts a fresh implicit doc if previous doc already had certs and no file meta row appeared
+            commitDoc();
+          }
+          if (!currentDoc) {
+            currentDoc = createEmptyDoc({ fileName: `Документ ${documents.length + 1}` }, documents.length);
+          }
+          if (!currentDoc.docMeta.overallStatus) {
+            currentDoc.docMeta.overallStatus = cleanValue(line);
+          }
+          continue;
         }
-        if (current && !current.signedAtUtc) {
-          current.signedAtUtc = val;
-        } else {
-          pendingPre.signedAtUtc = val;
-        }
-        continue;
-      }
 
-      if (keyNorm === 'время подписи по мск' || keyNorm === 'время подписи') {
-        if (current && current.subjectRaw && current.signedAtMsk) {
-          commitCurrent();
-        }
-        if (current && !current.signedAtMsk) {
-          current.signedAtMsk = val;
-        } else {
-          pendingPre.signedAtMsk = val;
-        }
-        continue;
-      }
+        const kvMatch = line.match(/^([^:]{2,50}):\s*(.*)$/);
+        if (!kvMatch) continue;
 
-      if (keyNorm === 'формат подписи') {
-        if (current && current.subjectRaw && current.signatureFormat) {
-          commitCurrent();
-        }
-        if (current && !current.signatureFormat) {
-          current.signatureFormat = val;
-        } else {
-          pendingPre.signatureFormat = val;
-        }
-        continue;
-      }
+        const key = kvMatch[1].trim();
+        const val = kvMatch[2].trim();
+        const keyNorm = normalizeText(key);
 
-      if (keyNorm === 'субъект' || keyNorm === 'владелец' || keyNorm === 'подписант') {
-        if (current && current.subjectRaw) {
-          commitCurrent();
+        // Explicit key-value metadata
+        if (keyNorm === 'наименование файла') {
+          if (currentDoc && (currentDoc.certificates.length > 0 || (currentDoc.docMeta.fileName && currentDoc.docMeta.fileName !== val))) {
+            commitDoc();
+          }
+          if (!currentDoc) {
+            currentDoc = createEmptyDoc({ fileName: val }, documents.length);
+          } else if (!currentDoc.docMeta.fileName) {
+            currentDoc.docMeta.fileName = val;
+          }
+          continue;
         }
-        if (!current) {
-          current = createCert(certificates.length + 1);
-          current.rowIndex = lineObj.rowIndex;
+        if (keyNorm === 'шифр проекта') {
+          if (!currentDoc) currentDoc = createEmptyDoc({}, documents.length);
+          if (!currentDoc.docMeta.projectCode) currentDoc.docMeta.projectCode = val;
+          continue;
+        }
+        if (keyNorm === 'наименование проекта') {
+          if (!currentDoc) currentDoc = createEmptyDoc({}, documents.length);
+          if (!currentDoc.docMeta.projectName) currentDoc.docMeta.projectName = val;
+          continue;
+        }
+        if (keyNorm === 'наименование документа') {
+          if (!currentDoc) currentDoc = createEmptyDoc({}, documents.length);
+          if (!currentDoc.docMeta.docName) currentDoc.docMeta.docName = val;
+          continue;
+        }
+
+        // Certificate header: Информация о сертификате N:
+        const certHeaderMatch = keyNorm.match(/^информация\s+о\s+сертификате\s*(\d+)?$/i);
+        if (certHeaderMatch) {
+          commitCert();
+          const num = certHeaderMatch[1] ? parseInt(certHeaderMatch[1], 10) : null;
+          // If certificate numbering resets to 1 inside an implicit doc that already had >1 certs without a new docMeta row
+          if (num === 1 && currentDoc && currentDoc.certificates.length > 0 && !currentDoc.docMeta.fileName) {
+            commitDoc();
+          }
+          if (!currentDoc) {
+            currentDoc = createEmptyDoc({ fileName: `Документ ${documents.length + 1}` }, documents.length);
+          }
+          currentCert = createCert(num || (currentDoc.certificates.length + 1), lineObj.rowIndex);
           pendingPre = { signedAtUtc: '', signedAtMsk: '', signatureFormat: '' };
+          continue;
         }
-        current.subjectRaw = val;
-        continue;
-      }
 
-      if (!current) continue;
+        // Pre-certificate signature timestamp / format lines
+        if (keyNorm === 'время подписи по гринвичу') {
+          if (currentCert && currentCert.subjectRaw) {
+            commitCert();
+          }
+          if (currentCert && !currentCert.signedAtUtc) {
+            currentCert.signedAtUtc = val;
+          } else {
+            pendingPre.signedAtUtc = val;
+          }
+          continue;
+        }
 
-      if (keyNorm === 'издатель') {
-        current.issuerRaw = val;
-      } else if (keyNorm === 'действует с') {
-        current.validFromRaw = val;
-        current.validFromDate = parseDateValue(val);
-      } else if (keyNorm === 'действует до') {
-        current.validToRaw = val;
-        current.validToDate = parseDateValue(val);
-      } else if (keyNorm === 'серийный номер') {
-        current.serialNumber = val;
-      } else if (keyNorm.startsWith('отпечаток')) {
-        current.thumbprint = val;
+        if (keyNorm === 'время подписи по мск' || keyNorm === 'время подписи') {
+          if (currentCert && currentCert.subjectRaw && currentCert.signedAtMsk) {
+            commitCert();
+          }
+          if (currentCert && !currentCert.signedAtMsk) {
+            currentCert.signedAtMsk = val;
+          } else {
+            pendingPre.signedAtMsk = val;
+          }
+          continue;
+        }
+
+        if (keyNorm === 'формат подписи') {
+          if (currentCert && currentCert.subjectRaw && currentCert.signatureFormat) {
+            commitCert();
+          }
+          if (currentCert && !currentCert.signatureFormat) {
+            currentCert.signatureFormat = val;
+          } else {
+            pendingPre.signatureFormat = val;
+          }
+          continue;
+        }
+
+        if (keyNorm === 'субъект' || keyNorm === 'владелец' || keyNorm === 'подписант') {
+          if (currentCert && currentCert.subjectRaw) {
+            commitCert();
+          }
+          if (!currentDoc) {
+            currentDoc = createEmptyDoc({ fileName: `Документ ${documents.length + 1}` }, documents.length);
+          }
+          if (!currentCert) {
+            currentCert = createCert(currentDoc.certificates.length + 1, lineObj.rowIndex);
+            pendingPre = { signedAtUtc: '', signedAtMsk: '', signatureFormat: '' };
+          }
+          currentCert.subjectRaw = val;
+          continue;
+        }
+
+        if (!currentCert) continue;
+
+        if (keyNorm === 'издатель') {
+          currentCert.issuerRaw = val;
+        } else if (keyNorm === 'действует с') {
+          currentCert.validFromRaw = val;
+          currentCert.validFromDate = parseDateValue(val);
+        } else if (keyNorm === 'действует до') {
+          currentCert.validToRaw = val;
+          currentCert.validToDate = parseDateValue(val);
+        } else if (keyNorm === 'серийный номер') {
+          currentCert.serialNumber = val;
+        } else if (keyNorm.startsWith('отпечаток')) {
+          currentCert.thumbprint = val;
+        }
       }
     }
 
-    commitCurrent();
+    commitDoc();
+
+    // Keep only documents that have at least one certificate OR an explicit filename from metadata
+    const validDocs = documents.filter((d) => d.certificates.length > 0 || d.docMeta.fileName);
+    const totalCerts = validDocs.reduce((sum, d) => sum + d.certificates.length, 0);
+
+    if (totalCerts === 0) {
+      return { mode: 'none', documents: [], docMeta: {}, certificates: [] };
+    }
+
+    validDocs.forEach((d, idx) => {
+      d.index = idx;
+      d.id = `doc_${idx}`;
+      if (!d.docMeta.fileName) {
+        d.docMeta.fileName = d.docMeta.docName || `Документ ${idx + 1}`;
+      }
+    });
 
     return {
-      mode: certificates.length > 0 ? 'protocol' : 'none',
-      docMeta,
-      certificates
+      mode: 'protocol',
+      documents: validDocs,
+      docMeta: validDocs[0].docMeta,
+      certificates: validDocs.flatMap((d) => d.certificates)
     };
   }
 
@@ -657,6 +737,7 @@
         const norm = normalizeText(cell);
         if (/(фио|подписант|владелец|субъект|фамилия|сотрудник)/i.test(norm)) score += 3;
         if (/(действует до|срок действия|окончани|valid to|истекает)/i.test(norm)) score += 3;
+        if (/(файл|документ)/i.test(norm)) score += 2;
         if (/(действует с|время подписи|дата подписи|издатель|статус)/i.test(norm)) score += 1;
       });
 
@@ -678,6 +759,7 @@
     let validToCol = -1;
     let signedAtCol = -1;
     let validFromCol = -1;
+    let fileCol = -1;
 
     headers.forEach((h, idx) => {
       const norm = normalizeText(h);
@@ -693,6 +775,9 @@
       if (signedAtCol === -1 && /(время подписи|дата подписи|подписано)/i.test(norm)) {
         signedAtCol = idx;
       }
+      if (fileCol === -1 && /(наименование файла|имя файла|файл|документ)/i.test(norm)) {
+        fileCol = idx;
+      }
     });
 
     if (nameCol === -1 && headers.length >= 1) nameCol = 0;
@@ -701,7 +786,7 @@
     return {
       headerRowIndex,
       headers,
-      mapping: { nameCol, validToCol, validFromCol, signedAtCol }
+      mapping: { nameCol, validToCol, validFromCol, signedAtCol, fileCol }
     };
   }
 
@@ -723,8 +808,13 @@
     const signedAtCol = (customMapping && typeof customMapping.signedAtCol === 'number')
       ? customMapping.signedAtCol
       : detected.mapping.signedAtCol;
+    const fileCol = (customMapping && typeof customMapping.fileCol === 'number')
+      ? customMapping.fileCol
+      : detected.mapping.fileCol;
 
-    const certificates = [];
+    const docsMap = new Map();
+    const allCertificates = [];
+
     for (let r = headerRowIndex + 1; r < rowsForDetect.length; r++) {
       const fRow = rowsForDetect[r] || [];
       const rRow = (rawRows && rawRows[r]) ? rawRows[r] : fRow;
@@ -751,11 +841,29 @@
 
       const validFromRawVal = validFromCol >= 0 ? (rRow[validFromCol] !== '' && rRow[validFromCol] !== undefined ? rRow[validFromCol] : fRow[validFromCol]) : '';
       const validFromDate = parseDateValue(validFromRawVal) || parseDateValue(validFromCol >= 0 ? fRow[validFromCol] : '');
-
       const signedAtRawVal = signedAtCol >= 0 ? cleanValue(fRow[signedAtCol]) : '';
+      const docKey = fileCol >= 0 ? (cleanValue(fRow[fileCol]) || 'Документ') : 'Отчет';
 
-      certificates.push({
-        certNumber: certificates.length + 1,
+      if (!docsMap.has(docKey)) {
+        docsMap.set(docKey, {
+          index: docsMap.size,
+          id: `doc_${docsMap.size}`,
+          docMeta: {
+            fileName: docKey,
+            projectCode: '',
+            projectName: '',
+            contractNumber: '',
+            stageNumber: '',
+            docName: '',
+            overallStatus: ''
+          },
+          certificates: []
+        });
+      }
+
+      const targetDoc = docsMap.get(docKey);
+      const certObj = {
+        certNumber: targetDoc.certificates.length + 1,
         signedAtUtc: '',
         signedAtMsk: signedAtRawVal,
         signatureFormat: '',
@@ -780,15 +888,29 @@
         validityLabel: validity.label,
         daysLeft: validity.daysLeft,
         rowIndex: r
+      };
+
+      targetDoc.certificates.push(certObj);
+      allCertificates.push(certObj);
+    }
+
+    const documents = Array.from(docsMap.values());
+    if (documents.length === 0) {
+      documents.push({
+        index: 0,
+        id: 'doc_0',
+        docMeta: { fileName: 'Отчет', projectCode: '', projectName: '', contractNumber: '', stageNumber: '', docName: '', overallStatus: '' },
+        certificates: []
       });
     }
 
     return {
       mode: 'tabular',
-      docMeta: { fileName: '', projectCode: '', projectName: '', contractNumber: '', stageNumber: '', docName: '', overallStatus: '' },
+      documents,
+      docMeta: documents[0].docMeta,
       headers: detected.headers,
-      mapping: { headerRowIndex, nameCol, validToCol, validFromCol, signedAtCol },
-      certificates
+      mapping: { headerRowIndex, nameCol, validToCol, validFromCol, signedAtCol, fileCol },
+      certificates: allCertificates
     };
   }
 
@@ -797,6 +919,7 @@
     if (!rows || rows.length === 0) {
       return {
         mode: 'empty',
+        documents: [],
         docMeta: {},
         certificates: [],
         headers: [],
@@ -805,8 +928,8 @@
     }
 
     if (!customMapping || customMapping.forceTabular !== true) {
-      const protocolResult = parseProtocolCertificates(rows, referenceNow);
-      if (protocolResult.certificates.length > 0) {
+      const protocolResult = parseProtocolDocuments(rows, referenceNow);
+      if (protocolResult.documents.length > 0) {
         return protocolResult;
       }
     }
@@ -837,21 +960,17 @@
 
     if (qSurname !== cSurname) return false;
 
-    // Single word query (surname only): matches by surname
     if (qParts.length === 1) return true;
 
-    // Query includes initials or given name/patronymic (e.g. "Минаев О.Б." / "Минаев Олег")
     const qRest = qParts.slice(1).join('');
     const cRest = cParts.slice(1);
     if (cRest.length === 0) return false;
 
-    // Match compact initials like "об" against cRest[0][0] + cRest[1][0]
     if (qParts.length === 2 && qParts[1].length <= 3 && cRest.length >= qParts[1].length) {
       const targetInitials = cRest.slice(0, qParts[1].length).map((w) => w[0]).join('');
       if (qParts[1] === targetInitials) return true;
     }
 
-    // Match token-by-token prefix (handles "Минаев О Б" and "Минаев Олег Б")
     const qTokens = qParts.slice(1);
     if (qTokens.length <= cRest.length) {
       const allMatch = qTokens.every((qt, idx) => {
@@ -915,7 +1034,6 @@
       }
     });
 
-    // Combined rows ordered intuitively: matched first, then missing, then extra
     const allRows = [...matchedItems, ...missingItems, ...extraItems];
 
     const expiredCount = certs.filter((c) => c.certStatus === 'expired').length;
@@ -945,9 +1063,96 @@
     };
   }
 
+  function reconcilePackage(documents, expectedSigners) {
+    const docs = Array.isArray(documents) ? documents : [];
+    const expected = Array.isArray(expectedSigners) ? expectedSigners : [];
+
+    const docResults = docs.map((doc) => {
+      const res = reconcileSigners(doc.certificates, expected);
+      const hasMissing = res.stats.missingCount > 0;
+      const hasExtra = res.stats.extraCount > 0;
+      const hasExpired = res.stats.expiredCount > 0;
+      const hasExpiringSoon = res.stats.expiringSoonCount > 0;
+      const isComplete = !hasMissing && !hasExpired;
+      const hasAnyIssue = hasMissing || hasExtra || hasExpired || hasExpiringSoon;
+
+      return {
+        doc,
+        reconciliation: res,
+        hasMissing,
+        hasExtra,
+        hasExpired,
+        hasExpiringSoon,
+        isComplete,
+        hasAnyIssue
+      };
+    });
+
+    const expectedStatsById = {};
+    expected.forEach((expItem) => {
+      const id = typeof expItem === 'string' ? expItem : expItem.id;
+      const query = typeof expItem === 'string' ? expItem : expItem.query;
+      let signedDocsCount = 0;
+      const missingInDocs = [];
+      let hasExpired = false;
+      let hasExpiringSoon = false;
+
+      docResults.forEach((dr) => {
+        const matched = dr.doc.certificates.filter((c) => doesSignerMatchCertificate(query, c));
+        if (matched.length > 0) {
+          signedDocsCount++;
+          if (matched.some((c) => c.certStatus === 'expired')) hasExpired = true;
+          if (matched.some((c) => c.certStatus === 'expiring_soon')) hasExpiringSoon = true;
+        } else {
+          missingInDocs.push(dr.doc.docMeta.fileName || `Документ ${dr.doc.index + 1}`);
+        }
+      });
+
+      expectedStatsById[id] = {
+        query,
+        signedDocsCount,
+        totalDocs: docs.length,
+        missingInDocs,
+        hasExpired,
+        hasExpiringSoon
+      };
+    });
+
+    const uniqueSignersMap = new Map();
+    docs.forEach((doc) => {
+      doc.certificates.forEach((cert) => {
+        const key = normalizeText(cert.fullName);
+        if (key && !uniqueSignersMap.has(key)) {
+          uniqueSignersMap.set(key, cert);
+        }
+      });
+    });
+
+    const stats = {
+      docCount: docs.length,
+      docsComplete: docResults.filter((d) => d.isComplete).length,
+      docsWithMissing: docResults.filter((d) => d.hasMissing).length,
+      docsWithExtra: docResults.filter((d) => d.hasExtra).length,
+      docsWithCertIssues: docResults.filter((d) => d.hasExpired || d.hasExpiringSoon).length,
+      docsWithAnyIssue: docResults.filter((d) => d.hasAnyIssue).length,
+      uniqueSignersCount: uniqueSignersMap.size,
+      totalSignaturesAllDocs: docs.reduce((s, d) => s + d.certificates.length, 0)
+    };
+
+    return {
+      hasExpectedList: expected.length > 0,
+      isMultiDocument: docs.length > 1,
+      stats,
+      docResults,
+      expectedStatsById,
+      uniqueSigners: Array.from(uniqueSignersMap.values())
+    };
+  }
+
   function getSampleReportRows() {
     return [
       ['Наименование файла', 'Шифр проекта', 'Наименование проекта', '№ договора', '№ этапа', 'Наименование документа'],
+      // Документ 1 — 8 сертификатов (один из них истекает 03.12.2026)
       ['960-02-232110-02-МПЦ2.1 (Пост ЭЦ).pdf', '00.0001', '010101_Тест', '', '', 'Чертеж - Раздел 1 «Пояснительная записка»'],
       ['Подпись действительна'],
       ['Время подписи по Гринвичу: 12.11.2026 10:47:48'],
@@ -980,8 +1185,8 @@
       ['Действует до: 10.03.2027 07:01:21'],
       ['Серийный номер: 52A85FA768F927954212DB55019CD68C'],
       ['Отпечаток сертификата: BD9B2A7E2152AEBB4E393EBAF175E88AD6FA66EC'],
-      ['Время подписи по Гринвичу: 12.11.2026 10:39:56'],
-      ['Время подписи по МСК: 12.11.2026 13:39:56'],
+      ['Время подписи по Гринвичу: 12.11.2026 10:45:20'],
+      ['Время подписи по МСК: 12.11.2026 13:45:20'],
       ['Формат подписи: CAdES-XLT1 (долгосрочная расширенная подпись со штампом времени на всей подписи)'],
       ['Информация о сертификате 4:'],
       ['Субъект: CN=Кудряшова Ольга Евгеньевна, SN=Кудряшова, G=Ольга Евгеньевна, C=RU, E=koe@szdpro.ru'],
@@ -990,46 +1195,59 @@
       ['Действует до: 06.03.2027 10:21:22'],
       ['Серийный номер: 15B41643FD9B3F954EBF87A1019CC2AA'],
       ['Отпечаток сертификата: 377CBF3B72CB5B462591966AC366EFBFD0D45251'],
-      ['Время подписи по Гринвичу: 12.11.2026 10:45:20'],
-      ['Время подписи по МСК: 12.11.2026 13:45:20'],
+      ['Время подписи по Гринвичу: 12.11.2026 12:13:53'],
+      ['Время подписи по МСК: 12.11.2026 15:13:53'],
       ['Формат подписи: CAdES-XLT1 (долгосрочная расширенная подпись со штампом времени на всей подписи)'],
       ['Информация о сертификате 5:'],
+      ['Субъект: CN=Ашихмин Андрей Алексеевич, SN=Ашихмин, G=Андрей Алексеевич, C=RU, E=3a-cube@mail.ru'],
+      ['Издатель: CN=ООО ТАКСКОМ, O=ООО ТАКСКОМ, OU=Удостоверяющий центр, STREET=Барыковский пер., д. 4, стр. 2, L=Москва, S=77 Москва, C=RU, ИНН ЮЛ=7704211201, ОГРН=1027700071530'],
+      ['Действует с: 03.12.2025 09:20:34'],
+      ['Действует до: 03.12.2026 09:30:34'],
+      ['Серийный номер: 051AB69C00A8B38D9A48C0E749A7D5298D'],
+      ['Отпечаток сертификата: 1A4E56B0425F136CD80CB245CEB6CA3FDD46C9D1'],
+      // Документ 2 — отличается состав подписантов (недостает Кудряшовой и Ашихмина, но есть Алтухов и Степаненко)
+      ['960-02-232110-02-СЦБ300.2.pdf', '00.0001', '010101_Тест', '', '', 'Чертеж - Раздел 2 «Схемы кабельные»'],
+      ['Подпись действительна'],
+      ['Время подписи по Гринвичу: 12.11.2026 10:47:55'],
+      ['Время подписи по МСК: 12.11.2026 13:47:55'],
+      ['Формат подписи: CAdES-XLT1 (долгосрочная расширенная подпись со штампом времени на всей подписи)'],
+      ['Информация о сертификате 1:'],
+      ['Субъект: CN=Минаев Олег Борисович, SN=Минаев, G=Олег Борисович, C=RU, E=mob@szdpro.ru'],
+      ['Издатель: CN=ООО ТАКСКОМ, O=ООО ТАКСКОМ, OU=Удостоверяющий Центр, S=77 Москва, L=Москва, STREET=пер. Барыковский, д. 4, стр. 2, C=RU, ОГРН=1027700071530, ИНН ЮЛ=7704211201'],
+      ['Действует с: 13.03.2026 06:11:15'],
+      ['Действует до: 13.03.2027 06:21:15'],
+      ['Серийный номер: 417238D5EBDF248243CD3916019CE5DB'],
+      ['Отпечаток сертификата: CC334369C57526E1702241E093AE3A33BB01848A'],
+      ['Время подписи по Гринвичу: 12.11.2026 10:34:40'],
+      ['Время подписи по МСК: 12.11.2026 13:34:40'],
+      ['Формат подписи: CAdES-XLT1 (долгосрочная расширенная подпись со штампом времени на всей подписи)'],
+      ['Информация о сертификате 2:'],
+      ['Субъект: CN=Лисаков Илья Михайлович, SN=Лисаков, G=Илья Михайлович, C=RU, E=lim@szdpro.ru'],
+      ['Издатель: CN=ООО ТАКСКОМ, O=ООО ТАКСКОМ, OU=Удостоверяющий Центр, S=77 Москва, L=Москва, STREET=пер. Барыковский, д. 4, стр. 2, C=RU, ОГРН=1027700071530, ИНН ЮЛ=7704211201'],
+      ['Действует с: 11.03.2026 11:26:14'],
+      ['Действует до: 11.03.2027 11:36:14'],
+      ['Серийный номер: 061B8222E01BA6BE4731E0CF019CDCAE'],
+      ['Отпечаток сертификата: 614C4BA71CAC2791426E598E4CCC4112885EC402'],
+      ['Время подписи по Гринвичу: 12.11.2026 10:37:12'],
+      ['Время подписи по МСК: 12.11.2026 13:37:12'],
+      ['Формат подписи: CAdES-XLT1 (долгосрочная расширенная подпись со штампом времени на всей подписи)'],
+      ['Информация о сертификате 3:'],
       ['Субъект: CN=Алтухов Андрей Александрович, SN=Алтухов, G=Андрей Александрович, C=RU, E=alaa@szdpro.ru'],
       ['Издатель: CN=ООО ТАКСКОМ, O=ООО ТАКСКОМ, OU=Удостоверяющий Центр, S=77 Москва, L=Москва, STREET=пер. Барыковский, д. 4, стр. 2, C=RU, ОГРН=1027700071530, ИНН ЮЛ=7704211201'],
       ['Действует с: 12.03.2026 09:11:28'],
       ['Действует до: 12.03.2027 09:21:28'],
       ['Серийный номер: 211890E35E0C08814DA9D8D2019CE159'],
       ['Отпечаток сертификата: 1413D87B2689BCF61681F707BAD401095B8E7CF9'],
-      ['Время подписи по Гринвичу: 12.11.2026 10:37:12'],
-      ['Время подписи по МСК: 12.11.2026 13:37:12'],
+      ['Время подписи по Гринвичу: 13.11.2026 11:43:45'],
+      ['Время подписи по МСК: 13.11.2026 14:43:45'],
       ['Формат подписи: CAdES-XLT1 (долгосрочная расширенная подпись со штампом времени на всей подписи)'],
-      ['Информация о сертификате 6:'],
+      ['Информация о сертификате 4:'],
       ['Субъект: CN=Степаненко Светлана Владимировна, SN=Степаненко, G=Светлана Владимировна, C=RU, E=ssvl@szdpro.ru'],
       ['Издатель: CN=ООО ТАКСКОМ, O=ООО ТАКСКОМ, OU=Удостоверяющий Центр, S=77 Москва, L=Москва, STREET=пер. Барыковский, д. 4, стр. 2, C=RU, ОГРН=1027700071530, ИНН ЮЛ=7704211201'],
       ['Действует с: 12.03.2026 11:41:18'],
       ['Действует до: 12.03.2027 11:51:18'],
       ['Серийный номер: 379E7ED673581481475F055C019CE1E3'],
-      ['Отпечаток сертификата: 92FCA96116B0754182CB5307532CDDAF610CAD49'],
-      ['Время подписи по Гринвичу: 13.11.2026 11:43:45'],
-      ['Время подписи по МСК: 13.11.2026 14:43:45'],
-      ['Формат подписи: CAdES-XLT1 (долгосрочная расширенная подпись со штампом времени на всей подписи)'],
-      ['Информация о сертификате 7:'],
-      ['Субъект: CN=Смирнов Дмитрий Михайлович, SN=Смирнов, G=Дмитрий Михайлович, C=RU, E=SmirnovDM@rzdp.ru'],
-      ['Издатель: CN=ООО ТАКСКОМ, O=ООО ТАКСКОМ, OU=Удостоверяющий Центр, S=77 Москва, L=Москва, STREET=пер. Барыковский, д. 4, стр. 2, C=RU, ОГРН=1027700071530, ИНН ЮЛ=7704211201'],
-      ['Действует с: 03.03.2026 13:11:17'],
-      ['Действует до: 03.03.2027 13:21:17'],
-      ['Серийный номер: 76E25FEDD628C488451F2DA1019CB3DC'],
-      ['Отпечаток сертификата: 315FB019091369B768BB2895C638E69D1756026E'],
-      ['Время подписи по Гринвичу: 12.11.2026 12:13:53'],
-      ['Время подписи по МСК: 12.11.2026 15:13:53'],
-      ['Формат подписи: CAdES-XLT1 (долгосрочная расширенная подпись со штампом времени на всей подписи)'],
-      ['Информация о сертификате 8:'],
-      ['Субъект: CN=Ашихмин Андрей Алексеевич, SN=Ашихмин, G=Андрей Алексеевич, C=RU, E=3a-cube@mail.ru'],
-      ['Издатель: CN=ООО ТАКСКОМ, O=ООО ТАКСКОМ, OU=Удостоверяющий центр, STREET=Барыковский пер., д. 4, стр. 2, L=Москва, S=77 Москва, C=RU, ИНН ЮЛ=7704211201, ОГРН=1027700071530'],
-      ['Действует с: 03.12.2025 09:20:34'],
-      ['Действует до: 03.12.2026 09:30:34'],
-      ['Серийный номер: 051AB69C00A8B38D9A48C0E749A7D5298D'],
-      ['Отпечаток сертификата: 1A4E56B0425F136CD80CB245CEB6CA3FDD46C9D1']
+      ['Отпечаток сертификата: 92FCA96116B0754182CB5307532CDDAF610CAD49']
     ];
   }
 
@@ -1041,12 +1259,11 @@
     parseX509Subject,
     parseDateValue,
     formatDateDisplay,
-    formatDateShort,
     evaluateCertificateValidity,
     parseWorkbookSheet,
     doesSignerMatchCertificate,
     reconcileSigners,
-    getSampleReportRows,
-    MONTHS_RU
+    reconcilePackage,
+    getSampleReportRows
   };
 })(window);

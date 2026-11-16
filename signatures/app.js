@@ -22,7 +22,10 @@
     fileName: '',
     isSample: false,
     parseResult: null,
+    packageReconciliation: null,
     reconciliation: null,
+    selectedDocIndex: 0,
+    docFilter: 'all',
     customMapping: null,
     showMappingBar: false,
     activeFilter: 'all',
@@ -48,6 +51,7 @@
     mapNameCol: document.getElementById('mapNameCol'),
     mapValidToCol: document.getElementById('mapValidToCol'),
     mapSignedAtCol: document.getElementById('mapSignedAtCol'),
+    mapFileCol: document.getElementById('mapFileCol'),
     reportErrorAlert: document.getElementById('reportErrorAlert'),
 
     addSurnameForm: document.getElementById('addSurnameForm'),
@@ -72,13 +76,27 @@
     expectedSignersContainer: document.getElementById('expectedSignersContainer'),
 
     kpiSection: document.getElementById('kpiSection'),
+    kpiLabel1: document.getElementById('kpiLabel1'),
+    kpiLabel2: document.getElementById('kpiLabel2'),
+    kpiLabel3: document.getElementById('kpiLabel3'),
+    kpiLabel4: document.getElementById('kpiLabel4'),
+    kpiLabel5: document.getElementById('kpiLabel5'),
     kpiTotalInReport: document.getElementById('kpiTotalInReport'),
     kpiTotalExpected: document.getElementById('kpiTotalExpected'),
     kpiMatched: document.getElementById('kpiMatched'),
     kpiMissing: document.getElementById('kpiMissing'),
     kpiExtraOrCert: document.getElementById('kpiExtraOrCert'),
 
+    documentsPackagePanel: document.getElementById('documentsPackagePanel'),
+    packageDocsCountText: document.getElementById('packageDocsCountText'),
+    packageDocsTableBody: document.getElementById('packageDocsTableBody'),
+
     resultsPanel: document.getElementById('resultsPanel'),
+    activeDocBanner: document.getElementById('activeDocBanner'),
+    activeDocSub: document.getElementById('activeDocSub'),
+    activeDocTitle: document.getElementById('activeDocTitle'),
+    btnPrevDoc: document.getElementById('btnPrevDoc'),
+    btnNextDoc: document.getElementById('btnNextDoc'),
     resultsSearchInput: document.getElementById('resultsSearchInput'),
     btnCopySummary: document.getElementById('btnCopySummary'),
     emptyExpectedHint: document.getElementById('emptyExpectedHint'),
@@ -345,21 +363,39 @@
       return;
     }
 
-    const certs = state.parseResult ? state.parseResult.certificates : [];
-    const hasReport = Boolean(state.parseResult && certs.length > 0);
+    const pkg = state.packageReconciliation;
+    const isMulti = Boolean(pkg && pkg.isMultiDocument);
+    const activeDocResult = getActiveDocResult();
+    const certs = activeDocResult ? activeDocResult.doc.certificates : (state.parseResult ? state.parseResult.certificates : []);
+    const hasReport = Boolean(state.parseResult && state.parseResult.certificates.length > 0);
 
     container.innerHTML = state.expected.map((item) => {
       let badgeHtml = '';
       if (hasReport) {
-        const matched = certs.filter((c) => Parser.doesSignerMatchCertificate(item.query, c));
-        if (matched.length === 0) {
-          badgeHtml = `<span class="ep-status ep-status-err"><i class="bx bx-x-circle"></i>Нет в отчете</span>`;
-        } else if (matched.some((c) => c.certStatus === 'expired')) {
-          badgeHtml = `<span class="ep-status ep-status-err"><i class="bx bx-error-circle"></i>Просрочен ЭП</span>`;
-        } else if (matched.some((c) => c.certStatus === 'expiring_soon')) {
-          badgeHtml = `<span class="ep-status ep-status-warn"><i class="bx bx-time-five"></i>Истекает ЭП</span>`;
+        if (isMulti && pkg.expectedStatsById && pkg.expectedStatsById[item.id]) {
+          const st = pkg.expectedStatsById[item.id];
+          if (st.signedDocsCount === 0) {
+            badgeHtml = `<span class="ep-status ep-status-err"><i class="bx bx-x-circle"></i>Нет ни в 1 файле</span>`;
+          } else if (st.signedDocsCount < st.totalDocs) {
+            badgeHtml = `<span class="ep-status ep-status-err" title="Нет в файлах: ${escapeHtml(st.missingInDocs.join(', '))}"><i class="bx bx-error-circle"></i>${st.signedDocsCount}/${st.totalDocs} файлов</span>`;
+          } else if (st.hasExpired) {
+            badgeHtml = `<span class="ep-status ep-status-err"><i class="bx bx-error-circle"></i>${st.signedDocsCount}/${st.totalDocs} · Просрочен</span>`;
+          } else if (st.hasExpiringSoon) {
+            badgeHtml = `<span class="ep-status ep-status-warn"><i class="bx bx-time-five"></i>${st.signedDocsCount}/${st.totalDocs} · Истекает</span>`;
+          } else {
+            badgeHtml = `<span class="ep-status ep-status-ok"><i class="bx bx-check-circle"></i>${st.signedDocsCount}/${st.totalDocs} файлов</span>`;
+          }
         } else {
-          badgeHtml = `<span class="ep-status ep-status-ok"><i class="bx bx-check-circle"></i>Подписан</span>`;
+          const matched = certs.filter((c) => Parser.doesSignerMatchCertificate(item.query, c));
+          if (matched.length === 0) {
+            badgeHtml = `<span class="ep-status ep-status-err"><i class="bx bx-x-circle"></i>Нет в отчете</span>`;
+          } else if (matched.some((c) => c.certStatus === 'expired')) {
+            badgeHtml = `<span class="ep-status ep-status-err"><i class="bx bx-error-circle"></i>Просрочен ЭП</span>`;
+          } else if (matched.some((c) => c.certStatus === 'expiring_soon')) {
+            badgeHtml = `<span class="ep-status ep-status-warn"><i class="bx bx-time-five"></i>Истекает ЭП</span>`;
+          } else {
+            badgeHtml = `<span class="ep-status ep-status-ok"><i class="bx bx-check-circle"></i>Подписан</span>`;
+          }
         }
       }
 
@@ -379,9 +415,20 @@
     }).join('');
   }
 
+  function getActiveDocResult() {
+    if (!state.packageReconciliation || !state.packageReconciliation.docResults.length) {
+      return null;
+    }
+    const idx = Math.max(0, Math.min(state.selectedDocIndex, state.packageReconciliation.docResults.length - 1));
+    return state.packageReconciliation.docResults[idx] || null;
+  }
+
   function renderDocumentMetadata() {
     if (!els.docMetaSection || !els.docMetaGrid) return;
-    const meta = state.parseResult && state.parseResult.docMeta ? state.parseResult.docMeta : null;
+    const activeDocRes = getActiveDocResult();
+    const meta = activeDocRes
+      ? activeDocRes.doc.docMeta
+      : (state.parseResult && state.parseResult.docMeta ? state.parseResult.docMeta : null);
     if (!meta) {
       els.docMetaSection.classList.add('d-none');
       return;
@@ -451,11 +498,48 @@
     if (els.mapNameCol) els.mapNameCol.innerHTML = buildOptions(mapping.nameCol ?? 0, false);
     if (els.mapValidToCol) els.mapValidToCol.innerHTML = buildOptions(mapping.validToCol ?? -1, true);
     if (els.mapSignedAtCol) els.mapSignedAtCol.innerHTML = buildOptions(mapping.signedAtCol ?? -1, true);
+    if (els.mapFileCol) els.mapFileCol.innerHTML = buildOptions(mapping.fileCol ?? -1, true);
   }
 
-  function renderKpis(reconcile) {
-    if (!els.kpiSection || !reconcile) return;
+  function renderKpis() {
+    if (!els.kpiSection || !state.packageReconciliation) return;
     els.kpiSection.classList.remove('d-none');
+
+    const pkg = state.packageReconciliation;
+    if (pkg.isMultiDocument) {
+      const s = pkg.stats;
+      const hasExp = pkg.hasExpectedList;
+
+      if (els.kpiLabel1) els.kpiLabel1.textContent = 'Документов в отчете';
+      if (els.kpiLabel2) els.kpiLabel2.textContent = 'Ожидается на файл';
+      if (els.kpiLabel3) els.kpiLabel3.textContent = 'Файлов без пропусков';
+      if (els.kpiLabel4) els.kpiLabel4.textContent = 'Файлов с недостачей';
+      if (els.kpiLabel5) els.kpiLabel5.textContent = 'С лишними / Срок ЭП';
+
+      els.kpiTotalInReport.textContent = String(s.docCount);
+      els.kpiTotalExpected.textContent = hasExp ? String(state.expected.length) : '—';
+
+      els.kpiMatched.textContent = hasExp ? `${s.docsComplete} / ${s.docCount}` : '—';
+      els.kpiMatched.style.color = hasExp && s.docsComplete === s.docCount ? 'var(--ep-ok)' : 'var(--ep-text)';
+
+      els.kpiMissing.textContent = hasExp ? String(s.docsWithMissing) : '—';
+      els.kpiMissing.style.color = hasExp && s.docsWithMissing > 0 ? 'var(--ep-err)' : 'var(--ep-text)';
+
+      els.kpiExtraOrCert.textContent = `${hasExp ? s.docsWithExtra : 0} / ${s.docsWithCertIssues}`;
+      els.kpiExtraOrCert.style.color = s.docsWithCertIssues > 0 || (hasExp && s.docsWithExtra > 0)
+        ? 'var(--ep-warn)'
+        : 'var(--ep-text)';
+      return;
+    }
+
+    const reconcile = state.reconciliation;
+    if (!reconcile) return;
+
+    if (els.kpiLabel1) els.kpiLabel1.textContent = 'Подписали в отчете';
+    if (els.kpiLabel2) els.kpiLabel2.textContent = 'Ожидается по списку';
+    if (els.kpiLabel3) els.kpiLabel3.textContent = 'Совпали';
+    if (els.kpiLabel4) els.kpiLabel4.textContent = 'Недостает подписей';
+    if (els.kpiLabel5) els.kpiLabel5.textContent = 'Лишние / Срок ЭП';
 
     const { stats, hasExpectedList } = reconcile;
     const certProblems = stats.expiredCount + stats.expiringSoonCount;
@@ -477,6 +561,103 @@
     els.kpiExtraOrCert.style.color = (stats.expiredCount > 0)
       ? 'var(--ep-err)'
       : ((stats.extraCount > 0 || certProblems > 0) ? 'var(--ep-warn)' : 'var(--ep-text)');
+  }
+
+  function buildDocPackageStatusPill(dr, hasExpectedList) {
+    if (dr.hasExpired) {
+      return `<span class="ep-status ep-status-err"><i class="bx bx-error-circle"></i>Просрочен ЭП</span>`;
+    }
+    if (hasExpectedList && dr.hasMissing) {
+      return `<span class="ep-status ep-status-err"><i class="bx bx-x-circle"></i>Недостает ЭП</span>`;
+    }
+    if (dr.hasExpiringSoon) {
+      return `<span class="ep-status ep-status-warn"><i class="bx bx-time-five"></i>Истекает ЭП</span>`;
+    }
+    if (hasExpectedList && dr.hasExtra) {
+      return `<span class="ep-status ep-status-warn"><i class="bx bx-user-plus"></i>Есть лишние</span>`;
+    }
+    if (hasExpectedList) {
+      return `<span class="ep-status ep-status-ok"><i class="bx bx-check-circle"></i>Полный состав</span>`;
+    }
+    return `<span class="ep-status ep-status-neutral"><i class="bx bx-file"></i>Без замечаний</span>`;
+  }
+
+  function renderDocumentsPackagePanel() {
+    if (!els.documentsPackagePanel || !els.packageDocsTableBody) return;
+    const pkg = state.packageReconciliation;
+
+    if (!pkg || !pkg.isMultiDocument) {
+      els.documentsPackagePanel.classList.add('d-none');
+      return;
+    }
+
+    els.documentsPackagePanel.classList.remove('d-none');
+    const allDocs = pkg.docResults;
+    const issuesDocs = allDocs.filter((d) => d.hasAnyIssue);
+    const okDocs = allDocs.filter((d) => !d.hasAnyIssue);
+
+    if (els.packageDocsCountText) {
+      els.packageDocsCountText.textContent = pkg.hasExpectedList
+        ? `Всего файлов: ${allDocs.length} · С замечаниями: ${issuesDocs.length} · Кликните по строке для просмотра подписей`
+        : `Всего файлов: ${allDocs.length} · Выберите документ, чтобы просмотреть его подписантов`;
+    }
+
+    const docFilterCounts = {
+      all: allDocs.length,
+      issues: issuesDocs.length,
+      ok: okDocs.length
+    };
+    const docFilterLabels = {
+      all: 'Все',
+      issues: 'С замечаниями',
+      ok: 'Без замечаний'
+    };
+    document.querySelectorAll('.ep-doc-filter-btn').forEach((btn) => {
+      const f = btn.getAttribute('data-doc-filter');
+      btn.classList.toggle('is-active', f === state.docFilter);
+      btn.textContent = `${docFilterLabels[f] || f} (${docFilterCounts[f] ?? 0})`;
+    });
+
+    let visibleDocs = allDocs;
+    if (state.docFilter === 'issues') {
+      visibleDocs = issuesDocs;
+    } else if (state.docFilter === 'ok') {
+      visibleDocs = okDocs;
+    }
+
+    if (visibleDocs.length === 0) {
+      els.packageDocsTableBody.innerHTML = `
+        <tr>
+          <td colspan="7" class="text-center py-3 text-muted">
+            Документов по выбранному фильтру нет.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    els.packageDocsTableBody.innerHTML = visibleDocs.map((dr) => {
+      const doc = dr.doc;
+      const s = dr.reconciliation.stats;
+      const isSelected = doc.index === state.selectedDocIndex;
+      const title = doc.docMeta.fileName || `Документ ${doc.index + 1}`;
+      const sub = doc.docMeta.docName && doc.docMeta.docName !== title ? doc.docMeta.docName : '';
+
+      return `
+        <tr class="ep-doc-row ${isSelected ? 'is-selected' : ''}" data-doc-index="${doc.index}">
+          <td class="ep-tabular text-muted">${doc.index + 1}</td>
+          <td>
+            <div class="fw-semibold">${escapeHtml(title)}</div>
+            ${sub ? `<div class="small text-muted text-truncate" style="max-width: 360px;">${escapeHtml(sub)}</div>` : ''}
+          </td>
+          <td class="ep-tabular">${s.totalInReport}</td>
+          <td class="ep-tabular">${pkg.hasExpectedList ? s.matchedCount : '—'}</td>
+          <td class="ep-tabular ${pkg.hasExpectedList && s.missingCount > 0 ? 'text-danger fw-bold' : ''}">${pkg.hasExpectedList ? s.missingCount : '—'}</td>
+          <td class="ep-tabular ${pkg.hasExpectedList && s.extraCount > 0 ? 'text-warning fw-semibold' : ''}">${pkg.hasExpectedList ? s.extraCount : '—'}</td>
+          <td>${buildDocPackageStatusPill(dr, pkg.hasExpectedList)}</td>
+        </tr>
+      `;
+    }).join('');
   }
 
   function buildStatusPill(row) {
@@ -550,6 +731,26 @@
     if (!els.resultsPanel || !els.resultsTableBody || !state.reconciliation) return;
     els.resultsPanel.classList.remove('d-none');
 
+    const pkg = state.packageReconciliation;
+    const activeDocRes = getActiveDocResult();
+    if (els.activeDocBanner) {
+      if (pkg && pkg.isMultiDocument && activeDocRes) {
+        const totalDocs = pkg.docResults.length;
+        const pos = activeDocRes.doc.index + 1;
+        els.activeDocBanner.classList.remove('d-none');
+        if (els.activeDocSub) {
+          els.activeDocSub.textContent = `Документ ${pos} из ${totalDocs}`;
+        }
+        if (els.activeDocTitle) {
+          els.activeDocTitle.textContent = activeDocRes.doc.docMeta.fileName || `Документ ${pos}`;
+        }
+        if (els.btnPrevDoc) els.btnPrevDoc.disabled = activeDocRes.doc.index <= 0;
+        if (els.btnNextDoc) els.btnNextDoc.disabled = activeDocRes.doc.index >= totalDocs - 1;
+      } else {
+        els.activeDocBanner.classList.add('d-none');
+      }
+    }
+
     if (els.emptyExpectedHint) {
       els.emptyExpectedHint.classList.toggle('d-none', state.reconciliation.hasExpectedList);
     }
@@ -572,7 +773,7 @@
       cert_issues: 'Срок ЭП'
     };
 
-    document.querySelectorAll('.ep-filter-btn').forEach((btn) => {
+    document.querySelectorAll('.ep-res-filter-btn').forEach((btn) => {
       const f = btn.getAttribute('data-filter');
       btn.classList.toggle('is-active', f === state.activeFilter);
       btn.textContent = `${labelsByFilter[f] || f} (${countsByFilter[f] ?? 0})`;
@@ -688,32 +889,64 @@
     }).join('');
   }
 
-  function recalculateAndRenderResults() {
-    renderExpectedList();
+  function selectDocument(docIndex) {
+    if (!state.packageReconciliation || !state.packageReconciliation.docResults.length) return;
+    const maxIdx = state.packageReconciliation.docResults.length - 1;
+    state.selectedDocIndex = Math.max(0, Math.min(docIndex, maxIdx));
+    state.expandedRows.clear();
 
+    const activeDocRes = getActiveDocResult();
+    state.reconciliation = activeDocRes ? activeDocRes.reconciliation : null;
+
+    renderDocumentMetadata();
+    renderDocumentsPackagePanel();
+    renderResultsTable();
+  }
+
+  function recalculateAndRenderResults() {
     if (!state.parseResult) {
+      state.packageReconciliation = null;
+      state.reconciliation = null;
+      renderExpectedList();
       if (els.kpiSection) els.kpiSection.classList.add('d-none');
+      if (els.documentsPackagePanel) els.documentsPackagePanel.classList.add('d-none');
       if (els.resultsPanel) els.resultsPanel.classList.add('d-none');
       return;
     }
 
-    state.reconciliation = Parser.reconcileSigners(state.parseResult.certificates, state.expected);
-    renderKpis(state.reconciliation);
+    const docs = Array.isArray(state.parseResult.documents) && state.parseResult.documents.length > 0
+      ? state.parseResult.documents
+      : [{ index: 0, id: 'doc_0', docMeta: state.parseResult.docMeta || {}, certificates: state.parseResult.certificates || [] }];
+
+    state.packageReconciliation = Parser.reconcilePackage(docs, state.expected);
+    if (state.selectedDocIndex >= docs.length) {
+      state.selectedDocIndex = 0;
+    }
+    const activeDocRes = getActiveDocResult();
+    state.reconciliation = activeDocRes ? activeDocRes.reconciliation : null;
+
+    renderExpectedList();
+    renderDocumentMetadata();
+    renderKpis();
+    renderDocumentsPackagePanel();
     renderResultsTable();
   }
 
   function parseActiveRows(mappingOverride) {
     const mapToUse = mappingOverride || state.customMapping;
     state.parseResult = Parser.parseWorkbookSheet(state.rawRows, state.formattedRows, mapToUse, new Date());
+    state.selectedDocIndex = 0;
+    state.docFilter = 'all';
 
     if (els.activeReportModeInfo) {
+      const docCount = state.parseResult.documents ? state.parseResult.documents.length : 0;
       const modeLabel = state.parseResult.mode === 'protocol'
         ? 'Распознан протокол сертификатов ЭП'
         : (state.parseResult.mode === 'tabular' ? 'Табличный режим разбора' : 'Подписи не найдены');
-      els.activeReportModeInfo.textContent = `${modeLabel} · Сертификатов: ${state.parseResult.certificates.length}`;
+      const docPart = docCount > 1 ? ` · Документов: ${docCount}` : '';
+      els.activeReportModeInfo.textContent = `${modeLabel}${docPart} · Сертификатов: ${state.parseResult.certificates.length}`;
     }
 
-    renderDocumentMetadata();
     renderColumnMappingBar();
     recalculateAndRenderResults();
   }
@@ -831,7 +1064,10 @@
     state.fileName = '';
     state.isSample = false;
     state.parseResult = null;
+    state.packageReconciliation = null;
     state.reconciliation = null;
+    state.selectedDocIndex = 0;
+    state.docFilter = 'all';
     state.expandedRows.clear();
 
     if (els.reportFileInput) els.reportFileInput.value = '';
@@ -843,33 +1079,68 @@
   }
 
   function copyVerificationSummary() {
-    if (!state.reconciliation || !state.parseResult) return;
-    const meta = state.parseResult.docMeta || {};
-    const rec = state.reconciliation;
+    if (!state.packageReconciliation || !state.parseResult) return;
+    const pkg = state.packageReconciliation;
     const lines = [];
 
-    lines.push(`Проверка ЭП — ${meta.fileName || state.fileName}`);
-    if (meta.docName) lines.push(`Документ: ${meta.docName}`);
-    lines.push(`Подписали в отчете: ${rec.stats.totalInReport}`);
-
-    if (rec.hasExpectedList) {
-      lines.push(`Ожидалось: ${rec.stats.totalExpected}, совпало: ${rec.stats.matchedCount}`);
-      if (rec.missingItems.length > 0) {
-        lines.push(`Недостающие подписи (${rec.missingItems.length}): ${rec.missingItems.map((m) => m.expectedQuery).join(', ')}`);
+    if (pkg.isMultiDocument) {
+      const s = pkg.stats;
+      lines.push(`Проверка ЭП по пакету — ${state.fileName}`);
+      lines.push(`Документов в отчете: ${s.docCount} · Без пропусков: ${s.docsComplete}`);
+      if (pkg.hasExpectedList) {
+        lines.push(`Ожидалось подписантов на каждый файл: ${state.expected.length}`);
       }
-      if (rec.extraItems.length > 0) {
-        lines.push(`Лишние подписи (${rec.extraItems.length}): ${rec.extraItems.map((e) => e.cert.fullName).join(', ')}`);
+      const docsWithIssues = pkg.docResults.filter((dr) => dr.hasAnyIssue);
+      if (docsWithIssues.length === 0) {
+        lines.push('Замечаний по документам не выявлено.');
+      } else {
+        lines.push(`Документы с замечаниями (${docsWithIssues.length}):`);
+        docsWithIssues.forEach((dr) => {
+          const title = dr.doc.docMeta.fileName || `Документ ${dr.doc.index + 1}`;
+          const rec = dr.reconciliation;
+          const details = [];
+          if (rec.missingItems.length > 0) {
+            details.push(`нет подписей: ${rec.missingItems.map((m) => m.expectedQuery).join(', ')}`);
+          }
+          if (rec.extraItems.length > 0 && pkg.hasExpectedList) {
+            details.push(`лишние: ${rec.extraItems.map((e) => e.cert.surname || e.cert.fullName).join(', ')}`);
+          }
+          const badCerts = dr.doc.certificates.filter((c) => c.certStatus === 'expired' || c.certStatus === 'expiring_soon');
+          if (badCerts.length > 0) {
+            details.push(`срок ЭП: ${badCerts.map((c) => `${c.surname || c.fullName} (до ${c.validToDisplay})`).join(', ')}`);
+          }
+          lines.push(`- ${title}: ${details.join('; ')}`);
+        });
       }
-    }
+    } else if (state.reconciliation) {
+      const activeDocRes = getActiveDocResult();
+      const meta = activeDocRes ? activeDocRes.doc.docMeta : (state.parseResult.docMeta || {});
+      const rec = state.reconciliation;
 
-    const problemCerts = state.parseResult.certificates.filter(
-      (c) => c.certStatus === 'expired' || c.certStatus === 'expiring_soon'
-    );
-    if (problemCerts.length > 0) {
-      lines.push('Замечания по срокам ЭП:');
-      problemCerts.forEach((c) => {
-        lines.push(`- ${c.fullName}: действует до ${c.validToDisplay} (${c.validityLabel})`);
-      });
+      lines.push(`Проверка ЭП — ${meta.fileName || state.fileName}`);
+      if (meta.docName) lines.push(`Документ: ${meta.docName}`);
+      lines.push(`Подписали в отчете: ${rec.stats.totalInReport}`);
+
+      if (rec.hasExpectedList) {
+        lines.push(`Ожидалось: ${rec.stats.totalExpected}, совпало: ${rec.stats.matchedCount}`);
+        if (rec.missingItems.length > 0) {
+          lines.push(`Недостающие подписи (${rec.missingItems.length}): ${rec.missingItems.map((m) => m.expectedQuery).join(', ')}`);
+        }
+        if (rec.extraItems.length > 0) {
+          lines.push(`Лишние подписи (${rec.extraItems.length}): ${rec.extraItems.map((e) => e.cert.fullName).join(', ')}`);
+        }
+      }
+
+      const certs = activeDocRes ? activeDocRes.doc.certificates : state.parseResult.certificates;
+      const problemCerts = certs.filter(
+        (c) => c.certStatus === 'expired' || c.certStatus === 'expiring_soon'
+      );
+      if (problemCerts.length > 0) {
+        lines.push('Замечания по срокам ЭП:');
+        problemCerts.forEach((c) => {
+          lines.push(`- ${c.fullName}: действует до ${c.validToDisplay} (${c.validityLabel})`);
+        });
+      }
     }
 
     const text = lines.join('\n');
@@ -901,7 +1172,8 @@
       headerRowIndex: state.parseResult.mapping ? state.parseResult.mapping.headerRowIndex : 0,
       nameCol: els.mapNameCol ? parseInt(els.mapNameCol.value, 10) : 0,
       validToCol: els.mapValidToCol ? parseInt(els.mapValidToCol.value, 10) : -1,
-      signedAtCol: els.mapSignedAtCol ? parseInt(els.mapSignedAtCol.value, 10) : -1
+      signedAtCol: els.mapSignedAtCol ? parseInt(els.mapSignedAtCol.value, 10) : -1,
+      fileCol: els.mapFileCol ? parseInt(els.mapFileCol.value, 10) : -1
     };
     state.customMapping = mapping;
     saveMapping();
@@ -960,14 +1232,17 @@
       });
     }
 
-    [els.mapNameCol, els.mapValidToCol, els.mapSignedAtCol].forEach((sel) => {
+    [els.mapNameCol, els.mapValidToCol, els.mapSignedAtCol, els.mapFileCol].forEach((sel) => {
       if (sel) sel.addEventListener('change', applyCustomColumnMapping);
     });
 
     if (els.btnSaveAllFromReport) {
       els.btnSaveAllFromReport.addEventListener('click', () => {
         if (!state.parseResult || state.parseResult.certificates.length === 0) return;
-        const surnames = state.parseResult.certificates
+        const sourceCerts = (state.packageReconciliation && state.packageReconciliation.uniqueSigners.length)
+          ? state.packageReconciliation.uniqueSigners
+          : state.parseResult.certificates;
+        const surnames = sourceCerts
           .map((c) => c.surname || c.fullName)
           .filter(Boolean);
         const count = addSurnamesToDirectory(surnames, true);
@@ -1102,8 +1377,39 @@
       });
     }
 
+    // Package document switcher & filters
+    document.querySelectorAll('.ep-doc-filter-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.docFilter = btn.getAttribute('data-doc-filter') || 'all';
+        renderDocumentsPackagePanel();
+      });
+    });
+
+    if (els.packageDocsTableBody) {
+      els.packageDocsTableBody.addEventListener('click', (e) => {
+        const row = e.target.closest('.ep-doc-row');
+        if (!row) return;
+        const idx = parseInt(row.getAttribute('data-doc-index'), 10);
+        if (!isNaN(idx)) {
+          selectDocument(idx);
+        }
+      });
+    }
+
+    if (els.btnPrevDoc) {
+      els.btnPrevDoc.addEventListener('click', () => {
+        selectDocument(state.selectedDocIndex - 1);
+      });
+    }
+
+    if (els.btnNextDoc) {
+      els.btnNextDoc.addEventListener('click', () => {
+        selectDocument(state.selectedDocIndex + 1);
+      });
+    }
+
     // Filter tabs & search
-    document.querySelectorAll('.ep-filter-btn').forEach((btn) => {
+    document.querySelectorAll('.ep-res-filter-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         state.activeFilter = btn.getAttribute('data-filter') || 'all';
         renderResultsTable();

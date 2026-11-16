@@ -339,6 +339,32 @@
       flex-shrink: 0;
     }
 
+    /* Multi-document package table & switcher */
+    .ep-doc-list-wrap {
+      max-height: 290px;
+      overflow-y: auto;
+    }
+
+    .ep-doc-row {
+      cursor: pointer;
+      transition: background-color 0.14s ease;
+    }
+
+    .ep-doc-row.is-selected td {
+      background-color: rgba(37, 99, 235, 0.08) !important;
+    }
+
+    .ep-active-doc-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.7rem 1.25rem;
+      background-color: var(--ep-surface-muted);
+      border-bottom: 1px solid var(--ep-border);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       * {
         transition-duration: 0.01ms !important;
@@ -558,17 +584,21 @@
               <div id="columnMappingBar" class="pt-3 mt-3 border-top d-none">
                 <div class="small fw-semibold mb-2">Соответствие столбцов таблицы (для нестандартных выгрузок):</div>
                 <div class="row g-2 align-items-end">
-                  <div class="col-12 col-md-4">
+                  <div class="col-12 col-md-3">
                     <label for="mapNameCol" class="form-label small text-muted mb-1">Столбец ФИО / Подписанта</label>
                     <select id="mapNameCol" class="form-select form-select-sm"></select>
                   </div>
-                  <div class="col-12 col-md-4">
+                  <div class="col-12 col-md-3">
                     <label for="mapValidToCol" class="form-label small text-muted mb-1">Столбец «Действует до»</label>
                     <select id="mapValidToCol" class="form-select form-select-sm"></select>
                   </div>
-                  <div class="col-12 col-md-4">
+                  <div class="col-12 col-md-3">
                     <label for="mapSignedAtCol" class="form-label small text-muted mb-1">Дата / время подписи (опц.)</label>
                     <select id="mapSignedAtCol" class="form-select form-select-sm"></select>
+                  </div>
+                  <div class="col-12 col-md-3">
+                    <label for="mapFileCol" class="form-label small text-muted mb-1">Файл / документ (опц.)</label>
+                    <select id="mapFileCol" class="form-select form-select-sm"></select>
                   </div>
                 </div>
               </div>
@@ -582,36 +612,82 @@
         <!-- KPI Summary Strip -->
         <section id="kpiSection" class="ep-kpi-grid d-none" aria-label="Сводка проверки ЭП">
           <div class="ep-kpi-cell">
-            <div class="ep-kpi-label">Подписали в отчете</div>
+            <div id="kpiLabel1" class="ep-kpi-label">Подписали в отчете</div>
             <div id="kpiTotalInReport" class="ep-kpi-value ep-tabular">0</div>
           </div>
           <div class="ep-kpi-cell">
-            <div class="ep-kpi-label">Ожидается по списку</div>
+            <div id="kpiLabel2" class="ep-kpi-label">Ожидается по списку</div>
             <div id="kpiTotalExpected" class="ep-kpi-value ep-tabular">0</div>
           </div>
           <div class="ep-kpi-cell">
-            <div class="ep-kpi-label">Совпали</div>
+            <div id="kpiLabel3" class="ep-kpi-label">Совпали</div>
             <div id="kpiMatched" class="ep-kpi-value ep-tabular">0</div>
           </div>
           <div class="ep-kpi-cell">
-            <div class="ep-kpi-label">Недостает подписей</div>
+            <div id="kpiLabel4" class="ep-kpi-label">Недостает подписей</div>
             <div id="kpiMissing" class="ep-kpi-value ep-tabular">0</div>
           </div>
           <div class="ep-kpi-cell">
-            <div class="ep-kpi-label">Лишние / Срок ЭП</div>
+            <div id="kpiLabel5" class="ep-kpi-label">Лишние / Срок ЭП</div>
             <div id="kpiExtraOrCert" class="ep-kpi-value ep-tabular">0 / 0</div>
+          </div>
+        </section>
+
+        <!-- Multi-Document Package Overview Panel (visible when report has > 1 file) -->
+        <section id="documentsPackagePanel" class="ep-panel d-none" aria-label="Документы в отчете">
+          <div class="ep-panel-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div>
+              <h2 class="h6 fw-bold mb-0">Документы в отчете</h2>
+              <div id="packageDocsCountText" class="small text-muted">Выберите строку документа, чтобы проверить его подписи</div>
+            </div>
+            <div class="ep-filter-bar" role="tablist" aria-label="Фильтр документов">
+              <button type="button" class="ep-filter-btn ep-doc-filter-btn is-active" data-doc-filter="all">Все</button>
+              <button type="button" class="ep-filter-btn ep-doc-filter-btn" data-doc-filter="issues">С замечаниями</button>
+              <button type="button" class="ep-filter-btn ep-doc-filter-btn" data-doc-filter="ok">Без замечаний</button>
+            </div>
+          </div>
+          <div class="table-responsive ep-doc-list-wrap">
+            <table class="table table-hover mb-0 ep-table">
+              <thead>
+                <tr>
+                  <th style="width: 48px;">№</th>
+                  <th>Файл / Документ</th>
+                  <th>Подписали</th>
+                  <th>Совпало</th>
+                  <th>Недостает</th>
+                  <th>Лишние</th>
+                  <th>Статус файла</th>
+                </tr>
+              </thead>
+              <tbody id="packageDocsTableBody"></tbody>
+            </table>
           </div>
         </section>
 
         <!-- Results Table Panel -->
         <section id="resultsPanel" class="ep-panel d-none" aria-label="Результаты проверки подписей">
+          <div id="activeDocBanner" class="ep-active-doc-bar d-none">
+            <div class="min-width-0">
+              <div class="small text-muted" id="activeDocSub">Выбранный документ</div>
+              <div class="fw-bold text-truncate" id="activeDocTitle">—</div>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+              <button type="button" id="btnPrevDoc" class="btn btn-outline-secondary btn-sm ep-btn-nowrap py-1 px-2">
+                <i class="bx bx-chevron-left"></i> Пред.
+              </button>
+              <button type="button" id="btnNextDoc" class="btn btn-outline-secondary btn-sm ep-btn-nowrap py-1 px-2">
+                След. <i class="bx bx-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+
           <div class="ep-panel-header d-flex flex-wrap align-items-center justify-content-between gap-2">
             <div class="ep-filter-bar" role="tablist" aria-label="Фильтр результатов">
-              <button type="button" class="ep-filter-btn is-active" data-filter="all">Все</button>
-              <button type="button" class="ep-filter-btn" data-filter="matched">Совпали</button>
-              <button type="button" class="ep-filter-btn" data-filter="missing">Недостающие</button>
-              <button type="button" class="ep-filter-btn" data-filter="extra">Лишние</button>
-              <button type="button" class="ep-filter-btn" data-filter="cert_issues">Срок ЭП</button>
+              <button type="button" class="ep-filter-btn ep-res-filter-btn is-active" data-filter="all">Все</button>
+              <button type="button" class="ep-filter-btn ep-res-filter-btn" data-filter="matched">Совпали</button>
+              <button type="button" class="ep-filter-btn ep-res-filter-btn" data-filter="missing">Недостающие</button>
+              <button type="button" class="ep-filter-btn ep-res-filter-btn" data-filter="extra">Лишние</button>
+              <button type="button" class="ep-filter-btn ep-res-filter-btn" data-filter="cert_issues">Срок ЭП</button>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <div class="input-group input-group-sm" style="width: 220px;">
